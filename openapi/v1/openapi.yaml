@@ -1,0 +1,160 @@
+openapi: 3.1.0
+info:
+  title: estate-dashboard API
+  version: 1.0.0
+  description: >-
+    The contract the Go server (ogen) and the Vue client (@hey-api/openapi-ts) are both generated
+    from. Change this document first; `task gen` regenerates both sides and `task gen:check` fails
+    when either is stale.
+  contact:
+    name: Joris Jonkers
+    url: https://github.com/JorisJonkers-dev
+  license:
+    name: Proprietary
+    url: https://github.com/JorisJonkers-dev/estate-dashboard/blob/main/LICENSE
+servers:
+  - url: https://estate.jorisjonkers.dev
+    description: Production. The SPA and the API share one origin.
+    x-internal: false
+security:
+  - forwardAuth: []
+tags:
+  - name: alerts
+    description: What the dashboard itself recorded about alerts.
+paths:
+  /api/v1/alerts/history:
+    get:
+      operationId: listAlertHistory
+      summary: List the states alerts were seen in, newest first
+      description: >-
+        Returns at most `limit` events, newest first. An event is one state of one firing of an
+        alert: it fired, or it resolved. Alertmanager forgets a resolved alert; this is the
+        dashboard's own record.
+      tags: [alerts]
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: How many events to return.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: The events.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertHistory"
+        "400":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+components:
+  securitySchemes:
+    forwardAuth:
+      type: apiKey
+      in: header
+      name: X-User-Id
+      description: >-
+        Set by the platform's forward-auth at the edge, never by a client. The server refuses a
+        request without it; on a local run DEV_USER fills it in.
+  responses:
+    Problem:
+      description: An RFC 9457 problem.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    AlertEvent:
+      description: One state an alert was seen in.
+      type: object
+      additionalProperties: false
+      required: [id, fingerprint, name, status, startsAt, observedAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+          description: The event's id.
+          example: 42
+        fingerprint:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Alertmanager's fingerprint of the alert.
+          example: 9f2c1a7b3d4e5f60
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: The alert's name.
+          example: CollectorStopped
+        status:
+          type: string
+          enum: [firing, resolved]
+          description: The state the alert was seen in.
+          example: resolved
+        startsAt:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When this firing of the alert started.
+          example: "2026-10-03T07:00:00Z"
+        endsAt:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When the alert resolved. Present exactly when the status is resolved.
+          example: "2026-10-03T07:30:00Z"
+        observedAt:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When the dashboard saw the alert in this state.
+          example: "2026-10-03T07:30:20Z"
+    AlertHistory:
+      description: A page of events, newest first.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          description: The events.
+          items:
+            $ref: "#/components/schemas/AlertEvent"
+    Problem:
+      description: An RFC 9457 problem detail.
+      type: object
+      additionalProperties: false
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          maxLength: 256
+          description: A URI naming the problem type.
+          example: about:blank
+        title:
+          type: string
+          maxLength: 256
+          description: A short summary of the problem type.
+          example: Bad request
+        status:
+          type: integer
+          format: int32
+          minimum: 100
+          maximum: 599
+          description: The HTTP status code.
+          example: 400
+        detail:
+          type: string
+          maxLength: 1024
+          description: What went wrong in this occurrence.
+          example: The limit is out of range.
