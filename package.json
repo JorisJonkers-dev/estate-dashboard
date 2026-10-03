@@ -1,0 +1,8 @@
+{
+  "name": "estate-dashboard",
+  "private": true,
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=24"
+  }
+}

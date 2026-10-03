@@ -1,0 +1,55 @@
+# deploy-kit Project Intent for the estate's admin dashboard: one Process serving the API and the
+# embedded web app, reading the project's Postgres database. Shape follows spec/v1/examples/minimal
+# and spec/v1/examples/knowledge in JorisJonkers-dev/deploy-kit.
+
+apiVersion: intent.jorisjonkers.dev/v1
+kind: Project
+schemaVersion: 1.0.0
+
+project: estate-dashboard # the namespace derives: estate-dashboard-system; the database: estate-dashboard_db
+owner: joris
+
+applications:
+  - id: estate-dashboard
+    # The binary applies its goose migrations at startup (db/migrations), so it holds the owner
+    # role and startupBudget covers the migration.
+    migration: self
+
+    # No observability block: the dashboard serves no /metrics yet.
+    exposure:
+      - name: public
+        host: estate.jorisjonkers.dev # the host auth-api registered the dashboard's OIDC client for
+        # The API requires the identity the platform's forward-auth puts on every request
+        # (X-User-Id, openapi/v1/openapi.yaml), so the whole host sits behind it.
+        audience: authenticated
+        contentPolicy: strict
+        routes:
+          - { path: /, match: prefix, process: estate-dashboard, surface: http }
+
+    processes:
+      - name: estate-dashboard
+        lifecycle: application
+        image: estate-dashboard # an alias; the lock resolves digest, uid and gid
+        runtime: none # a static Go binary needs no Runtime Profile
+
+        provides:
+          http: 8080 # matches the default ADDR; above 1024, so no CAP_NET_BIND_SERVICE
+
+        # The edge derives the project's database and this Process's data credential.
+        dependsOn:
+          - application: platform-postgres
+            surface: postgres
+            credentials: { rotation: { tolerates: restart } } # pgxpool reads its URL once
+
+        placement:
+          memory: 96Mi
+          cpu: 50m
+
+        probes:
+          readiness: { path: /readyz, port: 8080 } # fails while Postgres does not answer
+          liveness: { path: /healthz, port: 8080 }
+
+        startupBudget: 30s # covers the migrations
+
+        # No volumes, so a continuous cutover is honourable.
+        cutover: continuous
