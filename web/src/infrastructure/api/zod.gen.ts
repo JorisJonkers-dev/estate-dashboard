@@ -16,6 +16,14 @@ export const zAlertEvent = z.object({
 });
 
 /**
+ * The signed-in admin.
+ */
+export const zSession = z.object({
+    subject: z.string().min(1).max(255),
+    name: z.string().min(1).max(255)
+});
+
+/**
  * A page of events, newest first.
  */
 export const zAlertHistory = z.object({
@@ -31,6 +39,11 @@ export const zProblem = z.object({
     status: z.int().gte(100).lte(599),
     detail: z.string().max(1024).optional()
 });
+
+/**
+ * The signed-in admin.
+ */
+export const zGetSessionResponse = zSession;
 
 export const zListAlertHistoryQuery = z.object({
     limit: z.int().gte(1).lte(100).optional().default(50)

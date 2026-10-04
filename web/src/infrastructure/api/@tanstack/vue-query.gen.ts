@@ -3,8 +3,8 @@
 import { queryOptions } from '@tanstack/vue-query';
 
 import { client } from '../client.gen';
-import { listAlertHistory, type Options } from '../sdk.gen';
-import type { ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse } from '../types.gen';
+import { getSession, listAlertHistory, type Options } from '../sdk.gen';
+import type { GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -38,6 +38,26 @@ const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions
     }
     return [params];
 };
+
+export const getSessionQueryKey = (options?: Options<GetSessionData>) => createQueryKey('getSession', options);
+
+/**
+ * Say who is signed in
+ *
+ * Returns the admin the session cookie belongs to. A request without a session, or with one auth no longer stands behind, gets a 401: the web app then shows the sign-in page.
+ */
+export const getSessionOptions = (options?: Options<GetSessionData>) => queryOptions<GetSessionResponse, GetSessionError, GetSessionResponse, ReturnType<typeof getSessionQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getSession({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getSessionQueryKey(options)
+});
 
 export const listAlertHistoryQueryKey = (options?: Options<ListAlertHistoryData>) => createQueryKey('listAlertHistory', options);
 

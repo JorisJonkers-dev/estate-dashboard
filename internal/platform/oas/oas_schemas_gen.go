@@ -163,31 +163,6 @@ func (s *AlertHistory) SetItems(val []AlertEvent) {
 
 func (*AlertHistory) listAlertHistoryRes() {}
 
-type ForwardAuth struct {
-	APIKey string
-	Roles  []string
-}
-
-// GetAPIKey returns the value of APIKey.
-func (s *ForwardAuth) GetAPIKey() string {
-	return s.APIKey
-}
-
-// GetRoles returns the value of Roles.
-func (s *ForwardAuth) GetRoles() []string {
-	return s.Roles
-}
-
-// SetAPIKey sets the value of APIKey.
-func (s *ForwardAuth) SetAPIKey(val string) {
-	s.APIKey = val
-}
-
-// SetRoles sets the value of Roles.
-func (s *ForwardAuth) SetRoles(val []string) {
-	s.Roles = val
-}
-
 // NewOptDateTime returns new OptDateTime with value set to v.
 func NewOptDateTime(v time.Time) OptDateTime {
 	return OptDateTime{
@@ -405,4 +380,61 @@ func (s *ProblemStatusCode) SetResponse(val Problem) {
 	s.Response = val
 }
 
+func (*ProblemStatusCode) getSessionRes()       {}
 func (*ProblemStatusCode) listAlertHistoryRes() {}
+
+// The signed-in admin.
+// Ref: #/components/schemas/Session
+type Session struct {
+	// The account's id in auth.
+	Subject string `json:"subject"`
+	// What to call the admin, which is the account's username.
+	Name string `json:"name"`
+}
+
+// GetSubject returns the value of Subject.
+func (s *Session) GetSubject() string {
+	return s.Subject
+}
+
+// GetName returns the value of Name.
+func (s *Session) GetName() string {
+	return s.Name
+}
+
+// SetSubject sets the value of Subject.
+func (s *Session) SetSubject(val string) {
+	s.Subject = val
+}
+
+// SetName sets the value of Name.
+func (s *Session) SetName(val string) {
+	s.Name = val
+}
+
+func (*Session) getSessionRes() {}
+
+type SessionCookie struct {
+	APIKey string
+	Roles  []string
+}
+
+// GetAPIKey returns the value of APIKey.
+func (s *SessionCookie) GetAPIKey() string {
+	return s.APIKey
+}
+
+// GetRoles returns the value of Roles.
+func (s *SessionCookie) GetRoles() []string {
+	return s.Roles
+}
+
+// SetAPIKey sets the value of APIKey.
+func (s *SessionCookie) SetAPIKey(val string) {
+	s.APIKey = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *SessionCookie) SetRoles(val []string) {
+	s.Roles = val
+}

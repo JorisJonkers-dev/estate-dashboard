@@ -57,6 +57,7 @@ func TestTheMigratedSchemaHoldsTheDashboardsState(t *testing.T) {
 		"a session with no subject":            {`INSERT INTO sessions (subject, refresh_token_sealed, expires_at) VALUES ('', '\x01', now() + interval '1 hour')`, check},
 		"a session with nothing to renew with": {`INSERT INTO sessions (subject, refresh_token_sealed, expires_at) VALUES ('joris', '', now() + interval '1 hour')`, check},
 		"a session with no end":                {`INSERT INTO sessions (subject, refresh_token_sealed) VALUES ('joris', '\x01')`, notNull},
+		"a session with an endless name":       {`INSERT INTO sessions (subject, name, refresh_token_sealed, expires_at) VALUES ('joris', repeat('n', 256), '\x01', now() + interval '1 hour')`, check},
 		"an alert in a state that is not one":  {`INSERT INTO alert_history (fingerprint, name, status, starts_at) VALUES ('a', 'A', 'pending', now())`, check},
 		"a firing alert with an end":           {`INSERT INTO alert_history (fingerprint, name, status, starts_at, ends_at) VALUES ('a', 'A', 'firing', now(), now())`, check},
 		"a resolved alert with no end":         {`INSERT INTO alert_history (fingerprint, name, status, starts_at) VALUES ('a', 'A', 'resolved', now())`, check},

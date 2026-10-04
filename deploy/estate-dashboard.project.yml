@@ -19,9 +19,10 @@ applications:
     exposure:
       - name: public
         host: estate.jorisjonkers.dev # the host auth-api registered the dashboard's OIDC client for
-        # The API requires the identity the platform's forward-auth puts on every request
-        # (X-User-Id, openapi/v1/openapi.yaml), so the whole host sits behind it.
-        audience: authenticated
+        # The dashboard signs admins in itself, as an OIDC client of auth, and refuses every
+        # request without a live admin session (openapi/v1/openapi.yaml). Its sign-in page has to
+        # be reachable by a browser nobody is signed in on, so the edge puts nothing in front.
+        audience: anonymous
         contentPolicy: strict
         routes:
           - { path: /, match: prefix, process: estate-dashboard, surface: http }
@@ -40,6 +41,19 @@ applications:
           - application: platform-postgres
             surface: postgres
             credentials: { rotation: { tolerates: restart } } # pgxpool reads its URL once
+          # Signing in and every renewal call auth: discovery, its keys and its token endpoint.
+          - { application: auth, surface: http }
+
+        # What signing in needs and nobody else reads: the client secret auth registered for
+        # `estate-dashboard`, and the key the session cookie and the stored refresh tokens are
+        # sealed with. One document, because its reader set is this one Process. Both are read
+        # once, at startup (deploy/env/estate-dashboard/base.env).
+        secrets:
+          - path: secret/data/estate-dashboard-system/sign-in
+            keys: [oidc-client-secret, session-key]
+            access: read
+            delivery: env
+            rotation: { tolerates: restart }
 
         placement:
           memory: 96Mi

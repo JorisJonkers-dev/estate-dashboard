@@ -6,10 +6,23 @@ package queries
 
 import (
 	"context"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 type Querier interface {
+	// Every time in these queries is the caller's, never the database's: the service measures a
+	// session's age on its own clock, and a second clock that drifts from it would stretch that age.
+	CreateSession(ctx context.Context, arg CreateSessionParams) (uuid.UUID, error)
+	DeleteExpiredSessions(ctx context.Context, now time.Time) (int64, error)
+	DeleteSession(ctx context.Context, id uuid.UUID) ([]byte, error)
+	GetSession(ctx context.Context, arg GetSessionParams) (GetSessionRow, error)
 	ListAlertHistory(ctx context.Context, limit int32) ([]ListAlertHistoryRow, error)
+	// The row lock is what makes concurrent requests spend a rotating refresh token once.
+	LockSession(ctx context.Context, arg LockSessionParams) (LockSessionRow, error)
+	// renewed_at always moves, so a request that loaded the session before sees it was renewed.
+	RenewSession(ctx context.Context, arg RenewSessionParams) (RenewSessionRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

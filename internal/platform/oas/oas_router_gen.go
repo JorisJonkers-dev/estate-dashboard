@@ -10,12 +10,6 @@ import (
 	"github.com/ogen-go/ogen/uri"
 )
 
-var (
-	rn1AllowedHeaders = map[string]string{
-		"GET": "X-User-Id",
-	}
-)
-
 func (s *Server) cutPrefix(path string) (string, bool) {
 	prefix := s.cfg.Prefix
 	if prefix == "" {
@@ -54,29 +48,68 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/api/v1/alerts/history"
+		case '/': // Prefix: "/api/v1/"
 
-			if l := len("/api/v1/alerts/history"); len(elem) >= l && elem[0:l] == "/api/v1/alerts/history" {
+			if l := len("/api/v1/"); len(elem) >= l && elem[0:l] == "/api/v1/" {
 				elem = elem[l:]
 			} else {
 				break
 			}
 
 			if len(elem) == 0 {
-				// Leaf node.
-				switch r.Method {
-				case "GET":
-					s.handleListAlertHistoryRequest([0]string{}, elemIsEscaped, w, r)
-				default:
-					s.notAllowed(w, r, notAllowedParams{
-						allowedMethods: "GET",
-						allowedHeaders: rn1AllowedHeaders,
-						acceptPost:     "",
-						acceptPatch:    "",
-					})
+				break
+			}
+			switch elem[0] {
+			case 'a': // Prefix: "alerts/history"
+
+				if l := len("alerts/history"); len(elem) >= l && elem[0:l] == "alerts/history" {
+					elem = elem[l:]
+				} else {
+					break
 				}
 
-				return
+				if len(elem) == 0 {
+					// Leaf node.
+					switch r.Method {
+					case "GET":
+						s.handleListAlertHistoryRequest([0]string{}, elemIsEscaped, w, r)
+					default:
+						s.notAllowed(w, r, notAllowedParams{
+							allowedMethods: "GET",
+							allowedHeaders: nil,
+							acceptPost:     "",
+							acceptPatch:    "",
+						})
+					}
+
+					return
+				}
+
+			case 's': // Prefix: "session"
+
+				if l := len("session"); len(elem) >= l && elem[0:l] == "session" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					// Leaf node.
+					switch r.Method {
+					case "GET":
+						s.handleGetSessionRequest([0]string{}, elemIsEscaped, w, r)
+					default:
+						s.notAllowed(w, r, notAllowedParams{
+							allowedMethods: "GET",
+							allowedHeaders: nil,
+							acceptPost:     "",
+							acceptPatch:    "",
+						})
+					}
+
+					return
+				}
+
 			}
 
 		}
@@ -165,29 +198,68 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/api/v1/alerts/history"
+		case '/': // Prefix: "/api/v1/"
 
-			if l := len("/api/v1/alerts/history"); len(elem) >= l && elem[0:l] == "/api/v1/alerts/history" {
+			if l := len("/api/v1/"); len(elem) >= l && elem[0:l] == "/api/v1/" {
 				elem = elem[l:]
 			} else {
 				break
 			}
 
 			if len(elem) == 0 {
-				// Leaf node.
-				switch method {
-				case "GET":
-					r.name = ListAlertHistoryOperation
-					r.summary = "List the states alerts were seen in, newest first"
-					r.operationID = "listAlertHistory"
-					r.operationGroup = ""
-					r.pathPattern = "/api/v1/alerts/history"
-					r.args = args
-					r.count = 0
-					return r, true
-				default:
-					return
+				break
+			}
+			switch elem[0] {
+			case 'a': // Prefix: "alerts/history"
+
+				if l := len("alerts/history"); len(elem) >= l && elem[0:l] == "alerts/history" {
+					elem = elem[l:]
+				} else {
+					break
 				}
+
+				if len(elem) == 0 {
+					// Leaf node.
+					switch method {
+					case "GET":
+						r.name = ListAlertHistoryOperation
+						r.summary = "List the states alerts were seen in, newest first"
+						r.operationID = "listAlertHistory"
+						r.operationGroup = ""
+						r.pathPattern = "/api/v1/alerts/history"
+						r.args = args
+						r.count = 0
+						return r, true
+					default:
+						return
+					}
+				}
+
+			case 's': // Prefix: "session"
+
+				if l := len("session"); len(elem) >= l && elem[0:l] == "session" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					// Leaf node.
+					switch method {
+					case "GET":
+						r.name = GetSessionOperation
+						r.summary = "Say who is signed in"
+						r.operationID = "getSession"
+						r.operationGroup = ""
+						r.pathPattern = "/api/v1/session"
+						r.args = args
+						r.count = 0
+						return r, true
+					default:
+						return
+					}
+				}
+
 			}
 
 		}

@@ -13,6 +13,16 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// GetSession implements getSession operation.
+//
+// Returns the admin the session cookie belongs to. A request without a session, or with one auth no
+// longer stands behind, gets a 401: the web app then shows the sign-in page.
+//
+// GET /api/v1/session
+func (UnimplementedHandler) GetSession(ctx context.Context) (r GetSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListAlertHistory implements listAlertHistory operation.
 //
 // Returns at most `limit` events, newest first. An event is one state of one firing of an alert: it
