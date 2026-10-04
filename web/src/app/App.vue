@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
+
+const route = useRoute()
 </script>
 
 <template>
-  <main class="shell">
+  <RouterView v-if="route.meta.public" />
+  <main v-else class="shell">
     <RouterView />
   </main>
 </template>

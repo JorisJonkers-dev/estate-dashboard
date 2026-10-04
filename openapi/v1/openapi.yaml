@@ -17,11 +17,32 @@ servers:
     description: Production. The SPA and the API share one origin.
     x-internal: false
 security:
-  - forwardAuth: []
+  - sessionCookie: []
 tags:
+  - name: session
+    description: Who is signed in.
   - name: alerts
     description: What the dashboard itself recorded about alerts.
 paths:
+  /api/v1/session:
+    get:
+      operationId: getSession
+      summary: Say who is signed in
+      description: >-
+        Returns the admin the session cookie belongs to. A request without a session, or with one
+        auth no longer stands behind, gets a 401: the web app then shows the sign-in page.
+      tags: [session]
+      responses:
+        "200":
+          description: The signed-in admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/alerts/history:
     get:
       operationId: listAlertHistory
@@ -55,13 +76,14 @@ paths:
           $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
-    forwardAuth:
+    sessionCookie:
       type: apiKey
-      in: header
-      name: X-User-Id
+      in: cookie
+      name: __Host-estate_session
       description: >-
-        Set by the platform's forward-auth at the edge, never by a client. The server refuses a
-        request without it; on a local run DEV_USER fills it in.
+        The dashboard's own session, set when an admin signs in through auth at `/auth/login`. The
+        cookie holds a sealed session id and nothing else. The server refuses a request without a
+        live session of an account that holds the admin role; on a local run DEV_USER stands in.
   responses:
     Problem:
       description: An RFC 9457 problem.
@@ -118,6 +140,24 @@ components:
           maxLength: 64
           description: When the dashboard saw the alert in this state.
           example: "2026-10-03T07:30:20Z"
+    Session:
+      description: The signed-in admin.
+      type: object
+      additionalProperties: false
+      required: [subject, name]
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: The account's id in auth.
+          example: 3f6c2a1e-8b7d-4c5f-9a10-2b3c4d5e6f70
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: What to call the admin, which is the account's username.
+          example: joris
     AlertHistory:
       description: A page of events, newest first.
       type: object

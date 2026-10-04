@@ -8,6 +8,13 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// GetSession implements getSession operation.
+	//
+	// Returns the admin the session cookie belongs to. A request without a session, or with one auth no
+	// longer stands behind, gets a 401: the web app then shows the sign-in page.
+	//
+	// GET /api/v1/session
+	GetSession(ctx context.Context) (GetSessionRes, error)
 	// ListAlertHistory implements listAlertHistory operation.
 	//
 	// Returns at most `limit` events, newest first. An event is one state of one firing of an alert: it

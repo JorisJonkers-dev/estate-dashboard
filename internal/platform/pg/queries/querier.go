@@ -6,10 +6,20 @@ package queries
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 type Querier interface {
+	CreateSession(ctx context.Context, arg CreateSessionParams) (uuid.UUID, error)
+	DeleteExpiredSessions(ctx context.Context) (int64, error)
+	DeleteSession(ctx context.Context, id uuid.UUID) ([]byte, error)
+	GetSession(ctx context.Context, id uuid.UUID) (GetSessionRow, error)
 	ListAlertHistory(ctx context.Context, limit int32) ([]ListAlertHistoryRow, error)
+	// The row lock is what makes concurrent requests spend a rotating refresh token once.
+	LockSession(ctx context.Context, id uuid.UUID) (LockSessionRow, error)
+	// renewed_at always moves, so a request that loaded the session before sees it was renewed.
+	RenewSession(ctx context.Context, arg RenewSessionParams) (RenewSessionRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

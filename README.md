@@ -14,8 +14,8 @@ template's [`docs/blueprints/`](https://github.com/JorisJonkers-dev/template-go-
 
 | Ticket | State |
 |--------|-------|
-| Scaffold: contract, project file, database | this repository as it stands |
-| Sign in through auth | JorisJonkers-dev/estate-dashboard#2 |
+| Scaffold: contract, project file, database | done |
+| Sign in through auth | this repository as it stands |
 | Read the estate, the cluster and Alertmanager | JorisJonkers-dev/estate-dashboard#3 |
 | The screens, to the design | JorisJonkers-dev/estate-dashboard#4 |
 
@@ -30,16 +30,16 @@ template's [`docs/blueprints/`](https://github.com/JorisJonkers-dev/template-go-
 | `db/migrations/` | goose migrations, embedded and applied by the binary at startup; linted by squawk |
 | `db/queries/`, `internal/platform/pg/queries/` | SQL, and the Go sqlc generates from it |
 | `internal/alerts/` | The first bounded context: `domain` (pure), `app` (use cases), `adapters/persistence` and `adapters/web` |
-| `internal/platform/` | Postgres (`pg`, with `pgtest` for a migrated database per test), `httpapi` (assembles the ogen server), `httpx`, `webui` |
-| `internal/server/` | Probes, `/api/` to the API, everything else to the SPA, graceful drain |
-| `cmd/estate-dashboard/` | The composition root; reads `DATABASE_URL`, `ADDR` (default `:8080`) and `DEV_USER` |
+| `internal/platform/` | Postgres (`pg`, with `pgtest` for a migrated database per test, and the session store), `oidc` (sign-in through auth), `session` (the cookie and refresh-token seal), `httpapi` (assembles the ogen server and admits only an admin), `httpx`, `webui` |
+| `internal/server/` | Probes, `/api/` to the API, `/auth/` to sign-in, everything else to the SPA, graceful drain |
+| `cmd/estate-dashboard/` | The composition root; reads `DATABASE_URL`, `ADDR` (default `:8080`), the sign-in environment below, and `DEV_USER` |
 | `web/` | The Vue 3 SPA, and `embed.go`, which embeds its build (`web/dist`) in the binary |
 | `web/tests/e2e/` | Playwright with axe, on a desktop and a phone, against the built binary |
 | `mise.toml`, `Taskfile.yml` | The pinned toolchain, and every command: `task` lists them |
 | `Dockerfile` | Builds the web app, embeds it, ships a static binary on `distroless/static:nonroot` |
 | `.github/workflows/ci.yml` | One job, `Pipeline Complete`: `task check`, `task e2e`, `docker build` |
 | `.github/workflows/release.yml`, `release-please-config.json` | release-please, as in the rest of the estate |
-| `deploy/estate-dashboard.project.yml` | The dashboard's [deploy-kit](https://github.com/JorisJonkers-dev/deploy-kit) Project Intent: one Process, `estate.jorisjonkers.dev` behind forward-auth, a Postgres edge |
+| `deploy/estate-dashboard.project.yml` | The dashboard's [deploy-kit](https://github.com/JorisJonkers-dev/deploy-kit) Project Intent: one Process, `estate.jorisjonkers.dev`, a Postgres edge, an edge to auth and the sign-in secrets; `deploy/env/` is its environment |
 
 ## State
 
@@ -48,7 +48,7 @@ Estate repository, the cluster and Alertmanager are read where they are.
 
 | Table | Holds | First used by |
 |-------|-------|---------------|
-| `sessions` | a signed-in admin: the subject, the sealed token that renews the session, when it ends | JorisJonkers-dev/estate-dashboard#2 |
+| `sessions` | a signed-in admin: the subject, the name, the sealed token that renews the session, when it ends | signing in |
 | `alert_history` | every state an alert was seen in, one row when it fires and one when it resolves | `GET /api/v1/alerts/history`; written from JorisJonkers-dev/estate-dashboard#3 |
 | `acknowledgements` | who is handling one firing of an alert | JorisJonkers-dev/estate-dashboard#3 |
 | `silences` | a mirror of the silences the dashboard created in Alertmanager | JorisJonkers-dev/estate-dashboard#3 |
@@ -78,6 +78,21 @@ when committed generated code is stale, and CI runs it.
 (`.testcoverage.yml`), measured across packages and excluding generated code. Web: 90% on lines,
 branches, functions and statements (`web/vite.config.ts`). Raise them as the suite grows.
 
-**Identity.** The API requires an `X-User-Id` header, which the platform's forward-auth sets at the
-edge (`audience: authenticated` in the project file). On a local run nothing sits in front of the
-binary, so `DEV_USER` fills the header in. Never set `DEV_USER` in a deployment.
+**Signing in.** The dashboard is an OIDC client of auth (authorization code with PKCE, state and
+nonce) and keeps a session of its own: the cookie holds a sealed session id and nothing else, and
+the refresh token stays in the `sessions` table, sealed. Only an account holding `ROLE_ADMIN` gets
+a session; anyone else lands on the Not-an-admin page. Every 15 seconds of use the session is
+renewed through auth's token endpoint, which re-reads the account's roles, so a role withdrawn or
+an account disabled in auth ends the session here. While auth cannot be reached a session stays
+readable for five minutes. Signing out ends the dashboard's session only.
+
+| Variable | What it is |
+|----------|------------|
+| `OIDC_ISSUER` | auth's address; discovery is read from it at startup, so the dashboard does not start while auth is away |
+| `OIDC_CLIENT_ID` | the client auth registered; defaults to `estate-dashboard` |
+| `OIDC_CLIENT_SECRET` | that client's secret |
+| `OIDC_REDIRECT_URL` | `https://<host>/auth/callback`, as registered in auth |
+| `SESSION_KEY` | at least 32 characters; seals the cookies and the stored refresh tokens. Changing it signs everyone out |
+
+On a local run `DEV_USER` replaces all five: every request is that admin and nothing asks auth.
+Never set `DEV_USER` in a deployment.

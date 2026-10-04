@@ -13,10 +13,11 @@ import (
 
 // SecurityHandler is handler for security parameters.
 type SecurityHandler interface {
-	// HandleForwardAuth handles forwardAuth security.
-	// Set by the platform's forward-auth at the edge, never by a client. The server refuses a request
-	// without it; on a local run DEV_USER fills it in.
-	HandleForwardAuth(ctx context.Context, operationName OperationName, t ForwardAuth) (context.Context, error)
+	// HandleSessionCookie handles sessionCookie security.
+	// The dashboard's own session, set when an admin signs in through auth at `/auth/login`. The cookie
+	// holds a sealed session id and nothing else. The server refuses a request without a live session of
+	// an account that holds the admin role; on a local run DEV_USER stands in.
+	HandleSessionCookie(ctx context.Context, operationName OperationName, t SessionCookie) (context.Context, error)
 }
 
 func findAuthorization(h http.Header, prefix string) (string, bool) {
@@ -34,23 +35,24 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 	return "", false
 }
 
-// operationRolesForwardAuth is a private map storing roles per operation.
-var operationRolesForwardAuth = map[string][]string{
+// operationRolesSessionCookie is a private map storing roles per operation.
+var operationRolesSessionCookie = map[string][]string{
+	GetSessionOperation:       []string{},
 	ListAlertHistoryOperation: []string{},
 }
 
-// GetRolesForForwardAuth returns the required roles for the given operation.
+// GetRolesForSessionCookie returns the required roles for the given operation.
 //
 // This is useful for authorization scenarios where you need to know which roles
 // are required for an operation.
 //
 // Example:
 //
-//	requiredRoles := GetRolesForForwardAuth(AddPetOperation)
+//	requiredRoles := GetRolesForSessionCookie(AddPetOperation)
 //
 // Returns nil if the operation has no role requirements or if the operation is unknown.
-func GetRolesForForwardAuth(operation string) []string {
-	roles, ok := operationRolesForwardAuth[operation]
+func GetRolesForSessionCookie(operation string) []string {
+	roles, ok := operationRolesSessionCookie[operation]
 	if !ok {
 		return nil
 	}
@@ -60,16 +62,21 @@ func GetRolesForForwardAuth(operation string) []string {
 	return result
 }
 
-func (s *Server) securityForwardAuth(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
-	var t ForwardAuth
-	const parameterName = "X-User-Id"
-	value := req.Header.Get(parameterName)
-	if value == "" {
+func (s *Server) securitySessionCookie(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
+	var t SessionCookie
+	const parameterName = "__Host-estate_session"
+	var value string
+	switch cookie, err := req.Cookie(parameterName); {
+	case err == nil: // if NO error
+		value = cookie.Value
+	case errors.Is(err, http.ErrNoCookie):
 		return ctx, false, nil
+	default:
+		return nil, false, errors.Wrap(err, "get cookie value")
 	}
 	t.APIKey = value
-	t.Roles = operationRolesForwardAuth[operationName]
-	rctx, err := s.sec.HandleForwardAuth(ctx, operationName, t)
+	t.Roles = operationRolesSessionCookie[operationName]
+	rctx, err := s.sec.HandleSessionCookie(ctx, operationName, t)
 	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
 		return nil, false, nil
 	} else if err != nil {
@@ -80,17 +87,21 @@ func (s *Server) securityForwardAuth(ctx context.Context, operationName Operatio
 
 // SecuritySource is provider of security values (tokens, passwords, etc.).
 type SecuritySource interface {
-	// ForwardAuth provides forwardAuth security value.
-	// Set by the platform's forward-auth at the edge, never by a client. The server refuses a request
-	// without it; on a local run DEV_USER fills it in.
-	ForwardAuth(ctx context.Context, operationName OperationName) (ForwardAuth, error)
+	// SessionCookie provides sessionCookie security value.
+	// The dashboard's own session, set when an admin signs in through auth at `/auth/login`. The cookie
+	// holds a sealed session id and nothing else. The server refuses a request without a live session of
+	// an account that holds the admin role; on a local run DEV_USER stands in.
+	SessionCookie(ctx context.Context, operationName OperationName) (SessionCookie, error)
 }
 
-func (s *Client) securityForwardAuth(ctx context.Context, operationName OperationName, req *http.Request) error {
-	t, err := s.sec.ForwardAuth(ctx, operationName)
+func (s *Client) securitySessionCookie(ctx context.Context, operationName OperationName, req *http.Request) error {
+	t, err := s.sec.SessionCookie(ctx, operationName)
 	if err != nil {
-		return errors.Wrap(err, "security source \"ForwardAuth\"")
+		return errors.Wrap(err, "security source \"SessionCookie\"")
 	}
-	req.Header.Set("X-User-Id", t.APIKey)
+	req.AddCookie(&http.Cookie{
+		Name:  "__Host-estate_session",
+		Value: t.APIKey,
+	})
 	return nil
 }

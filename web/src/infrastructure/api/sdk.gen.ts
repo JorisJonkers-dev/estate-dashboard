@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses } from './types.gen';
-import { zListAlertHistoryQuery, zListAlertHistoryResponse } from './zod.gen';
+import type { GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses } from './types.gen';
+import { zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -22,6 +22,27 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
+ * Say who is signed in
+ *
+ * Returns the admin the session cookie belongs to. A request without a session, or with one auth no longer stands behind, gets a 401: the web app then shows the sign-in page.
+ */
+export const getSession = <ThrowOnError extends boolean = false>(options?: Options<GetSessionData, ThrowOnError>): RequestResult<GetSessionResponses, GetSessionErrors, ThrowOnError> => (options?.client ?? client).get<GetSessionResponses, GetSessionErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zGetSessionResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/session',
+    ...options
+});
+
+/**
  * List the states alerts were seen in, newest first
  *
  * Returns at most `limit` events, newest first. An event is one state of one firing of an alert: it fired, or it resolved. Alertmanager forgets a resolved alert; this is the dashboard's own record.
@@ -33,7 +54,11 @@ export const listAlertHistory = <ThrowOnError extends boolean = false>(options?:
         query: zListAlertHistoryQuery.optional()
     }).parseAsync(data),
     responseValidator: async (data) => await zListAlertHistoryResponse.parseAsync(data),
-    security: [{ name: 'X-User-Id', type: 'apiKey' }],
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
     url: '/api/v1/alerts/history',
     ...options
 });

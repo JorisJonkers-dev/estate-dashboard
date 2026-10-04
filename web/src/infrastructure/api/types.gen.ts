@@ -39,6 +39,20 @@ export type AlertEvent = {
 };
 
 /**
+ * The signed-in admin.
+ */
+export type Session = {
+    /**
+     * The account's id in auth.
+     */
+    subject: string;
+    /**
+     * What to call the admin, which is the account's username.
+     */
+    name: string;
+};
+
+/**
  * A page of events, newest first.
  */
 export type AlertHistory = {
@@ -69,6 +83,35 @@ export type Problem = {
      */
     detail?: string;
 };
+
+export type GetSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/session';
+};
+
+export type GetSessionErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type GetSessionError = GetSessionErrors[keyof GetSessionErrors];
+
+export type GetSessionResponses = {
+    /**
+     * The signed-in admin.
+     */
+    200: Session;
+};
+
+export type GetSessionResponse = GetSessionResponses[keyof GetSessionResponses];
 
 export type ListAlertHistoryData = {
     body?: never;

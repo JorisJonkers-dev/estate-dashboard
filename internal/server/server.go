@@ -1,5 +1,5 @@
-// Package server is the HTTP surface of the service: the probes, the API under /api, the web app
-// everywhere else, and a graceful drain when its context is cancelled.
+// Package server is the HTTP surface of the service: the probes, the API under /api, sign-in under
+// /auth, the web app everywhere else, and a graceful drain when its context is cancelled.
 package server
 
 import (
@@ -25,6 +25,8 @@ const (
 type Routes struct {
 	// API serves every path under /api/.
 	API http.Handler
+	// Auth serves every path under /auth/: signing in through auth, and out.
+	Auth http.Handler
 	// Web serves every other path: the single-page app.
 	Web http.Handler
 	// Ready reports whether the service's dependencies answer; /readyz fails while it errors.
@@ -66,6 +68,7 @@ func (s *Server) Handler() http.Handler {
 		plain(w, http.StatusOK, "ready")
 	})
 	mux.Handle("/api/", s.routes.API)
+	mux.Handle("/auth/", s.routes.Auth)
 	mux.Handle("/", s.routes.Web)
 	return httpx.SecurityHeaders(mux)
 }

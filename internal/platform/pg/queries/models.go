@@ -36,6 +36,7 @@ type Session struct {
 	CreatedAt          time.Time
 	RenewedAt          time.Time
 	ExpiresAt          time.Time
+	Name               string
 }
 
 type Silence struct {
