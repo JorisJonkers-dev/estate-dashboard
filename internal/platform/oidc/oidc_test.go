@@ -550,7 +550,7 @@ func TestConcurrentRequestsSpendARefreshTokenOnce(t *testing.T) {
 	}
 }
 
-func TestTheSessionCacheForgetsWhatItNoLongerNeeds(t *testing.T) {
+func TestASessionIsReadFromTheStoreOnEveryRequest(t *testing.T) {
 	f := newFakeIssuer(t)
 	f.next = admin()
 	a, mux, store, clk := newAuth(t, f)
@@ -559,27 +559,51 @@ func TestTheSessionCacheForgetsWhatItNoLongerNeeds(t *testing.T) {
 	if _, ok := a.Admin(context.Background(), sess.Value); !ok {
 		t.Fatal("signed in")
 	}
-	// Inside cacheFor the store is not asked again; after it, it is.
-	delete(store.sessions, id)
-	clk.add(cacheFor - time.Millisecond)
-	if _, ok := a.Admin(context.Background(), sess.Value); !ok {
-		t.Fatal("a session read a moment ago is served from the cache")
+	// Ended behind this process's back, as another replica or a sweep would: the next request sees it.
+	if _, err := store.SignOut(context.Background(), id); err != nil {
+		t.Fatal(err)
 	}
-	clk.add(time.Millisecond)
 	if _, ok := a.Admin(context.Background(), sess.Value); ok {
-		t.Fatal("the cache holds a session for cacheFor, no longer")
+		t.Fatal("a session the store no longer holds is admitted from memory")
 	}
 
-	for i := range cacheMax {
-		a.remember(Session{ID: fmt.Sprint(i)})
+	// The same while auth is away and the session is waiting on it.
+	again := signIn(t, f, mux)
+	f.set(func(f *fakeIssuer) { f.down = true })
+	clk.add(FreshFor)
+	if _, ok := a.Admin(context.Background(), again.Value); !ok || !a.waiting(a.sessionID(again.Value)) {
+		t.Fatal("inside the grace period, waiting on auth")
 	}
-	clk.add(cacheFor)
-	a.remember(Session{ID: "fresh"})
-	if len(a.cache) != 1 {
-		t.Fatalf("a full cache drops every stale entry, kept %d", len(a.cache))
+	if _, err := store.SignOut(context.Background(), a.sessionID(again.Value)); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := a.Admin(context.Background(), again.Value); ok {
+		t.Fatal("a wait on auth admits a session the store no longer holds")
+	}
+}
+
+func TestRolesStampedInTheFutureAreReadAgain(t *testing.T) {
+	f := newFakeIssuer(t)
+	f.next = admin()
+	a, mux, _, clk := newAuth(t, f)
+	sess := signIn(t, f, mux)
+	// The clock steps back an hour: the roles now carry a time that has not come yet.
+	clk.add(-time.Hour)
+	if _, ok := a.Admin(context.Background(), sess.Value); !ok || f.refreshes != 1 {
+		t.Fatalf("roles from the future are re-read, not trusted for an hour: %d renewals", f.refreshes)
 	}
 
-	for i := range cacheMax {
+	clk.add(-time.Hour)
+	f.set(func(f *fakeIssuer) { f.down = true })
+	if _, ok := a.Admin(context.Background(), sess.Value); ok {
+		t.Fatal("and with auth away there is no grace to measure them by")
+	}
+}
+
+func TestTheListOfWaitsOnAuthIsBounded(t *testing.T) {
+	f := newFakeIssuer(t)
+	a, _, _, clk := newAuth(t, f)
+	for i := range waitsMax {
 		a.wait(fmt.Sprint(i))
 	}
 	clk.add(retryAfter)
@@ -639,7 +663,6 @@ func TestAStoreThatFailsSignsNobodyIn(t *testing.T) {
 	a, mux, _, _ := newAuth(t, f)
 	sess := signIn(t, f, mux)
 	a.store = brokenStore{}
-	a.forget(a.sessionID(sess.Value))
 	if _, ok := a.Admin(context.Background(), sess.Value); ok {
 		t.Fatal("a session the store cannot load is not signed in")
 	}

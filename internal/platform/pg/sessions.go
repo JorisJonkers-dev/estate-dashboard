@@ -18,7 +18,9 @@ import (
 const sealedAs = "refresh-token"
 
 // Sessions is the dashboard's server-side sessions, in the sessions table. A refresh token is
-// stored sealed: a copy of the table is not a set of tokens auth accepts.
+// stored sealed: a copy of the table is not a set of tokens auth accepts. Every time it writes
+// or compares is its caller's clock, never the database's, so a session's age is measured on the
+// one clock that also reads it.
 type Sessions struct {
 	store *Store
 	codec *session.Codec
@@ -27,9 +29,9 @@ type Sessions struct {
 
 var _ oidc.Store = (*Sessions)(nil)
 
-// Sessions returns the session store, sealing refresh tokens with codec.
-func (s *Store) Sessions(codec *session.Codec) *Sessions {
-	return &Sessions{store: s, codec: codec, now: time.Now}
+// Sessions returns the session store, sealing refresh tokens with codec and telling the time by now.
+func (s *Store) Sessions(codec *session.Codec, now func() time.Time) *Sessions {
+	return &Sessions{store: s, codec: codec, now: now}
 }
 
 // SignIn implements oidc.Store.
@@ -39,7 +41,7 @@ func (s *Sessions) SignIn(ctx context.Context, id oidc.Identity, refreshToken st
 		return "", err
 	}
 	sid, err := s.store.Queries().CreateSession(ctx, queries.CreateSessionParams{
-		Subject: id.Sub, Name: id.Name, RefreshTokenSealed: sealed, ExpiresAt: expires,
+		Subject: id.Sub, Name: id.Name, RefreshTokenSealed: sealed, Now: s.now(), ExpiresAt: expires,
 	})
 	if err != nil {
 		return "", fmt.Errorf("pg: create session: %w", err)
@@ -53,7 +55,7 @@ func (s *Sessions) Load(ctx context.Context, sessionID string) (oidc.Session, er
 	if err != nil {
 		return oidc.Session{}, oidc.ErrNoSession
 	}
-	row, err := s.store.Queries().GetSession(ctx, id)
+	row, err := s.store.Queries().GetSession(ctx, queries.GetSessionParams{ID: id, Now: s.now()})
 	if err != nil {
 		return oidc.Session{}, gone(err, "load session")
 	}
@@ -77,7 +79,7 @@ func (s *Sessions) Refresh(ctx context.Context, sessionID string, seen time.Time
 	defer func() { _ = tx.Rollback(ctx) }() // a no-op once committed
 	q := queries.New(tx)
 
-	row, err := q.LockSession(ctx, id)
+	row, err := q.LockSession(ctx, queries.LockSessionParams{ID: id, Now: s.now()})
 	if err != nil {
 		return oidc.Session{}, gone(err, "lock session")
 	}
@@ -104,7 +106,7 @@ func (s *Sessions) Refresh(ctx context.Context, sessionID string, seen time.Time
 	if err != nil {
 		return oidc.Session{}, err
 	}
-	renewed, err := q.RenewSession(ctx, queries.RenewSessionParams{ID: id, Name: who.Name, RefreshTokenSealed: sealed})
+	renewed, err := q.RenewSession(ctx, queries.RenewSessionParams{ID: id, Name: who.Name, RefreshTokenSealed: sealed, Now: s.now()})
 	if err != nil {
 		return oidc.Session{}, fmt.Errorf("pg: renew session: %w", err)
 	}
@@ -145,7 +147,7 @@ func (s *Sessions) SignOut(ctx context.Context, sessionID string) (string, error
 
 // Sweep deletes every session past its end, and returns how many.
 func (s *Sessions) Sweep(ctx context.Context) (int64, error) {
-	return s.store.Queries().DeleteExpiredSessions(ctx)
+	return s.store.Queries().DeleteExpiredSessions(ctx, s.now())
 }
 
 // seal seals a refresh token until its session ends.

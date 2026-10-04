@@ -13,8 +13,9 @@ import (
 )
 
 const createSession = `-- name: CreateSession :one
-INSERT INTO sessions (subject, name, refresh_token_sealed, expires_at)
-VALUES ($1, $2, $3, $4)
+
+INSERT INTO sessions (subject, name, refresh_token_sealed, created_at, renewed_at, expires_at)
+VALUES ($1, $2, $3, $4, $4, $5)
 RETURNING id
 `
 
@@ -22,14 +23,18 @@ type CreateSessionParams struct {
 	Subject            string
 	Name               string
 	RefreshTokenSealed []byte
+	Now                time.Time
 	ExpiresAt          time.Time
 }
 
+// Every time in these queries is the caller's, never the database's: the service measures a
+// session's age on its own clock, and a second clock that drifts from it would stretch that age.
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, createSession,
 		arg.Subject,
 		arg.Name,
 		arg.RefreshTokenSealed,
+		arg.Now,
 		arg.ExpiresAt,
 	)
 	var id uuid.UUID
@@ -39,11 +44,11 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (u
 
 const deleteExpiredSessions = `-- name: DeleteExpiredSessions :execrows
 DELETE FROM sessions
-WHERE expires_at <= now()
+WHERE expires_at <= $1
 `
 
-func (q *Queries) DeleteExpiredSessions(ctx context.Context) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteExpiredSessions)
+func (q *Queries) DeleteExpiredSessions(ctx context.Context, now time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredSessions, now)
 	if err != nil {
 		return 0, err
 	}
@@ -66,8 +71,13 @@ func (q *Queries) DeleteSession(ctx context.Context, id uuid.UUID) ([]byte, erro
 const getSession = `-- name: GetSession :one
 SELECT id, subject, name, created_at, renewed_at, expires_at
 FROM sessions
-WHERE id = $1 AND expires_at > now()
+WHERE id = $1 AND expires_at > $2
 `
+
+type GetSessionParams struct {
+	ID  uuid.UUID
+	Now time.Time
+}
 
 type GetSessionRow struct {
 	ID        uuid.UUID
@@ -78,8 +88,8 @@ type GetSessionRow struct {
 	ExpiresAt time.Time
 }
 
-func (q *Queries) GetSession(ctx context.Context, id uuid.UUID) (GetSessionRow, error) {
-	row := q.db.QueryRow(ctx, getSession, id)
+func (q *Queries) GetSession(ctx context.Context, arg GetSessionParams) (GetSessionRow, error) {
+	row := q.db.QueryRow(ctx, getSession, arg.ID, arg.Now)
 	var i GetSessionRow
 	err := row.Scan(
 		&i.ID,
@@ -95,9 +105,14 @@ func (q *Queries) GetSession(ctx context.Context, id uuid.UUID) (GetSessionRow, 
 const lockSession = `-- name: LockSession :one
 SELECT id, subject, name, refresh_token_sealed, created_at, renewed_at, expires_at
 FROM sessions
-WHERE id = $1 AND expires_at > now()
+WHERE id = $1 AND expires_at > $2
 FOR UPDATE
 `
+
+type LockSessionParams struct {
+	ID  uuid.UUID
+	Now time.Time
+}
 
 type LockSessionRow struct {
 	ID                 uuid.UUID
@@ -110,8 +125,8 @@ type LockSessionRow struct {
 }
 
 // The row lock is what makes concurrent requests spend a rotating refresh token once.
-func (q *Queries) LockSession(ctx context.Context, id uuid.UUID) (LockSessionRow, error) {
-	row := q.db.QueryRow(ctx, lockSession, id)
+func (q *Queries) LockSession(ctx context.Context, arg LockSessionParams) (LockSessionRow, error) {
+	row := q.db.QueryRow(ctx, lockSession, arg.ID, arg.Now)
 	var i LockSessionRow
 	err := row.Scan(
 		&i.ID,
@@ -127,17 +142,18 @@ func (q *Queries) LockSession(ctx context.Context, id uuid.UUID) (LockSessionRow
 
 const renewSession = `-- name: RenewSession :one
 UPDATE sessions
-SET name = $2,
-    refresh_token_sealed = $3,
-    renewed_at = greatest(clock_timestamp(), renewed_at + interval '1 microsecond')
-WHERE id = $1
+SET name = $1,
+    refresh_token_sealed = $2,
+    renewed_at = greatest($3::timestamptz, renewed_at + interval '1 microsecond')
+WHERE id = $4
 RETURNING id, subject, name, created_at, renewed_at, expires_at
 `
 
 type RenewSessionParams struct {
-	ID                 uuid.UUID
 	Name               string
 	RefreshTokenSealed []byte
+	Now                time.Time
+	ID                 uuid.UUID
 }
 
 type RenewSessionRow struct {
@@ -151,7 +167,12 @@ type RenewSessionRow struct {
 
 // renewed_at always moves, so a request that loaded the session before sees it was renewed.
 func (q *Queries) RenewSession(ctx context.Context, arg RenewSessionParams) (RenewSessionRow, error) {
-	row := q.db.QueryRow(ctx, renewSession, arg.ID, arg.Name, arg.RefreshTokenSealed)
+	row := q.db.QueryRow(ctx, renewSession,
+		arg.Name,
+		arg.RefreshTokenSealed,
+		arg.Now,
+		arg.ID,
+	)
 	var i RenewSessionRow
 	err := row.Scan(
 		&i.ID,

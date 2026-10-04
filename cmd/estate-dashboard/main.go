@@ -99,7 +99,8 @@ func (s signIn) gate(ctx context.Context, logger *slog.Logger, store *pg.Store) 
 		dev := oidc.DevBypass{Sub: s.devUser}
 		return dev, dev.Session, nil
 	}
-	sessions := store.Sessions(s.codec)
+	// One clock: oidc.Auth reads time.Now too, and a session's age is the difference of the two.
+	sessions := store.Sessions(s.codec, time.Now)
 	auth, err := oidc.New(ctx, s.client, s.codec, sessions, logger)
 	if err != nil {
 		return nil, nil, err

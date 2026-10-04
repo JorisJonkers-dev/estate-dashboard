@@ -42,8 +42,8 @@ const (
 	// retryAfter is how long a session waits after auth failed to answer before asking again, so
 	// an outage of auth costs one slow request in a while, not every request.
 	retryAfter = 5 * time.Second
-	cacheFor   = 3 * time.Second
-	cacheMax   = 1024
+	// waitsMax bounds the sessions remembered as waiting on auth.
+	waitsMax = 1024
 )
 
 // AdminRole is auth's administrator role: the one role the dashboard admits.
@@ -99,7 +99,8 @@ type Session struct {
 // RefreshFunc trades a refresh token for a new one and the account's current Identity.
 type RefreshFunc func(ctx context.Context, refreshToken string) (newRefreshToken string, id Identity, err error)
 
-// Store keeps the server-side sessions.
+// Store keeps the server-side sessions. It stamps them with the clock Auth reads, never with its
+// own: a session's age is then one clock's reading, and two clocks that drift cannot stretch it.
 type Store interface {
 	SignIn(ctx context.Context, id Identity, refreshToken string, expires time.Time) (sessionID string, err error)
 	Load(ctx context.Context, sessionID string) (Session, error)
@@ -145,15 +146,10 @@ type Auth struct {
 	log        *slog.Logger
 	now        func() time.Time
 
+	// retry is when a session auth failed to answer for may ask again. It is the only state kept
+	// outside the store, and it admits nobody: a session is read from the store on every request.
 	mu    sync.Mutex
-	cache map[string]cached
-	// retry is when a session auth failed to answer for may ask again.
 	retry map[string]time.Time
-}
-
-type cached struct {
-	s  Session
-	at time.Time
 }
 
 // New discovers the issuer and prepares the client.
@@ -180,7 +176,6 @@ func New(ctx context.Context, cfg Config, codec *session.Codec, store Store, log
 		http:       &http.Client{Timeout: 10 * time.Second},
 		log:        log,
 		now:        time.Now,
-		cache:      map[string]cached{},
 		retry:      map[string]time.Time{},
 	}, nil
 }
@@ -328,37 +323,9 @@ func (a *Auth) sessionID(cookie string) string {
 	return id
 }
 
-func (a *Auth) load(ctx context.Context, id string) (Session, error) {
+// answered records that nothing waits on auth for this session any more.
+func (a *Auth) answered(id string) {
 	a.mu.Lock()
-	if c, ok := a.cache[id]; ok && a.now().Sub(c.at) < cacheFor {
-		a.mu.Unlock()
-		return c.s, nil
-	}
-	a.mu.Unlock()
-	s, err := a.store.Load(ctx, id)
-	if err != nil {
-		return Session{}, err
-	}
-	a.remember(s)
-	return s, nil
-}
-
-func (a *Auth) remember(s Session) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if len(a.cache) >= cacheMax {
-		for k, c := range a.cache {
-			if a.now().Sub(c.at) >= cacheFor {
-				delete(a.cache, k)
-			}
-		}
-	}
-	a.cache[s.ID] = cached{s: s, at: a.now()}
-}
-
-func (a *Auth) forget(id string) {
-	a.mu.Lock()
-	delete(a.cache, id)
 	delete(a.retry, id)
 	a.mu.Unlock()
 }
@@ -374,7 +341,7 @@ func (a *Auth) waiting(id string) bool {
 func (a *Auth) wait(id string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if len(a.retry) >= cacheMax {
+	if len(a.retry) >= waitsMax {
 		for k, at := range a.retry {
 			if !a.now().Before(at) {
 				delete(a.retry, k)
@@ -392,30 +359,31 @@ func (a *Auth) Admin(ctx context.Context, cookie string) (Admin, bool) {
 	if id == "" {
 		return Admin{}, false
 	}
-	s, err := a.load(ctx, id)
+	s, err := a.store.Load(ctx, id)
 	if err != nil {
 		if !errors.Is(err, ErrNoSession) {
 			a.log.Warn("load session", "error", err)
 		}
 		return Admin{}, false
 	}
+	// The store stamps a session with this clock, so its age is one clock's reading. Roles stamped
+	// in the future are a clock that stepped back: they are re-read, not trusted until it catches up.
 	age := a.now().Sub(s.CheckedAt)
-	if age < FreshFor || age <= grace && a.waiting(id) {
+	if age >= 0 && (age < FreshFor || age <= grace && a.waiting(id)) {
 		return Admin{Sub: s.Sub, Name: s.Name}, true
 	}
 	fresh, err := a.store.Refresh(ctx, id, s.CheckedAt, a.refresh)
 	switch {
 	case err == nil:
-		a.forget(id)
-		a.remember(fresh)
+		a.answered(id)
 		return Admin{Sub: fresh.Sub, Name: fresh.Name}, true
 	case errors.Is(err, ErrSessionGone), errors.Is(err, ErrNoSession):
-		a.forget(id)
+		a.answered(id)
 		return Admin{}, false
 	case errors.Is(err, errAuthAway):
 		a.log.Warn("re-read roles from auth", "error", err)
 		a.wait(id)
-		if age <= grace {
+		if age >= 0 && age <= grace {
 			return Admin{Sub: s.Sub, Name: s.Name}, true
 		}
 		return Admin{}, false
@@ -430,7 +398,7 @@ func (a *Auth) Admin(ctx context.Context, cookie string) (Admin, bool) {
 func (a *Auth) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(SessionCookie); err == nil {
 		if id := a.sessionID(c.Value); id != "" {
-			a.forget(id)
+			a.answered(id)
 			rt, err := a.store.SignOut(r.Context(), id)
 			if err != nil && !errors.Is(err, ErrNoSession) {
 				a.log.Warn("sign out", "error", err)

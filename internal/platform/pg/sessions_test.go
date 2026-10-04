@@ -29,7 +29,28 @@ func codec(t *testing.T, key string) *session.Codec {
 	return c
 }
 
+// clock is the service's clock, as a test moves it.
+type clock struct {
+	mu sync.Mutex
+	t  time.Time
+}
+
+func (c *clock) now() time.Time { c.mu.Lock(); defer c.mu.Unlock(); return c.t }
+func (c *clock) add(d time.Duration) {
+	c.mu.Lock()
+	c.t = c.t.Add(d)
+	c.mu.Unlock()
+}
+
 func sessions(t *testing.T) (*pg.Store, *pg.Sessions, string) {
+	t.Helper()
+	store, s, _, url := sessionsAt(t)
+	return store, s, url
+}
+
+// sessionsAt is sessions with the clock the store tells the time by. It starts well away from
+// the database's own, so a query that read the database's clock would show.
+func sessionsAt(t *testing.T) (*pg.Store, *pg.Sessions, *clock, string) {
 	t.Helper()
 	url := pgtest.URL(t)
 	store, err := pg.Open(t.Context(), url)
@@ -37,7 +58,8 @@ func sessions(t *testing.T) (*pg.Store, *pg.Sessions, string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(store.Close)
-	return store, store.Sessions(codec(t, "k")), url
+	clk := &clock{t: time.Date(2031, 3, 4, 5, 6, 7, 0, time.UTC)}
+	return store, store.Sessions(codec(t, "k"), clk.now), clk, url
 }
 
 func never(t *testing.T) oidc.RefreshFunc {
@@ -49,7 +71,7 @@ func never(t *testing.T) oidc.RefreshFunc {
 
 func signIn(t *testing.T, s *pg.Sessions) oidc.Session {
 	t.Helper()
-	id, err := s.SignIn(t.Context(), oidc.Identity{Sub: "user-1", Name: "joris"}, "rt-1", time.Now().Add(time.Hour))
+	id, err := s.SignIn(t.Context(), oidc.Identity{Sub: "user-1", Name: "joris"}, "rt-1", time.Date(2031, 3, 4, 6, 6, 7, 0, time.UTC))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +209,7 @@ func TestASessionSealedUnderAnotherKeyCannotBeRenewed(t *testing.T) {
 	t.Parallel()
 	store, s, _ := sessions(t)
 	got := signIn(t, s)
-	rotated := store.Sessions(codec(t, "other"[:1]))
+	rotated := store.Sessions(codec(t, "o"), func() time.Time { return time.Date(2031, 3, 4, 5, 6, 7, 0, time.UTC) })
 
 	if _, err := rotated.Refresh(t.Context(), got.ID, got.CheckedAt, never(t)); !errors.Is(err, oidc.ErrSessionGone) {
 		t.Fatalf("refresh: %v", err)
@@ -201,32 +223,53 @@ func TestASessionSealedUnderAnotherKeyCannotBeRenewed(t *testing.T) {
 	}
 }
 
-func TestAnExpiredSessionIsNoSessionAndIsSwept(t *testing.T) {
+func TestASessionIsStampedAndExpiredOnTheServicesClock(t *testing.T) {
 	t.Parallel()
-	store, s, url := sessions(t)
-	live := signIn(t, s)
-	old := signIn(t, s)
-	conn, err := pgx.Connect(t.Context(), url)
+	_, s, clk, _ := sessionsAt(t)
+	start := clk.now()
+	short, err := s.SignIn(t.Context(), oidc.Identity{Sub: "user-1", Name: "joris"}, "rt-1", start.Add(time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = conn.Close(context.Background()) }()
-	// A session that started and ended in the past; the table refuses one that ends before it starts.
-	if _, err := conn.Exec(t.Context(),
-		"UPDATE sessions SET created_at = now() - interval '2 hours', renewed_at = now() - interval '2 hours', expires_at = now() - interval '1 hour' WHERE id = $1", old.ID); err != nil {
+	long, err := s.SignIn(t.Context(), oidc.Identity{Sub: "user-1", Name: "joris"}, "rt-1", start.Add(3*time.Hour))
+	if err != nil {
 		t.Fatal(err)
 	}
+	got, err := s.Load(t.Context(), short)
+	if err != nil || !got.CreatedAt.Equal(start) || !got.CheckedAt.Equal(start) {
+		t.Fatalf("a session is stamped with the service's clock, not the database's: %+v %v", got, err)
+	}
 
-	if _, err := s.Load(t.Context(), old.ID); !errors.Is(err, oidc.ErrNoSession) {
+	// A renewal is stamped with it too, and still moves when the clock has not.
+	renew := func(context.Context, string) (string, oidc.Identity, error) {
+		return "rt-2", oidc.Identity{Sub: "user-1", Name: "joris"}, nil
+	}
+	still, err := s.Refresh(t.Context(), short, got.CheckedAt, renew)
+	if err != nil || !still.CheckedAt.Equal(start.Add(time.Microsecond)) {
+		t.Fatalf("a renewal on a still clock: %+v %v", still, err)
+	}
+	clk.add(time.Minute)
+	later, err := s.Refresh(t.Context(), short, still.CheckedAt, renew)
+	if err != nil || !later.CheckedAt.Equal(start.Add(time.Minute)) {
+		t.Fatalf("a renewal a minute on: %+v %v", later, err)
+	}
+
+	// The end is read on the same clock: the last moment is the one before it.
+	clk.add(time.Hour - time.Minute - time.Microsecond)
+	if _, err := s.Load(t.Context(), short); err != nil {
+		t.Fatalf("the moment before it ends: %v", err)
+	}
+	clk.add(time.Microsecond)
+	if _, err := s.Load(t.Context(), short); !errors.Is(err, oidc.ErrNoSession) {
 		t.Fatalf("an expired session loads: %v", err)
 	}
-	if _, err := s.Refresh(t.Context(), old.ID, old.CheckedAt, never(t)); !errors.Is(err, oidc.ErrNoSession) {
+	if _, err := s.Refresh(t.Context(), short, later.CheckedAt, never(t)); !errors.Is(err, oidc.ErrNoSession) {
 		t.Fatalf("an expired session renews: %v", err)
 	}
 	if n, err := s.Sweep(t.Context()); err != nil || n != 1 {
 		t.Fatalf("swept %d: %v", n, err)
 	}
-	if _, err := store.Sessions(codec(t, "k")).Load(t.Context(), live.ID); err != nil {
+	if _, err := s.Load(t.Context(), long); err != nil {
 		t.Fatalf("the sweep took a live session: %v", err)
 	}
 }
