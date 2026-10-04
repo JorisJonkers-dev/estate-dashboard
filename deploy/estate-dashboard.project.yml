@@ -19,10 +19,12 @@ applications:
     exposure:
       - name: public
         host: estate.jorisjonkers.dev # the host auth-api registered the dashboard's OIDC client for
-        # The dashboard signs admins in itself, as an OIDC client of auth, and refuses every
-        # request without a live admin session (openapi/v1/openapi.yaml). Its sign-in page has to
-        # be reachable by a browser nobody is signed in on, so the edge puts nothing in front.
-        audience: anonymous
+        # Two checks, on purpose. The edge's forward-auth admits only a browser signed in to
+        # auth, so nobody else reaches the host at all. Behind it the dashboard is an OIDC client
+        # of auth with a session of its own, and refuses every request without a live admin
+        # session (openapi/v1/openapi.yaml): being signed in is not being an admin, and the edge
+        # cannot tell the two apart.
+        audience: authenticated
         contentPolicy: strict
         routes:
           - { path: /, match: prefix, process: estate-dashboard, surface: http }
