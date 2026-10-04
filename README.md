@@ -78,9 +78,11 @@ when committed generated code is stale, and CI runs it.
 (`.testcoverage.yml`), measured across packages and excluding generated code. Web: 90% on lines,
 branches, functions and statements (`web/vite.config.ts`). Raise them as the suite grows.
 
-**Signing in.** The dashboard is an OIDC client of auth (authorization code with PKCE, state and
-nonce) and keeps a session of its own: the cookie holds a sealed session id and nothing else, and
-the refresh token stays in the `sessions` table, sealed. Only an account holding `ROLE_ADMIN` gets
+**Signing in.** The host sits behind the platform's forward-auth (`audience: authenticated` in the
+project file), so only a browser signed in to auth reaches it. Behind that, the dashboard is an
+OIDC client of auth (authorization code with PKCE, state and nonce) and keeps a session of its
+own: the cookie holds a sealed session id and nothing else, and the refresh token stays in the
+`sessions` table, sealed. Only an account holding `ROLE_ADMIN` gets
 a session; anyone else lands on the Not-an-admin page. Every 15 seconds of use the session is
 renewed through auth's token endpoint, which re-reads the account's roles, so a role withdrawn or
 an account disabled in auth ends the session here. While auth cannot be reached a session stays
