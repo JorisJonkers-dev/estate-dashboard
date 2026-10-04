@@ -115,13 +115,15 @@ func (s *Sessions) Refresh(ctx context.Context, sessionID string, seen time.Time
 	return current, nil
 }
 
-// end deletes a session auth no longer stands behind.
+// end deletes a session auth no longer stands behind. The session is gone whether or not the
+// delete lands: a database that fails here must not turn auth's refusal into an error a caller
+// could read as auth being away.
 func (s *Sessions) end(ctx context.Context, tx pgx.Tx, q *queries.Queries, id uuid.UUID) error {
 	if _, err := q.DeleteSession(ctx, id); err != nil {
-		return fmt.Errorf("pg: end session: %w", err)
+		return fmt.Errorf("%w: pg: end session: %w", oidc.ErrSessionGone, err)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("pg: commit: %w", err)
+		return fmt.Errorf("%w: pg: commit: %w", oidc.ErrSessionGone, err)
 	}
 	return oidc.ErrSessionGone
 }

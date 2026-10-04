@@ -159,6 +159,17 @@ func TestASessionAuthNoLongerStandsBehindIsDeleted(t *testing.T) {
 		t.Fatalf("the session is still there: %v", err)
 	}
 
+	// A delete that does not land is still auth saying no: the caller hears that, not a database error.
+	undeletable := signIn(t, s)
+	ctx, cancel := context.WithCancel(t.Context())
+	_, err = s.Refresh(ctx, undeletable.ID, undeletable.CheckedAt, func(context.Context, string) (string, oidc.Identity, error) {
+		cancel()
+		return "", oidc.Identity{}, oidc.ErrSessionGone
+	})
+	if !errors.Is(err, oidc.ErrSessionGone) || !errors.Is(err, context.Canceled) {
+		t.Fatalf("refresh whose delete fails: %v", err)
+	}
+
 	// auth being away is not auth saying no: the session and its token stay as they were.
 	kept := signIn(t, s)
 	away := errors.New("auth is away")

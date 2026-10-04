@@ -116,6 +116,9 @@ var (
 	ErrNoSession = errors.New("oidc: no such session")
 	// ErrSessionGone means auth no longer lets this account in: revoked, disabled, or no longer an admin.
 	ErrSessionGone = errors.New("oidc: session ended by auth")
+	// errAuthAway means auth did not give an answer the roles can be read from. It is the one
+	// failure the grace period covers: a store that fails is not auth being away.
+	errAuthAway = errors.New("oidc: auth did not answer")
 )
 
 // Gate decides who is an admin, from the session cookie a request carries.
@@ -298,13 +301,13 @@ func (a *Auth) refresh(ctx context.Context, refreshToken string) (string, Identi
 		if errors.As(err, &re) && (re.ErrorCode == "invalid_grant" || re.Response != nil && re.Response.StatusCode == http.StatusUnauthorized) {
 			return "", Identity{}, ErrSessionGone
 		}
-		return "", Identity{}, err
+		return "", Identity{}, fmt.Errorf("%w: %w", errAuthAway, err)
 	}
 	// auth sends a new ID token with every renewal; one without is not a renewal the roles can be read from.
 	raw, _ := tok.Extra("id_token").(string)
 	idt, err := a.verifier.Verify(ctx, raw)
 	if err != nil {
-		return "", Identity{}, fmt.Errorf("oidc: verify renewed token: %w", err)
+		return "", Identity{}, fmt.Errorf("%w: verify renewed token: %w", errAuthAway, err)
 	}
 	var cl claims
 	_ = idt.Claims(&cl) // a verified token is JSON; a claim of another type reads as no roles
@@ -382,7 +385,8 @@ func (a *Auth) wait(id string) {
 }
 
 // Admin returns the signed-in admin, re-reading the roles from auth once they are FreshFor old.
-// While auth cannot be reached, a session whose roles are within the grace period stays in.
+// While auth cannot be reached, a session whose roles are within the grace period stays in. Any
+// other failure to renew admits nobody.
 func (a *Auth) Admin(ctx context.Context, cookie string) (Admin, bool) {
 	id := a.sessionID(cookie)
 	if id == "" {
@@ -408,12 +412,16 @@ func (a *Auth) Admin(ctx context.Context, cookie string) (Admin, bool) {
 	case errors.Is(err, ErrSessionGone), errors.Is(err, ErrNoSession):
 		a.forget(id)
 		return Admin{}, false
-	default:
+	case errors.Is(err, errAuthAway):
 		a.log.Warn("re-read roles from auth", "error", err)
 		a.wait(id)
 		if age <= grace {
 			return Admin{Sub: s.Sub, Name: s.Name}, true
 		}
+		return Admin{}, false
+	default:
+		// The store failed. Nothing says the account is still an admin, so nobody is admitted on it.
+		a.log.Warn("renew session", "error", err)
 		return Admin{}, false
 	}
 }

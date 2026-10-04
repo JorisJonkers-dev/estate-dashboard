@@ -603,6 +603,36 @@ func (brokenStore) SignOut(context.Context, string) (string, error) {
 	return "", errors.New("database is away")
 }
 
+// renewalFails is a store that loads a session and then cannot renew it.
+type renewalFails struct{ *MemStore }
+
+func (renewalFails) Refresh(context.Context, string, time.Time, RefreshFunc) (Session, error) {
+	return Session{}, errors.New("database is away")
+}
+
+func TestAStoreThatCannotRenewAdmitsNobody(t *testing.T) {
+	f := newFakeIssuer(t)
+	f.next = admin()
+	a, mux, store, clk := newAuth(t, f)
+	sess := signIn(t, f, mux)
+	a.store = renewalFails{store}
+
+	if _, ok := a.Admin(context.Background(), sess.Value); !ok {
+		t.Fatal("roles read a moment ago need no renewal")
+	}
+	clk.add(FreshFor)
+	if _, ok := a.Admin(context.Background(), sess.Value); ok {
+		t.Fatal("the grace period is for auth being away, not for a store that fails")
+	}
+	if a.waiting(a.sessionID(sess.Value)) || f.refreshes != 0 {
+		t.Fatal("auth was not asked, so nothing waits on it")
+	}
+	a.store = store
+	if _, ok := a.Admin(context.Background(), sess.Value); !ok {
+		t.Fatal("the session is still there once the store answers")
+	}
+}
+
 func TestAStoreThatFailsSignsNobodyIn(t *testing.T) {
 	f := newFakeIssuer(t)
 	f.next = admin()
