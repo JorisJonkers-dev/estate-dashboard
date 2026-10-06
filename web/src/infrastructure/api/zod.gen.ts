@@ -3,6 +3,90 @@
 import * as z from 'zod';
 
 /**
+ * One Flux OCIRepository.
+ */
+export const zSource = z.object({
+    name: z.string().min(1).max(253),
+    url: z.string().max(1024),
+    digest: z.string().max(128),
+    revision: z.string().max(128).optional(),
+    ready: z.boolean(),
+    reason: z.string().max(256).optional(),
+    message: z.string().max(4096).optional()
+});
+
+/**
+ * The pin sources, by name.
+ */
+export const zSourceList = z.object({
+    truncated: z.boolean(),
+    items: z.array(zSource).max(1000)
+});
+
+/**
+ * One Flux Kustomization, one Reconcile Unit.
+ */
+export const zUnit = z.object({
+    name: z.string().min(1).max(253),
+    source: z.string().max(253),
+    path: z.string().max(1024),
+    dependsOn: z.array(z.string().max(253)).max(256),
+    applied: z.string().max(128).optional(),
+    ready: z.boolean(),
+    reason: z.string().max(256).optional(),
+    message: z.string().max(4096).optional()
+});
+
+/**
+ * The Reconcile Units, by name.
+ */
+export const zUnitList = z.object({
+    truncated: z.boolean(),
+    items: z.array(zUnit).max(1000)
+});
+
+/**
+ * One member of a gated Application, as Flagger switches it.
+ */
+export const zMember = z.object({
+    process: z.string().min(1).max(253),
+    phase: z.string().max(64).optional(),
+    revision: z.string().max(128).optional(),
+    iterations: z.int().gte(0).lte(1000000)
+});
+
+/**
+ * The migration the gate may start for a release.
+ */
+export const zReleaseMigration = z.object({
+    identity: z.string().min(1).max(253),
+    testedAgainst: z.string().max(128).optional(),
+    nonTransactional: z.boolean()
+});
+
+/**
+ * One gated Application.
+ */
+export const zRelease = z.object({
+    namespace: z.string().min(1).max(63),
+    application: z.string().min(1).max(253),
+    members: z.array(zMember).max(64),
+    migration: zReleaseMigration.optional(),
+    serving: z.string().max(128).optional(),
+    pinned: z.string().max(128).optional(),
+    since: z.iso.datetime({ offset: true }).max(64).optional(),
+    unreadable: z.string().max(256).optional()
+});
+
+/**
+ * The gated Applications.
+ */
+export const zReleaseList = z.object({
+    truncated: z.boolean(),
+    items: z.array(zRelease).max(1000)
+});
+
+/**
  * One alert Alertmanager holds now.
  */
 export const zAlert = z.object({
@@ -107,6 +191,21 @@ export const zSilenceAlertPath = z.object({
  * The silence Alertmanager now holds.
  */
 export const zSilenceAlertResponse = zSilence;
+
+/**
+ * What the cluster holds.
+ */
+export const zListSourcesResponse = zSourceList;
+
+/**
+ * What the cluster holds.
+ */
+export const zListUnitsResponse = zUnitList;
+
+/**
+ * What the cluster holds.
+ */
+export const zListReleasesResponse = zReleaseList;
 
 export const zListAlertHistoryQuery = z.object({
     limit: z.int().gte(1).lte(100).optional().default(50)

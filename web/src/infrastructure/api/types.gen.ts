@@ -5,6 +5,195 @@ export type ClientOptions = {
 };
 
 /**
+ * One Flux OCIRepository.
+ */
+export type Source = {
+    /**
+     * The source's name, project-<project> or estate.
+     */
+    name: string;
+    /**
+     * The OCI repository of the artifact.
+     */
+    url: string;
+    /**
+     * The digest the pin names; sixty-four zeros until the first publish.
+     */
+    digest: string;
+    /**
+     * What Flux last fetched, where it fetched anything.
+     */
+    revision?: string;
+    /**
+     * Whether Flux reports the object Ready.
+     */
+    ready: boolean;
+    /**
+     * The Ready condition's reason, where there is one.
+     */
+    reason?: string;
+    /**
+     * The Ready condition's message, where there is one.
+     */
+    message?: string;
+};
+
+/**
+ * The pin sources, by name.
+ */
+export type SourceList = {
+    /**
+     * Whether the cluster holds more than one read returns. A read is bounded, so a cluster holding more says so here rather than leaving the rest out unseen.
+     */
+    truncated: boolean;
+    /**
+     * The sources.
+     */
+    items: Array<Source>;
+};
+
+/**
+ * One Flux Kustomization, one Reconcile Unit.
+ */
+export type Unit = {
+    /**
+     * The unit's name.
+     */
+    name: string;
+    /**
+     * The source it applies from.
+     */
+    source: string;
+    /**
+     * The directory of the artifact it applies.
+     */
+    path: string;
+    /**
+     * The units it follows.
+     */
+    dependsOn: Array<string>;
+    /**
+     * The source revision Flux last applied, where it applied anything.
+     */
+    applied?: string;
+    /**
+     * Whether Flux reports the object Ready.
+     */
+    ready: boolean;
+    /**
+     * The Ready condition's reason, where there is one.
+     */
+    reason?: string;
+    /**
+     * The Ready condition's message, where there is one.
+     */
+    message?: string;
+};
+
+/**
+ * The Reconcile Units, by name.
+ */
+export type UnitList = {
+    /**
+     * Whether the cluster holds more than one read returns. A read is bounded, so a cluster holding more says so here rather than leaving the rest out unseen.
+     */
+    truncated: boolean;
+    /**
+     * The units.
+     */
+    items: Array<Unit>;
+};
+
+/**
+ * One member of a gated Application, as Flagger switches it.
+ */
+export type Member = {
+    /**
+     * The member Process.
+     */
+    process: string;
+    /**
+     * Flagger's phase of its Canary; absent before Flagger has seen it.
+     */
+    phase?: string;
+    /**
+     * The Application revision its Canary's webhooks carry.
+     */
+    revision?: string;
+    /**
+     * The analysis iterations Flagger has counted.
+     */
+    iterations: number;
+};
+
+/**
+ * The migration the gate may start for a release.
+ */
+export type ReleaseMigration = {
+    /**
+     * The identity its Jobs run as.
+     */
+    identity: string;
+    /**
+     * The serving revision the release was proven against; absent on a first release.
+     */
+    testedAgainst?: string;
+    /**
+     * Whether a changeset of it cannot run in a transaction, which no undo touches.
+     */
+    nonTransactional: boolean;
+};
+
+/**
+ * One gated Application.
+ */
+export type Release = {
+    /**
+     * The Application's namespace.
+     */
+    namespace: string;
+    /**
+     * The Application.
+     */
+    application: string;
+    /**
+     * Its members.
+     */
+    members: Array<Member>;
+    migration?: ReleaseMigration;
+    /**
+     * The revision the Release Gate recorded it serves; absent before it recorded one.
+     */
+    serving?: string;
+    /**
+     * The revision the gate saw applied and not yet serving; absent when none is.
+     */
+    pinned?: string;
+    /**
+     * When the gate first saw the pinned revision.
+     */
+    since?: string;
+    /**
+     * Why the rest of this release could not be read, where it could not: no inputs, inputs or a record that do not parse, or more members than an Application has. Absent when it was read whole.
+     */
+    unreadable?: string;
+};
+
+/**
+ * The gated Applications.
+ */
+export type ReleaseList = {
+    /**
+     * Whether the cluster holds more than one read returns. A read is bounded, so a cluster holding more says so here rather than leaving the rest out unseen.
+     */
+    truncated: boolean;
+    /**
+     * The releases.
+     */
+    items: Array<Release>;
+};
+
+/**
  * One alert Alertmanager holds now.
  */
 export type Alert = {
@@ -269,6 +458,105 @@ export type SilenceAlertResponses = {
 };
 
 export type SilenceAlertResponse = SilenceAlertResponses[keyof SilenceAlertResponses];
+
+export type ListSourcesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/delivery/sources';
+};
+
+export type ListSourcesErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListSourcesError = ListSourcesErrors[keyof ListSourcesErrors];
+
+export type ListSourcesResponses = {
+    /**
+     * What the cluster holds.
+     */
+    200: SourceList;
+};
+
+export type ListSourcesResponse = ListSourcesResponses[keyof ListSourcesResponses];
+
+export type ListUnitsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/delivery/units';
+};
+
+export type ListUnitsErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListUnitsError = ListUnitsErrors[keyof ListUnitsErrors];
+
+export type ListUnitsResponses = {
+    /**
+     * What the cluster holds.
+     */
+    200: UnitList;
+};
+
+export type ListUnitsResponse = ListUnitsResponses[keyof ListUnitsResponses];
+
+export type ListReleasesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/delivery/releases';
+};
+
+export type ListReleasesErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListReleasesError = ListReleasesErrors[keyof ListReleasesErrors];
+
+export type ListReleasesResponses = {
+    /**
+     * What the cluster holds.
+     */
+    200: ReleaseList;
+};
+
+export type ListReleasesResponse = ListReleasesResponses[keyof ListReleasesResponses];
 
 export type ListAlertHistoryData = {
     body?: never;

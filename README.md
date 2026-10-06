@@ -116,3 +116,25 @@ silence still holds; an Alertmanager that does not answer is a 503.
 An alert's class is its `alert_class` label (`business-hours`, `urgent` or `page`), as the alert
 rules write it; an alert with none is shown unclassed. `task db` starts a local Alertmanager on
 59093 beside Postgres.
+
+## Delivery
+
+Three reads of the cluster (`internal/delivery/`), through a ServiceAccount whose whole grant is
+the `api` block of `deploy/estate-dashboard.project.yml`:
+
+| Read | What |
+|------|------|
+| `GET /api/v1/delivery/sources` | every Flux `OCIRepository` the render wrote: the pinned digest, what Flux fetched, Ready |
+| `GET /api/v1/delivery/units` | every Flux `Kustomization` the render wrote: source, path, the units it follows, what it applied, Ready |
+| `GET /api/v1/delivery/releases` | every gated Application, found from the Canaries the render wrote: each member's phase and revision, the migration, and the Release Gate's record of what serves |
+
+It may get, list and watch OCIRepositories, Kustomizations and Canaries, and get a ConfigMap by
+name; it writes nothing. A release's inputs and record are read by name and never listed, at most
+256 Applications are read per request and every list is one page of at most 1000, so nothing
+anyone can create in the cluster grows a request; a read that stopped short says `truncated`, so
+nothing is left out unseen. Inputs or a record that do not read mark that
+one release `unreadable` and keep the others from failing with it. The ConfigMap `get` is still
+cluster-wide: https://github.com/JorisJonkers-dev/estate-dashboard/issues/15.
+
+The cluster is the one the dashboard runs in. On a local run `KUBECONFIG` may name one; without
+either, the three reads answer 503, "the dashboard runs without a cluster to read".

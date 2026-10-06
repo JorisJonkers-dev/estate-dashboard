@@ -30,6 +30,29 @@ type Handler interface {
 	//
 	// GET /api/v1/alerts
 	ListAlerts(ctx context.Context) (ListAlertsRes, error)
+	// ListReleases implements listReleases operation.
+	//
+	// Every Application whose release-gate inputs the render wrote, by namespace and Application: each
+	// member as Flagger switches it, the migration the gate may start, and what the Release Gate recorded
+	// it serves and saw pinned. A 503 means the cluster did not answer, or the dashboard runs without one.
+	//
+	// GET /api/v1/delivery/releases
+	ListReleases(ctx context.Context) (ListReleasesRes, error)
+	// ListSources implements listSources operation.
+	//
+	// Every Flux OCIRepository the render wrote: the artifact it names by digest, what Flux last fetched,
+	// and whether it is ready. A 503 means the cluster did not answer, or the dashboard runs without one.
+	//
+	// GET /api/v1/delivery/sources
+	ListSources(ctx context.Context) (ListSourcesRes, error)
+	// ListUnits implements listUnits operation.
+	//
+	// Every Flux Kustomization the render wrote: its source, its path, the units it follows, what it last
+	// applied, and whether it is ready. A 503 means the cluster did not answer, or the dashboard runs
+	// without one.
+	//
+	// GET /api/v1/delivery/units
+	ListUnits(ctx context.Context) (ListUnitsRes, error)
 	// SilenceAlert implements silenceAlert operation.
 	//
 	// Silences one firing alert, matching every one of its labels exactly, for an hour, four hours, a day,

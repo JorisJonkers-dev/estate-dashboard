@@ -44,6 +44,38 @@ func (UnimplementedHandler) ListAlerts(ctx context.Context) (r ListAlertsRes, _ 
 	return r, ht.ErrNotImplemented
 }
 
+// ListReleases implements listReleases operation.
+//
+// Every Application whose release-gate inputs the render wrote, by namespace and Application: each
+// member as Flagger switches it, the migration the gate may start, and what the Release Gate recorded
+// it serves and saw pinned. A 503 means the cluster did not answer, or the dashboard runs without one.
+//
+// GET /api/v1/delivery/releases
+func (UnimplementedHandler) ListReleases(ctx context.Context) (r ListReleasesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListSources implements listSources operation.
+//
+// Every Flux OCIRepository the render wrote: the artifact it names by digest, what Flux last fetched,
+// and whether it is ready. A 503 means the cluster did not answer, or the dashboard runs without one.
+//
+// GET /api/v1/delivery/sources
+func (UnimplementedHandler) ListSources(ctx context.Context) (r ListSourcesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListUnits implements listUnits operation.
+//
+// Every Flux Kustomization the render wrote: its source, its path, the units it follows, what it last
+// applied, and whether it is ready. A 503 means the cluster did not answer, or the dashboard runs
+// without one.
+//
+// GET /api/v1/delivery/units
+func (UnimplementedHandler) ListUnits(ctx context.Context) (r ListUnitsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // SilenceAlert implements silenceAlert operation.
 //
 // Silences one firing alert, matching every one of its labels exactly, for an hour, four hours, a day,

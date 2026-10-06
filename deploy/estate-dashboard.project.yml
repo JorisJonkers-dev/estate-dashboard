@@ -57,6 +57,27 @@ applications:
             delivery: env
             rotation: { tolerates: restart }
 
+        # Read-only by design: it reads delivery and writes nothing in the cluster. Its one write
+        # anywhere is an Alertmanager silence, over HTTP, which no Kubernetes verb grants.
+        api:
+          reason: >-
+            the dashboard shows each Project's Flux source and unit and each member's Canary, so it
+            gets, lists and watches those; and each gated Application's release-gate inputs and the
+            Release Gate's record of it, which it gets by name and never lists
+          rules:
+            - group: source.toolkit.fluxcd.io
+              objects: [ocirepositories]
+              verbs: [get, list, watch]
+            - group: kustomize.toolkit.fluxcd.io
+              objects: [kustomizations]
+              verbs: [get, list, watch]
+            - group: flagger.app
+              objects: [canaries]
+              verbs: [get, list, watch]
+            - group: core
+              objects: [configmaps]
+              verbs: [get]
+
         placement:
           memory: 96Mi
           cpu: 50m

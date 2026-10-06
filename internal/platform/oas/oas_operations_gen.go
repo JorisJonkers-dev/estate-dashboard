@@ -9,5 +9,8 @@ const (
 	GetSessionOperation       OperationName = "GetSession"
 	ListAlertHistoryOperation OperationName = "ListAlertHistory"
 	ListAlertsOperation       OperationName = "ListAlerts"
+	ListReleasesOperation     OperationName = "ListReleases"
+	ListSourcesOperation      OperationName = "ListSources"
+	ListUnitsOperation        OperationName = "ListUnits"
 	SilenceAlertOperation     OperationName = "SilenceAlert"
 )

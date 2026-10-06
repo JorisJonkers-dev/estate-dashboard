@@ -14,6 +14,10 @@ import (
 
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/app"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/domain"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/adapters/cluster"
+	deliveryweb "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/adapters/web"
+	deliveryapp "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/app"
+	delivery "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpapi"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oidc"
 )
@@ -67,7 +71,12 @@ func serve(t *testing.T, repo *memory) *httptest.Server {
 
 func serveLive(t *testing.T, repo *memory, l *live) *httptest.Server {
 	t.Helper()
-	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l)
+	return serveAll(t, repo, l, deliveryapp.New(cluster.Absent{}))
+}
+
+func serveAll(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases) *httptest.Server {
+	t.Helper()
+	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l, delivery)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,6 +241,82 @@ func TestASilenceOfNothingFiringOrOfNoLengthIsRefused(t *testing.T) {
 	}
 }
 
+// estate is a cluster read in memory.
+type estate struct {
+	sources  []delivery.Source
+	units    []delivery.Unit
+	releases []delivery.Release
+	err      error
+}
+
+func (e estate) Sources(context.Context) (delivery.Page[delivery.Source], error) {
+	return delivery.Page[delivery.Source]{Items: e.sources, Truncated: true}, e.err
+}
+
+func (e estate) Units(context.Context) (delivery.Page[delivery.Unit], error) {
+	return delivery.Page[delivery.Unit]{Items: e.units}, e.err
+}
+
+func (e estate) Releases(context.Context) (delivery.Page[delivery.Release], error) {
+	return delivery.Page[delivery.Release]{Items: e.releases}, e.err
+}
+
+func TestTheClusterIsServedInTheContractsShape(t *testing.T) {
+	since := time.Date(2026, 10, 3, 7, 0, 0, 0, time.UTC)
+	srv := serveAll(t, &memory{}, &live{}, deliveryapp.New(estate{
+		sources: []delivery.Source{
+			{Name: "project-b", URL: "oci://r/b", Digest: "sha256:0"},
+			{Name: "project-a", URL: "oci://r/a", Digest: "sha256:1", Revision: "sha256:1", Condition: delivery.Condition{Ready: true, Reason: "Succeeded", Message: "stored"}},
+		},
+		units: []delivery.Unit{{Name: "apps-a", Source: "project-a", Path: "./apps/a", DependsOn: []string{"estate-vso-secrets"}, Applied: "sha256:1", Condition: delivery.Condition{Ready: true}}},
+		releases: []delivery.Release{{
+			Namespace: "auth-system", Application: "auth", Serving: "sha256:s", Pinned: "sha256:p", Since: &since,
+			Members:   []delivery.Member{{Process: "auth-api", Phase: "Progressing", Revision: "sha256:p", Iterations: 2}, {Process: "auth-ui"}},
+			Migration: &delivery.Migration{Identity: "auth-migration", TestedAgainst: "sha256:s"},
+		}},
+	}))
+
+	sources := call(t, srv, http.MethodGet, "/api/v1/delivery/sources", "", true)
+	items, _ := sources.body["items"].([]any)
+	if sources.code != http.StatusOK || len(items) != 2 || items[0].(map[string]any)["name"] != "project-a" || sources.body["truncated"] != true {
+		t.Fatalf("sources = %d %v", sources.code, sources.body)
+	}
+	if bare := items[1].(map[string]any); bare["ready"] != false || len(bare) != 4 {
+		t.Fatalf("a source Flux has not touched = %v", bare)
+	}
+	units := call(t, srv, http.MethodGet, "/api/v1/delivery/units", "", true)
+	unit := units.body["items"].([]any)[0].(map[string]any)
+	if units.code != http.StatusOK || units.body["truncated"] != false || unit["dependsOn"].([]any)[0] != "estate-vso-secrets" || unit["applied"] != "sha256:1" || unit["ready"] != true {
+		t.Fatalf("units = %d %v", units.code, units.body)
+	}
+	releases := call(t, srv, http.MethodGet, "/api/v1/delivery/releases", "", true)
+	release := releases.body["items"].([]any)[0].(map[string]any)
+	members := release["members"].([]any)
+	if releases.code != http.StatusOK || release["since"] != "2026-10-03T07:00:00Z" || release["migration"].(map[string]any)["testedAgainst"] != "sha256:s" || len(members) != 2 {
+		t.Fatalf("releases = %d %v", releases.code, releases.body)
+	}
+	if api := members[0].(map[string]any); api["phase"] != "Progressing" || api["iterations"] != float64(2) {
+		t.Fatalf("a member = %v", api)
+	}
+	if ui := members[1].(map[string]any); len(ui) != 2 {
+		t.Fatalf("a member Flagger has not seen = %v", ui)
+	}
+}
+
+func TestAClusterThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
+	for want, uc := range map[string]deliveryweb.UseCases{
+		"The cluster did not answer.":                   deliveryapp.New(estate{err: errors.New("forbidden")}),
+		"The dashboard runs without a cluster to read.": deliveryapp.New(cluster.Absent{}),
+	} {
+		srv := serveAll(t, &memory{}, &live{}, uc)
+		for _, path := range []string{"/api/v1/delivery/sources", "/api/v1/delivery/units", "/api/v1/delivery/releases"} {
+			if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
+				t.Fatalf("%s = %d %v", path, got.code, got.body)
+			}
+		}
+	}
+}
+
 func TestTheSessionIsTheAdminTheCookieBelongsTo(t *testing.T) {
 	srv := serve(t, &memory{})
 	got := call(t, srv, http.MethodGet, "/api/v1/session", "", true)
@@ -242,7 +327,7 @@ func TestTheSessionIsTheAdminTheCookieBelongsTo(t *testing.T) {
 
 func TestOnlyALiveAdminSessionReachesAnOperation(t *testing.T) {
 	srv := serve(t, &memory{})
-	for _, path := range []string{"/api/v1/session", "/api/v1/alerts/history", "/api/v1/alerts"} {
+	for _, path := range []string{"/api/v1/session", "/api/v1/alerts/history", "/api/v1/alerts", "/api/v1/delivery/sources", "/api/v1/delivery/units", "/api/v1/delivery/releases"} {
 		for name, cookie := range map[string]string{"no cookie": "", "a cookie the gate does not admit": "someone-elses"} {
 			got := callWith(t, srv, http.MethodGet, path, "", cookie)
 			if got.code != http.StatusUnauthorized || got.body["status"] != float64(http.StatusUnauthorized) || got.body["detail"] != nil {

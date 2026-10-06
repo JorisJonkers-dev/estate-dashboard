@@ -13,6 +13,18 @@ type ListAlertsRes interface {
 	listAlertsRes()
 }
 
+type ListReleasesRes interface {
+	listReleasesRes()
+}
+
+type ListSourcesRes interface {
+	listSourcesRes()
+}
+
+type ListUnitsRes interface {
+	listUnitsRes()
+}
+
 type SilenceAlertRes interface {
 	silenceAlertRes()
 }

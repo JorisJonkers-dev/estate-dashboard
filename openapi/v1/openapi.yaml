@@ -19,6 +19,10 @@ servers:
 security:
   - sessionCookie: []
 tags:
+  - name: delivery
+    description: >-
+      What the cluster says about delivery, read through a ServiceAccount that may get, list and
+      watch and nothing else: Flux's sources and units, and each gated Application's release.
   - name: session
     description: Who is signed in.
   - name: alerts
@@ -109,6 +113,66 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/delivery/sources:
+    get:
+      operationId: listSources
+      summary: List the pin sources, by name
+      description: >-
+        Every Flux OCIRepository the render wrote: the artifact it names by digest, what Flux last fetched, and whether it is ready. A 503 means the cluster did not answer, or the dashboard runs without one.
+      tags: [delivery]
+      responses:
+        "200":
+          description: What the cluster holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/delivery/units:
+    get:
+      operationId: listUnits
+      summary: List the Reconcile Units, by name
+      description: >-
+        Every Flux Kustomization the render wrote: its source, its path, the units it follows, what it last applied, and whether it is ready. A 503 means the cluster did not answer, or the dashboard runs without one.
+      tags: [delivery]
+      responses:
+        "200":
+          description: What the cluster holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/delivery/releases:
+    get:
+      operationId: listReleases
+      summary: List the gated Applications and their releases
+      description: >-
+        Every Application whose release-gate inputs the render wrote, by namespace and Application: each member as Flagger switches it, the migration the gate may start, and what the Release Gate recorded it serves and saw pinned. A 503 means the cluster did not answer, or the dashboard runs without one.
+      tags: [delivery]
+      responses:
+        "200":
+          description: What the cluster holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/alerts/history:
     get:
       operationId: listAlertHistory
@@ -158,6 +222,230 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    Source:
+      description: One Flux OCIRepository.
+      type: object
+      additionalProperties: false
+      required: [name, url, digest, ready]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 253
+          description: The source's name, project-<project> or estate.
+          example: project-auth
+        url:
+          type: string
+          maxLength: 1024
+          description: The OCI repository of the artifact.
+          example: oci://ghcr.io/jorisjonkers-dev/render/auth
+        digest:
+          type: string
+          maxLength: 128
+          description: The digest the pin names; sixty-four zeros until the first publish.
+        revision:
+          type: string
+          maxLength: 128
+          description: What Flux last fetched, where it fetched anything.
+        ready:
+          type: boolean
+          description: Whether Flux reports the object Ready.
+        reason:
+          type: string
+          maxLength: 256
+          description: The Ready condition's reason, where there is one.
+        message:
+          type: string
+          maxLength: 4096
+          description: The Ready condition's message, where there is one.
+    SourceList:
+      description: The pin sources, by name.
+      type: object
+      additionalProperties: false
+      required: [items, truncated]
+      properties:
+        truncated:
+          type: boolean
+          description: >-
+            Whether the cluster holds more than one read returns. A read is bounded, so a cluster
+            holding more says so here rather than leaving the rest out unseen.
+        items:
+          type: array
+          maxItems: 1000
+          description: The sources.
+          items:
+            $ref: "#/components/schemas/Source"
+    Unit:
+      description: One Flux Kustomization, one Reconcile Unit.
+      type: object
+      additionalProperties: false
+      required: [name, source, path, dependsOn, ready]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 253
+          description: The unit's name.
+          example: apps-auth
+        source:
+          type: string
+          maxLength: 253
+          description: The source it applies from.
+          example: project-auth
+        path:
+          type: string
+          maxLength: 1024
+          description: The directory of the artifact it applies.
+          example: ./apps/auth
+        dependsOn:
+          type: array
+          maxItems: 256
+          description: The units it follows.
+          items:
+            type: string
+            maxLength: 253
+        applied:
+          type: string
+          maxLength: 128
+          description: The source revision Flux last applied, where it applied anything.
+        ready:
+          type: boolean
+          description: Whether Flux reports the object Ready.
+        reason:
+          type: string
+          maxLength: 256
+          description: The Ready condition's reason, where there is one.
+        message:
+          type: string
+          maxLength: 4096
+          description: The Ready condition's message, where there is one.
+    UnitList:
+      description: The Reconcile Units, by name.
+      type: object
+      additionalProperties: false
+      required: [items, truncated]
+      properties:
+        truncated:
+          type: boolean
+          description: >-
+            Whether the cluster holds more than one read returns. A read is bounded, so a cluster
+            holding more says so here rather than leaving the rest out unseen.
+        items:
+          type: array
+          maxItems: 1000
+          description: The units.
+          items:
+            $ref: "#/components/schemas/Unit"
+    Member:
+      description: One member of a gated Application, as Flagger switches it.
+      type: object
+      additionalProperties: false
+      required: [process, iterations]
+      properties:
+        process:
+          type: string
+          minLength: 1
+          maxLength: 253
+          description: The member Process.
+          example: auth-api
+        phase:
+          type: string
+          maxLength: 64
+          description: Flagger's phase of its Canary; absent before Flagger has seen it.
+          example: Progressing
+        revision:
+          type: string
+          maxLength: 128
+          description: The Application revision its Canary's webhooks carry.
+        iterations:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000000
+          description: The analysis iterations Flagger has counted.
+    ReleaseMigration:
+      description: The migration the gate may start for a release.
+      type: object
+      additionalProperties: false
+      required: [identity, nonTransactional]
+      properties:
+        identity:
+          type: string
+          minLength: 1
+          maxLength: 253
+          description: The identity its Jobs run as.
+          example: auth-migration
+        testedAgainst:
+          type: string
+          maxLength: 128
+          description: The serving revision the release was proven against; absent on a first release.
+        nonTransactional:
+          type: boolean
+          description: Whether a changeset of it cannot run in a transaction, which no undo touches.
+    Release:
+      description: One gated Application.
+      type: object
+      additionalProperties: false
+      required: [namespace, application, members]
+      properties:
+        namespace:
+          type: string
+          minLength: 1
+          maxLength: 63
+          description: The Application's namespace.
+          example: auth-system
+        application:
+          type: string
+          minLength: 1
+          maxLength: 253
+          description: The Application.
+          example: auth
+        members:
+          type: array
+          maxItems: 64
+          description: Its members.
+          items:
+            $ref: "#/components/schemas/Member"
+        migration:
+          $ref: "#/components/schemas/ReleaseMigration"
+        serving:
+          type: string
+          maxLength: 128
+          description: The revision the Release Gate recorded it serves; absent before it recorded one.
+        pinned:
+          type: string
+          maxLength: 128
+          description: The revision the gate saw applied and not yet serving; absent when none is.
+        since:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When the gate first saw the pinned revision.
+        unreadable:
+          type: string
+          maxLength: 256
+          description: >-
+            Why the rest of this release could not be read, where it could not: no inputs, inputs or
+            a record that do not parse, or more members than an Application has. Absent when it was
+            read whole.
+          example: release-gate inputs that do not parse
+    ReleaseList:
+      description: The gated Applications.
+      type: object
+      additionalProperties: false
+      required: [items, truncated]
+      properties:
+        truncated:
+          type: boolean
+          description: >-
+            Whether the cluster holds more than one read returns. A read is bounded, so a cluster
+            holding more says so here rather than leaving the rest out unseen.
+        items:
+          type: array
+          maxItems: 1000
+          description: The releases.
+          items:
+            $ref: "#/components/schemas/Release"
     Alert:
       description: One alert Alertmanager holds now.
       type: object

@@ -342,6 +342,83 @@ type ListAlertsUnauthorized ProblemStatusCode
 
 func (*ListAlertsUnauthorized) listAlertsRes() {}
 
+type ListReleasesServiceUnavailable ProblemStatusCode
+
+func (*ListReleasesServiceUnavailable) listReleasesRes() {}
+
+type ListReleasesUnauthorized ProblemStatusCode
+
+func (*ListReleasesUnauthorized) listReleasesRes() {}
+
+type ListSourcesServiceUnavailable ProblemStatusCode
+
+func (*ListSourcesServiceUnavailable) listSourcesRes() {}
+
+type ListSourcesUnauthorized ProblemStatusCode
+
+func (*ListSourcesUnauthorized) listSourcesRes() {}
+
+type ListUnitsServiceUnavailable ProblemStatusCode
+
+func (*ListUnitsServiceUnavailable) listUnitsRes() {}
+
+type ListUnitsUnauthorized ProblemStatusCode
+
+func (*ListUnitsUnauthorized) listUnitsRes() {}
+
+// One member of a gated Application, as Flagger switches it.
+// Ref: #/components/schemas/Member
+type Member struct {
+	// The member Process.
+	Process string `json:"process"`
+	// Flagger's phase of its Canary; absent before Flagger has seen it.
+	Phase OptString `json:"phase"`
+	// The Application revision its Canary's webhooks carry.
+	Revision OptString `json:"revision"`
+	// The analysis iterations Flagger has counted.
+	Iterations int32 `json:"iterations"`
+}
+
+// GetProcess returns the value of Process.
+func (s *Member) GetProcess() string {
+	return s.Process
+}
+
+// GetPhase returns the value of Phase.
+func (s *Member) GetPhase() OptString {
+	return s.Phase
+}
+
+// GetRevision returns the value of Revision.
+func (s *Member) GetRevision() OptString {
+	return s.Revision
+}
+
+// GetIterations returns the value of Iterations.
+func (s *Member) GetIterations() int32 {
+	return s.Iterations
+}
+
+// SetProcess sets the value of Process.
+func (s *Member) SetProcess(val string) {
+	s.Process = val
+}
+
+// SetPhase sets the value of Phase.
+func (s *Member) SetPhase(val OptString) {
+	s.Phase = val
+}
+
+// SetRevision sets the value of Revision.
+func (s *Member) SetRevision(val OptString) {
+	s.Revision = val
+}
+
+// SetIterations sets the value of Iterations.
+func (s *Member) SetIterations(val int32) {
+	s.Iterations = val
+}
+
 // NewOptAlertClass returns new OptAlertClass with value set to v.
 func NewOptAlertClass(v AlertClass) OptAlertClass {
 	return OptAlertClass{
@@ -480,6 +557,52 @@ func (o OptInt32) Or(d int32) int32 {
 	return d
 }
 
+// NewOptReleaseMigration returns new OptReleaseMigration with value set to v.
+func NewOptReleaseMigration(v ReleaseMigration) OptReleaseMigration {
+	return OptReleaseMigration{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptReleaseMigration is optional ReleaseMigration.
+type OptReleaseMigration struct {
+	Value ReleaseMigration
+	Set   bool
+}
+
+// IsSet returns true if OptReleaseMigration was set.
+func (o OptReleaseMigration) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptReleaseMigration) Reset() {
+	var v ReleaseMigration
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptReleaseMigration) SetTo(v ReleaseMigration) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptReleaseMigration) Get() (v ReleaseMigration, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptReleaseMigration) Or(d ReleaseMigration) ReleaseMigration {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptString returns new OptString with value set to v.
 func NewOptString(v string) OptString {
 	return OptString{
@@ -607,6 +730,180 @@ func (s *ProblemStatusCode) SetResponse(val Problem) {
 
 func (*ProblemStatusCode) getSessionRes()       {}
 func (*ProblemStatusCode) listAlertHistoryRes() {}
+
+// One gated Application.
+// Ref: #/components/schemas/Release
+type Release struct {
+	// The Application's namespace.
+	Namespace string `json:"namespace"`
+	// The Application.
+	Application string `json:"application"`
+	// Its members.
+	Members   []Member            `json:"members"`
+	Migration OptReleaseMigration `json:"migration"`
+	// The revision the Release Gate recorded it serves; absent before it recorded one.
+	Serving OptString `json:"serving"`
+	// The revision the gate saw applied and not yet serving; absent when none is.
+	Pinned OptString `json:"pinned"`
+	// When the gate first saw the pinned revision.
+	Since OptDateTime `json:"since"`
+	// Why the rest of this release could not be read, where it could not: no inputs, inputs or a record
+	// that do not parse, or more members than an Application has. Absent when it was read whole.
+	Unreadable OptString `json:"unreadable"`
+}
+
+// GetNamespace returns the value of Namespace.
+func (s *Release) GetNamespace() string {
+	return s.Namespace
+}
+
+// GetApplication returns the value of Application.
+func (s *Release) GetApplication() string {
+	return s.Application
+}
+
+// GetMembers returns the value of Members.
+func (s *Release) GetMembers() []Member {
+	return s.Members
+}
+
+// GetMigration returns the value of Migration.
+func (s *Release) GetMigration() OptReleaseMigration {
+	return s.Migration
+}
+
+// GetServing returns the value of Serving.
+func (s *Release) GetServing() OptString {
+	return s.Serving
+}
+
+// GetPinned returns the value of Pinned.
+func (s *Release) GetPinned() OptString {
+	return s.Pinned
+}
+
+// GetSince returns the value of Since.
+func (s *Release) GetSince() OptDateTime {
+	return s.Since
+}
+
+// GetUnreadable returns the value of Unreadable.
+func (s *Release) GetUnreadable() OptString {
+	return s.Unreadable
+}
+
+// SetNamespace sets the value of Namespace.
+func (s *Release) SetNamespace(val string) {
+	s.Namespace = val
+}
+
+// SetApplication sets the value of Application.
+func (s *Release) SetApplication(val string) {
+	s.Application = val
+}
+
+// SetMembers sets the value of Members.
+func (s *Release) SetMembers(val []Member) {
+	s.Members = val
+}
+
+// SetMigration sets the value of Migration.
+func (s *Release) SetMigration(val OptReleaseMigration) {
+	s.Migration = val
+}
+
+// SetServing sets the value of Serving.
+func (s *Release) SetServing(val OptString) {
+	s.Serving = val
+}
+
+// SetPinned sets the value of Pinned.
+func (s *Release) SetPinned(val OptString) {
+	s.Pinned = val
+}
+
+// SetSince sets the value of Since.
+func (s *Release) SetSince(val OptDateTime) {
+	s.Since = val
+}
+
+// SetUnreadable sets the value of Unreadable.
+func (s *Release) SetUnreadable(val OptString) {
+	s.Unreadable = val
+}
+
+// The gated Applications.
+// Ref: #/components/schemas/ReleaseList
+type ReleaseList struct {
+	// Whether the cluster holds more than one read returns. A read is bounded, so a cluster holding more
+	// says so here rather than leaving the rest out unseen.
+	Truncated bool `json:"truncated"`
+	// The releases.
+	Items []Release `json:"items"`
+}
+
+// GetTruncated returns the value of Truncated.
+func (s *ReleaseList) GetTruncated() bool {
+	return s.Truncated
+}
+
+// GetItems returns the value of Items.
+func (s *ReleaseList) GetItems() []Release {
+	return s.Items
+}
+
+// SetTruncated sets the value of Truncated.
+func (s *ReleaseList) SetTruncated(val bool) {
+	s.Truncated = val
+}
+
+// SetItems sets the value of Items.
+func (s *ReleaseList) SetItems(val []Release) {
+	s.Items = val
+}
+
+func (*ReleaseList) listReleasesRes() {}
+
+// The migration the gate may start for a release.
+// Ref: #/components/schemas/ReleaseMigration
+type ReleaseMigration struct {
+	// The identity its Jobs run as.
+	Identity string `json:"identity"`
+	// The serving revision the release was proven against; absent on a first release.
+	TestedAgainst OptString `json:"testedAgainst"`
+	// Whether a changeset of it cannot run in a transaction, which no undo touches.
+	NonTransactional bool `json:"nonTransactional"`
+}
+
+// GetIdentity returns the value of Identity.
+func (s *ReleaseMigration) GetIdentity() string {
+	return s.Identity
+}
+
+// GetTestedAgainst returns the value of TestedAgainst.
+func (s *ReleaseMigration) GetTestedAgainst() OptString {
+	return s.TestedAgainst
+}
+
+// GetNonTransactional returns the value of NonTransactional.
+func (s *ReleaseMigration) GetNonTransactional() bool {
+	return s.NonTransactional
+}
+
+// SetIdentity sets the value of Identity.
+func (s *ReleaseMigration) SetIdentity(val string) {
+	s.Identity = val
+}
+
+// SetTestedAgainst sets the value of TestedAgainst.
+func (s *ReleaseMigration) SetTestedAgainst(val OptString) {
+	s.TestedAgainst = val
+}
+
+// SetNonTransactional sets the value of NonTransactional.
+func (s *ReleaseMigration) SetNonTransactional(val bool) {
+	s.NonTransactional = val
+}
 
 // The signed-in admin.
 // Ref: #/components/schemas/Session
@@ -815,3 +1112,257 @@ func (s *SilenceRequestLength) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// One Flux OCIRepository.
+// Ref: #/components/schemas/Source
+type Source struct {
+	// The source's name, project- or estate.
+	Name string `json:"name"`
+	// The OCI repository of the artifact.
+	URL string `json:"url"`
+	// The digest the pin names; sixty-four zeros until the first publish.
+	Digest string `json:"digest"`
+	// What Flux last fetched, where it fetched anything.
+	Revision OptString `json:"revision"`
+	// Whether Flux reports the object Ready.
+	Ready bool `json:"ready"`
+	// The Ready condition's reason, where there is one.
+	Reason OptString `json:"reason"`
+	// The Ready condition's message, where there is one.
+	Message OptString `json:"message"`
+}
+
+// GetName returns the value of Name.
+func (s *Source) GetName() string {
+	return s.Name
+}
+
+// GetURL returns the value of URL.
+func (s *Source) GetURL() string {
+	return s.URL
+}
+
+// GetDigest returns the value of Digest.
+func (s *Source) GetDigest() string {
+	return s.Digest
+}
+
+// GetRevision returns the value of Revision.
+func (s *Source) GetRevision() OptString {
+	return s.Revision
+}
+
+// GetReady returns the value of Ready.
+func (s *Source) GetReady() bool {
+	return s.Ready
+}
+
+// GetReason returns the value of Reason.
+func (s *Source) GetReason() OptString {
+	return s.Reason
+}
+
+// GetMessage returns the value of Message.
+func (s *Source) GetMessage() OptString {
+	return s.Message
+}
+
+// SetName sets the value of Name.
+func (s *Source) SetName(val string) {
+	s.Name = val
+}
+
+// SetURL sets the value of URL.
+func (s *Source) SetURL(val string) {
+	s.URL = val
+}
+
+// SetDigest sets the value of Digest.
+func (s *Source) SetDigest(val string) {
+	s.Digest = val
+}
+
+// SetRevision sets the value of Revision.
+func (s *Source) SetRevision(val OptString) {
+	s.Revision = val
+}
+
+// SetReady sets the value of Ready.
+func (s *Source) SetReady(val bool) {
+	s.Ready = val
+}
+
+// SetReason sets the value of Reason.
+func (s *Source) SetReason(val OptString) {
+	s.Reason = val
+}
+
+// SetMessage sets the value of Message.
+func (s *Source) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// The pin sources, by name.
+// Ref: #/components/schemas/SourceList
+type SourceList struct {
+	// Whether the cluster holds more than one read returns. A read is bounded, so a cluster holding more
+	// says so here rather than leaving the rest out unseen.
+	Truncated bool `json:"truncated"`
+	// The sources.
+	Items []Source `json:"items"`
+}
+
+// GetTruncated returns the value of Truncated.
+func (s *SourceList) GetTruncated() bool {
+	return s.Truncated
+}
+
+// GetItems returns the value of Items.
+func (s *SourceList) GetItems() []Source {
+	return s.Items
+}
+
+// SetTruncated sets the value of Truncated.
+func (s *SourceList) SetTruncated(val bool) {
+	s.Truncated = val
+}
+
+// SetItems sets the value of Items.
+func (s *SourceList) SetItems(val []Source) {
+	s.Items = val
+}
+
+func (*SourceList) listSourcesRes() {}
+
+// One Flux Kustomization, one Reconcile Unit.
+// Ref: #/components/schemas/Unit
+type Unit struct {
+	// The unit's name.
+	Name string `json:"name"`
+	// The source it applies from.
+	Source string `json:"source"`
+	// The directory of the artifact it applies.
+	Path string `json:"path"`
+	// The units it follows.
+	DependsOn []string `json:"dependsOn"`
+	// The source revision Flux last applied, where it applied anything.
+	Applied OptString `json:"applied"`
+	// Whether Flux reports the object Ready.
+	Ready bool `json:"ready"`
+	// The Ready condition's reason, where there is one.
+	Reason OptString `json:"reason"`
+	// The Ready condition's message, where there is one.
+	Message OptString `json:"message"`
+}
+
+// GetName returns the value of Name.
+func (s *Unit) GetName() string {
+	return s.Name
+}
+
+// GetSource returns the value of Source.
+func (s *Unit) GetSource() string {
+	return s.Source
+}
+
+// GetPath returns the value of Path.
+func (s *Unit) GetPath() string {
+	return s.Path
+}
+
+// GetDependsOn returns the value of DependsOn.
+func (s *Unit) GetDependsOn() []string {
+	return s.DependsOn
+}
+
+// GetApplied returns the value of Applied.
+func (s *Unit) GetApplied() OptString {
+	return s.Applied
+}
+
+// GetReady returns the value of Ready.
+func (s *Unit) GetReady() bool {
+	return s.Ready
+}
+
+// GetReason returns the value of Reason.
+func (s *Unit) GetReason() OptString {
+	return s.Reason
+}
+
+// GetMessage returns the value of Message.
+func (s *Unit) GetMessage() OptString {
+	return s.Message
+}
+
+// SetName sets the value of Name.
+func (s *Unit) SetName(val string) {
+	s.Name = val
+}
+
+// SetSource sets the value of Source.
+func (s *Unit) SetSource(val string) {
+	s.Source = val
+}
+
+// SetPath sets the value of Path.
+func (s *Unit) SetPath(val string) {
+	s.Path = val
+}
+
+// SetDependsOn sets the value of DependsOn.
+func (s *Unit) SetDependsOn(val []string) {
+	s.DependsOn = val
+}
+
+// SetApplied sets the value of Applied.
+func (s *Unit) SetApplied(val OptString) {
+	s.Applied = val
+}
+
+// SetReady sets the value of Ready.
+func (s *Unit) SetReady(val bool) {
+	s.Ready = val
+}
+
+// SetReason sets the value of Reason.
+func (s *Unit) SetReason(val OptString) {
+	s.Reason = val
+}
+
+// SetMessage sets the value of Message.
+func (s *Unit) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// The Reconcile Units, by name.
+// Ref: #/components/schemas/UnitList
+type UnitList struct {
+	// Whether the cluster holds more than one read returns. A read is bounded, so a cluster holding more
+	// says so here rather than leaving the rest out unseen.
+	Truncated bool `json:"truncated"`
+	// The units.
+	Items []Unit `json:"items"`
+}
+
+// GetTruncated returns the value of Truncated.
+func (s *UnitList) GetTruncated() bool {
+	return s.Truncated
+}
+
+// GetItems returns the value of Items.
+func (s *UnitList) GetItems() []Unit {
+	return s.Items
+}
+
+// SetTruncated sets the value of Truncated.
+func (s *UnitList) SetTruncated(val bool) {
+	s.Truncated = val
+}
+
+// SetItems sets the value of Items.
+func (s *UnitList) SetItems(val []Unit) {
+	s.Items = val
+}
+
+func (*UnitList) listUnitsRes() {}
