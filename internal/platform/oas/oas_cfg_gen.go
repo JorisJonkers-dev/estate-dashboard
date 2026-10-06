@@ -18,7 +18,8 @@ import (
 )
 
 var regexMap = map[string]ogenregex.Regexp{
-	"^[0-9a-f]+$": ogenregex.MustCompile("^[0-9a-f]+$"),
+	"^[0-9a-f]+$":                 ogenregex.MustCompile("^[0-9a-f]+$"),
+	"^[a-z0-9_][a-z0-9_-]{0,62}$": ogenregex.MustCompile("^[a-z0-9_][a-z0-9_-]{0,62}$"),
 }
 var (
 	// Allocate option closure once.

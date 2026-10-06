@@ -52,7 +52,7 @@ applications:
         # once, at startup (deploy/env/estate-dashboard/base.env).
         secrets:
           - path: secret/data/estate-dashboard-system/sign-in
-            keys: [oidc-client-secret, session-key]
+            keys: [oidc-client-secret, session-key, github-token]
             access: read
             delivery: env
             rotation: { tolerates: restart }

@@ -30,6 +30,29 @@ type Handler interface {
 	//
 	// GET /api/v1/alerts
 	ListAlerts(ctx context.Context) (ListAlertsRes, error)
+	// ListDeploys implements listDeploys operation.
+	//
+	// The Estate repository's history of projects//source.yaml: its deploy log. A Project with no pin has
+	// none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+	//
+	// GET /api/v1/estate/projects/{project}/deploys
+	ListDeploys(ctx context.Context, params ListDeploysParams) (ListDeploysRes, error)
+	// ListIssues implements listIssues operation.
+	//
+	// The Estate repository's open issues: one per Project condition the composition keeps open. At most
+	// one page of 100. A 503 means GitHub did not answer, or the dashboard runs without the Estate
+	// repository.
+	//
+	// GET /api/v1/estate/issues
+	ListIssues(ctx context.Context) (ListIssuesRes, error)
+	// ListPins implements listPins operation.
+	//
+	// Every projects//source.yaml on the Estate repository's default branch: the digest its source names,
+	// and a Pause or a Rollback recorded on it. A 503 means GitHub did not answer, or the dashboard runs
+	// without the Estate repository.
+	//
+	// GET /api/v1/estate/pins
+	ListPins(ctx context.Context) (ListPinsRes, error)
 	// ListReleases implements listReleases operation.
 	//
 	// Every Application whose release-gate inputs the render wrote, by namespace and Application: each

@@ -5,6 +5,128 @@ export type ClientOptions = {
 };
 
 /**
+ * One Project's pin.
+ */
+export type Pin = {
+    /**
+     * The Project.
+     */
+    project: string;
+    /**
+     * The digest its source names; empty where the pin file holds no source.
+     */
+    digest: string;
+    paused?: Pause;
+    rolledBack?: Rollback;
+};
+
+/**
+ * What a Pause or a Rollback recorded on a pin.
+ */
+export type Pause = {
+    /**
+     * The GitHub login that ran it.
+     */
+    by: string;
+    /**
+     * When, as recorded.
+     */
+    at: string;
+    /**
+     * The reason given.
+     */
+    reason: string;
+};
+
+/**
+ * The release a Rollback took the Project back to.
+ */
+export type Rollback = {
+    /**
+     * The release version.
+     */
+    version: string;
+    /**
+     * That release's fragment, by digest.
+     */
+    fragment: string;
+};
+
+/**
+ * Every Project's pin, by Project.
+ */
+export type PinList = {
+    /**
+     * The pins.
+     */
+    items: Array<Pin>;
+};
+
+/**
+ * One commit that moved a pin.
+ */
+export type Deploy = {
+    /**
+     * The commit.
+     */
+    commit: string;
+    /**
+     * When it was committed.
+     */
+    at: string;
+    /**
+     * Its subject line.
+     */
+    message: string;
+};
+
+/**
+ * A Project's deploys, newest first.
+ */
+export type DeployList = {
+    /**
+     * The deploys.
+     */
+    items: Array<Deploy>;
+};
+
+/**
+ * One open issue of the Estate repository.
+ */
+export type Issue = {
+    /**
+     * The issue number.
+     */
+    number: number;
+    /**
+     * Its title.
+     */
+    title: string;
+    /**
+     * Where it is on GitHub.
+     */
+    url: string;
+    /**
+     * Its labels.
+     */
+    labels: Array<string>;
+    /**
+     * When it last changed.
+     */
+    updatedAt: string;
+};
+
+/**
+ * The open issues, most recently updated first.
+ */
+export type IssueList = {
+    /**
+     * The issues.
+     */
+    items: Array<Issue>;
+};
+
+/**
  * One Flux OCIRepository.
  */
 export type Source = {
@@ -458,6 +580,115 @@ export type SilenceAlertResponses = {
 };
 
 export type SilenceAlertResponse = SilenceAlertResponses[keyof SilenceAlertResponses];
+
+export type ListPinsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/estate/pins';
+};
+
+export type ListPinsErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListPinsError = ListPinsErrors[keyof ListPinsErrors];
+
+export type ListPinsResponses = {
+    /**
+     * What the Estate repository holds.
+     */
+    200: PinList;
+};
+
+export type ListPinsResponse = ListPinsResponses[keyof ListPinsResponses];
+
+export type ListDeploysData = {
+    body?: never;
+    path: {
+        /**
+         * The Project.
+         */
+        project: string;
+    };
+    query?: {
+        /**
+         * How many deploys to return.
+         */
+        limit?: number;
+    };
+    url: '/api/v1/estate/projects/{project}/deploys';
+};
+
+export type ListDeploysErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListDeploysError = ListDeploysErrors[keyof ListDeploysErrors];
+
+export type ListDeploysResponses = {
+    /**
+     * What the Estate repository holds.
+     */
+    200: DeployList;
+};
+
+export type ListDeploysResponse = ListDeploysResponses[keyof ListDeploysResponses];
+
+export type ListIssuesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/estate/issues';
+};
+
+export type ListIssuesErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListIssuesError = ListIssuesErrors[keyof ListIssuesErrors];
+
+export type ListIssuesResponses = {
+    /**
+     * What the Estate repository holds.
+     */
+    200: IssueList;
+};
+
+export type ListIssuesResponse = ListIssuesResponses[keyof ListIssuesResponses];
 
 export type ListSourcesData = {
     body?: never;

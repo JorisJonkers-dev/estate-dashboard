@@ -138,3 +138,19 @@ cluster-wide: https://github.com/JorisJonkers-dev/estate-dashboard/issues/15.
 
 The cluster is the one the dashboard runs in. On a local run `KUBECONFIG` may name one; without
 either, the three reads answer 503, "the dashboard runs without a cluster to read".
+
+## The Estate repository
+
+Three reads of `JorisJonkers-dev/estate` (`internal/estate/`), with `GITHUB_TOKEN`, a token that may
+read that repository and nothing else:
+
+| Read | What |
+|------|------|
+| `GET /api/v1/estate/pins` | every `projects/<project>/source.yaml`, in one GraphQL query: the digest its source names, and a Pause or a Rollback recorded on it |
+| `GET /api/v1/estate/projects/{project}/deploys` | the commits that touched that pin file, newest first: the deploy log |
+| `GET /api/v1/estate/issues` | the open issues, one per Project condition the composition keeps, at most 100 |
+
+`ESTATE_REPOSITORY` (default `JorisJonkers-dev/estate`) and `GITHUB_API` (default
+`https://api.github.com`) say where. Without a token the three reads answer 503, "the dashboard
+runs without the Estate repository to read". The composition lock is published to the registry
+with each composition, not committed, so it is not read here yet.

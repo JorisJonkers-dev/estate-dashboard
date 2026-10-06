@@ -3,7 +3,10 @@
 //
 // Environment: DATABASE_URL and ALERTMANAGER_URL (both required), and ADDR (default :8080). The
 // cluster is the one the dashboard runs in; on a local run KUBECONFIG may name one, and without
-// either the delivery reads answer that there is none. Signing in goes through auth, so
+// either the delivery reads answer that there is none. The Estate repository is read with
+// GITHUB_TOKEN, a token that may read it and nothing else, at ESTATE_REPOSITORY (default
+// JorisJonkers-dev/estate) through GITHUB_API (default https://api.github.com); without a token
+// the estate reads answer that there is none. Signing in goes through auth, so
 // a deployment also sets OIDC_ISSUER, OIDC_CLIENT_SECRET, OIDC_REDIRECT_URL and SESSION_KEY, and
 // may set OIDC_CLIENT_ID (default estate-dashboard). DEV_USER replaces all of those on a local
 // run: every request is that admin and nothing asks auth. It must never be set in a deployment.
@@ -28,6 +31,9 @@ import (
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/app"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/adapters/cluster"
 	deliveryapp "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/app"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/estate/adapters/github"
+	estateapp "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/app"
+	estatedomain "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpapi"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oidc"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/pg"
@@ -50,6 +56,10 @@ const (
 	watchEvery = 30 * time.Second
 	// alertmanagerTimeout bounds one call to Alertmanager, so a request never waits on it longer.
 	alertmanagerTimeout = 10 * time.Second
+	// githubTimeout bounds one call to GitHub.
+	githubTimeout    = 10 * time.Second
+	defaultGitHubAPI = "https://api.github.com"
+	defaultEstate    = "JorisJonkers-dev/estate"
 )
 
 func main() {
@@ -142,6 +152,22 @@ func sweep(ctx context.Context, logger *slog.Logger, sessions interface {
 	}
 }
 
+// readEstate reads the Estate repository the environment names, or none without a token.
+func readEstate(getenv func(string) string) (estatedomain.Repository, error) {
+	token := getenv("GITHUB_TOKEN")
+	if token == "" {
+		return github.Absent{}, nil
+	}
+	api, repository := getenv("GITHUB_API"), getenv("ESTATE_REPOSITORY")
+	if api == "" {
+		api = defaultGitHubAPI
+	}
+	if repository == "" {
+		repository = defaultEstate
+	}
+	return github.New(api, repository, token, &http.Client{Timeout: githubTimeout})
+}
+
 // watch records what Alertmanager holds, now and then every interval, until ctx is done.
 func watch(ctx context.Context, logger *slog.Logger, live interface{ Watch(context.Context) error }, every time.Duration) {
 	tick := time.NewTicker(every)
@@ -173,6 +199,10 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	if err != nil {
 		return err
 	}
+	repository, err := readEstate(getenv)
+	if err != nil {
+		return err
+	}
 	admission, err := readSignIn(getenv)
 	if err != nil {
 		return err
@@ -193,7 +223,7 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	history := persistence.New(store.Queries())
 	live := app.NewLive(am, history, persistence.NewSilences(store.Queries()), time.Now, logger)
 	go watch(ctx, logger, live, watchEvery)
-	api, err := httpapi.New(logger, gate, app.New(history), live, deliveryapp.New(kube))
+	api, err := httpapi.New(logger, gate, app.New(history), live, deliveryapp.New(kube), estateapp.New(repository))
 	if err != nil {
 		return err
 	}

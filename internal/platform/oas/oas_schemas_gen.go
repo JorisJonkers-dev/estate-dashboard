@@ -334,6 +334,150 @@ func (s *AlertList) SetItems(val []Alert) {
 
 func (*AlertList) listAlertsRes() {}
 
+// One commit that moved a pin.
+// Ref: #/components/schemas/Deploy
+type Deploy struct {
+	// The commit.
+	Commit string `json:"commit"`
+	// When it was committed.
+	At time.Time `json:"at"`
+	// Its subject line.
+	Message string `json:"message"`
+}
+
+// GetCommit returns the value of Commit.
+func (s *Deploy) GetCommit() string {
+	return s.Commit
+}
+
+// GetAt returns the value of At.
+func (s *Deploy) GetAt() time.Time {
+	return s.At
+}
+
+// GetMessage returns the value of Message.
+func (s *Deploy) GetMessage() string {
+	return s.Message
+}
+
+// SetCommit sets the value of Commit.
+func (s *Deploy) SetCommit(val string) {
+	s.Commit = val
+}
+
+// SetAt sets the value of At.
+func (s *Deploy) SetAt(val time.Time) {
+	s.At = val
+}
+
+// SetMessage sets the value of Message.
+func (s *Deploy) SetMessage(val string) {
+	s.Message = val
+}
+
+// A Project's deploys, newest first.
+// Ref: #/components/schemas/DeployList
+type DeployList struct {
+	// The deploys.
+	Items []Deploy `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *DeployList) GetItems() []Deploy {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *DeployList) SetItems(val []Deploy) {
+	s.Items = val
+}
+
+func (*DeployList) listDeploysRes() {}
+
+// One open issue of the Estate repository.
+// Ref: #/components/schemas/Issue
+type Issue struct {
+	// The issue number.
+	Number int32 `json:"number"`
+	// Its title.
+	Title string `json:"title"`
+	// Where it is on GitHub.
+	URL string `json:"url"`
+	// Its labels.
+	Labels []string `json:"labels"`
+	// When it last changed.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetNumber returns the value of Number.
+func (s *Issue) GetNumber() int32 {
+	return s.Number
+}
+
+// GetTitle returns the value of Title.
+func (s *Issue) GetTitle() string {
+	return s.Title
+}
+
+// GetURL returns the value of URL.
+func (s *Issue) GetURL() string {
+	return s.URL
+}
+
+// GetLabels returns the value of Labels.
+func (s *Issue) GetLabels() []string {
+	return s.Labels
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *Issue) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetNumber sets the value of Number.
+func (s *Issue) SetNumber(val int32) {
+	s.Number = val
+}
+
+// SetTitle sets the value of Title.
+func (s *Issue) SetTitle(val string) {
+	s.Title = val
+}
+
+// SetURL sets the value of URL.
+func (s *Issue) SetURL(val string) {
+	s.URL = val
+}
+
+// SetLabels sets the value of Labels.
+func (s *Issue) SetLabels(val []string) {
+	s.Labels = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *Issue) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// The open issues, most recently updated first.
+// Ref: #/components/schemas/IssueList
+type IssueList struct {
+	// The issues.
+	Items []Issue `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *IssueList) GetItems() []Issue {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *IssueList) SetItems(val []Issue) {
+	s.Items = val
+}
+
+func (*IssueList) listIssuesRes() {}
+
 type ListAlertsServiceUnavailable ProblemStatusCode
 
 func (*ListAlertsServiceUnavailable) listAlertsRes() {}
@@ -341,6 +485,30 @@ func (*ListAlertsServiceUnavailable) listAlertsRes() {}
 type ListAlertsUnauthorized ProblemStatusCode
 
 func (*ListAlertsUnauthorized) listAlertsRes() {}
+
+type ListDeploysServiceUnavailable ProblemStatusCode
+
+func (*ListDeploysServiceUnavailable) listDeploysRes() {}
+
+type ListDeploysUnauthorized ProblemStatusCode
+
+func (*ListDeploysUnauthorized) listDeploysRes() {}
+
+type ListIssuesServiceUnavailable ProblemStatusCode
+
+func (*ListIssuesServiceUnavailable) listIssuesRes() {}
+
+type ListIssuesUnauthorized ProblemStatusCode
+
+func (*ListIssuesUnauthorized) listIssuesRes() {}
+
+type ListPinsServiceUnavailable ProblemStatusCode
+
+func (*ListPinsServiceUnavailable) listPinsRes() {}
+
+type ListPinsUnauthorized ProblemStatusCode
+
+func (*ListPinsUnauthorized) listPinsRes() {}
 
 type ListReleasesServiceUnavailable ProblemStatusCode
 
@@ -557,6 +725,52 @@ func (o OptInt32) Or(d int32) int32 {
 	return d
 }
 
+// NewOptPause returns new OptPause with value set to v.
+func NewOptPause(v Pause) OptPause {
+	return OptPause{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPause is optional Pause.
+type OptPause struct {
+	Value Pause
+	Set   bool
+}
+
+// IsSet returns true if OptPause was set.
+func (o OptPause) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPause) Reset() {
+	var v Pause
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPause) SetTo(v Pause) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPause) Get() (v Pause, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPause) Or(d Pause) Pause {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptReleaseMigration returns new OptReleaseMigration with value set to v.
 func NewOptReleaseMigration(v ReleaseMigration) OptReleaseMigration {
 	return OptReleaseMigration{
@@ -597,6 +811,52 @@ func (o OptReleaseMigration) Get() (v ReleaseMigration, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptReleaseMigration) Or(d ReleaseMigration) ReleaseMigration {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptRollback returns new OptRollback with value set to v.
+func NewOptRollback(v Rollback) OptRollback {
+	return OptRollback{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRollback is optional Rollback.
+type OptRollback struct {
+	Value Rollback
+	Set   bool
+}
+
+// IsSet returns true if OptRollback was set.
+func (o OptRollback) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRollback) Reset() {
+	var v Rollback
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRollback) SetTo(v Rollback) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRollback) Get() (v Rollback, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRollback) Or(d Rollback) Rollback {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -648,6 +908,117 @@ func (o OptString) Or(d string) string {
 	}
 	return d
 }
+
+// What a Pause or a Rollback recorded on a pin.
+// Ref: #/components/schemas/Pause
+type Pause struct {
+	// The GitHub login that ran it.
+	By string `json:"by"`
+	// When, as recorded.
+	At string `json:"at"`
+	// The reason given.
+	Reason string `json:"reason"`
+}
+
+// GetBy returns the value of By.
+func (s *Pause) GetBy() string {
+	return s.By
+}
+
+// GetAt returns the value of At.
+func (s *Pause) GetAt() string {
+	return s.At
+}
+
+// GetReason returns the value of Reason.
+func (s *Pause) GetReason() string {
+	return s.Reason
+}
+
+// SetBy sets the value of By.
+func (s *Pause) SetBy(val string) {
+	s.By = val
+}
+
+// SetAt sets the value of At.
+func (s *Pause) SetAt(val string) {
+	s.At = val
+}
+
+// SetReason sets the value of Reason.
+func (s *Pause) SetReason(val string) {
+	s.Reason = val
+}
+
+// One Project's pin.
+// Ref: #/components/schemas/Pin
+type Pin struct {
+	// The Project.
+	Project string `json:"project"`
+	// The digest its source names; empty where the pin file holds no source.
+	Digest     string      `json:"digest"`
+	Paused     OptPause    `json:"paused"`
+	RolledBack OptRollback `json:"rolledBack"`
+}
+
+// GetProject returns the value of Project.
+func (s *Pin) GetProject() string {
+	return s.Project
+}
+
+// GetDigest returns the value of Digest.
+func (s *Pin) GetDigest() string {
+	return s.Digest
+}
+
+// GetPaused returns the value of Paused.
+func (s *Pin) GetPaused() OptPause {
+	return s.Paused
+}
+
+// GetRolledBack returns the value of RolledBack.
+func (s *Pin) GetRolledBack() OptRollback {
+	return s.RolledBack
+}
+
+// SetProject sets the value of Project.
+func (s *Pin) SetProject(val string) {
+	s.Project = val
+}
+
+// SetDigest sets the value of Digest.
+func (s *Pin) SetDigest(val string) {
+	s.Digest = val
+}
+
+// SetPaused sets the value of Paused.
+func (s *Pin) SetPaused(val OptPause) {
+	s.Paused = val
+}
+
+// SetRolledBack sets the value of RolledBack.
+func (s *Pin) SetRolledBack(val OptRollback) {
+	s.RolledBack = val
+}
+
+// Every Project's pin, by Project.
+// Ref: #/components/schemas/PinList
+type PinList struct {
+	// The pins.
+	Items []Pin `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *PinList) GetItems() []Pin {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *PinList) SetItems(val []Pin) {
+	s.Items = val
+}
+
+func (*PinList) listPinsRes() {}
 
 // An RFC 9457 problem detail.
 // Ref: #/components/schemas/Problem
@@ -903,6 +1274,35 @@ func (s *ReleaseMigration) SetTestedAgainst(val OptString) {
 // SetNonTransactional sets the value of NonTransactional.
 func (s *ReleaseMigration) SetNonTransactional(val bool) {
 	s.NonTransactional = val
+}
+
+// The release a Rollback took the Project back to.
+// Ref: #/components/schemas/Rollback
+type Rollback struct {
+	// The release version.
+	Version string `json:"version"`
+	// That release's fragment, by digest.
+	Fragment string `json:"fragment"`
+}
+
+// GetVersion returns the value of Version.
+func (s *Rollback) GetVersion() string {
+	return s.Version
+}
+
+// GetFragment returns the value of Fragment.
+func (s *Rollback) GetFragment() string {
+	return s.Fragment
+}
+
+// SetVersion sets the value of Version.
+func (s *Rollback) SetVersion(val string) {
+	s.Version = val
+}
+
+// SetFragment sets the value of Fragment.
+func (s *Rollback) SetFragment(val string) {
+	s.Fragment = val
 }
 
 // The signed-in admin.

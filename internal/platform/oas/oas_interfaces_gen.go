@@ -13,6 +13,18 @@ type ListAlertsRes interface {
 	listAlertsRes()
 }
 
+type ListDeploysRes interface {
+	listDeploysRes()
+}
+
+type ListIssuesRes interface {
+	listIssuesRes()
+}
+
+type ListPinsRes interface {
+	listPinsRes()
+}
+
 type ListReleasesRes interface {
 	listReleasesRes()
 }
