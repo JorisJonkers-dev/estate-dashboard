@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	rn11AllowedHeaders = map[string]string{
+	rn18AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
 )
@@ -161,7 +161,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn11AllowedHeaders,
+									allowedHeaders: rn18AllowedHeaders,
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -259,6 +259,134 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						}
 
 						return
+					}
+
+				}
+
+			case 'e': // Prefix: "estate/"
+
+				if l := len("estate/"); len(elem) >= l && elem[0:l] == "estate/" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					break
+				}
+				switch elem[0] {
+				case 'i': // Prefix: "issues"
+
+					if l := len("issues"); len(elem) >= l && elem[0:l] == "issues" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "GET":
+							s.handleListIssuesRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: nil,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+
+				case 'p': // Prefix: "p"
+
+					if l := len("p"); len(elem) >= l && elem[0:l] == "p" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						break
+					}
+					switch elem[0] {
+					case 'i': // Prefix: "ins"
+
+						if l := len("ins"); len(elem) >= l && elem[0:l] == "ins" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleListPinsRequest([0]string{}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: nil,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
+					case 'r': // Prefix: "rojects/"
+
+						if l := len("rojects/"); len(elem) >= l && elem[0:l] == "rojects/" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						// Param: "project"
+						// Match until "/"
+						idx := strings.IndexByte(elem, '/')
+						if idx < 0 {
+							idx = len(elem)
+						}
+						args[0] = elem[:idx]
+						elem = elem[idx:]
+
+						if len(elem) == 0 {
+							break
+						}
+						switch elem[0] {
+						case '/': // Prefix: "/deploys"
+
+							if l := len("/deploys"); len(elem) >= l && elem[0:l] == "/deploys" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							if len(elem) == 0 {
+								// Leaf node.
+								switch r.Method {
+								case "GET":
+									s.handleListDeploysRequest([1]string{
+										args[0],
+									}, elemIsEscaped, w, r)
+								default:
+									s.notAllowed(w, r, notAllowedParams{
+										allowedMethods: "GET",
+										allowedHeaders: nil,
+										acceptPost:     "",
+										acceptPatch:    "",
+									})
+								}
+
+								return
+							}
+
+						}
+
 					}
 
 				}
@@ -578,6 +706,132 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						default:
 							return
 						}
+					}
+
+				}
+
+			case 'e': // Prefix: "estate/"
+
+				if l := len("estate/"); len(elem) >= l && elem[0:l] == "estate/" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					break
+				}
+				switch elem[0] {
+				case 'i': // Prefix: "issues"
+
+					if l := len("issues"); len(elem) >= l && elem[0:l] == "issues" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "GET":
+							r.name = ListIssuesOperation
+							r.summary = "List the open issues, most recently updated first"
+							r.operationID = "listIssues"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/estate/issues"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
+						}
+					}
+
+				case 'p': // Prefix: "p"
+
+					if l := len("p"); len(elem) >= l && elem[0:l] == "p" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						break
+					}
+					switch elem[0] {
+					case 'i': // Prefix: "ins"
+
+						if l := len("ins"); len(elem) >= l && elem[0:l] == "ins" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = ListPinsOperation
+								r.summary = "List every Project's pin, by Project"
+								r.operationID = "listPins"
+								r.operationGroup = ""
+								r.pathPattern = "/api/v1/estate/pins"
+								r.args = args
+								r.count = 0
+								return r, true
+							default:
+								return
+							}
+						}
+
+					case 'r': // Prefix: "rojects/"
+
+						if l := len("rojects/"); len(elem) >= l && elem[0:l] == "rojects/" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						// Param: "project"
+						// Match until "/"
+						idx := strings.IndexByte(elem, '/')
+						if idx < 0 {
+							idx = len(elem)
+						}
+						args[0] = elem[:idx]
+						elem = elem[idx:]
+
+						if len(elem) == 0 {
+							break
+						}
+						switch elem[0] {
+						case '/': // Prefix: "/deploys"
+
+							if l := len("/deploys"); len(elem) >= l && elem[0:l] == "/deploys" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							if len(elem) == 0 {
+								// Leaf node.
+								switch method {
+								case "GET":
+									r.name = ListDeploysOperation
+									r.summary = "List the commits that moved a Project's pin, newest first"
+									r.operationID = "listDeploys"
+									r.operationGroup = ""
+									r.pathPattern = "/api/v1/estate/projects/{project}/deploys"
+									r.args = args
+									r.count = 1
+									return r, true
+								default:
+									return
+								}
+							}
+
+						}
+
 					}
 
 				}

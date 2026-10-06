@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
-import { zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListReleasesResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
+import type { GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
+import { zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListPinsResponse, zListReleasesResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -86,6 +86,69 @@ export const silenceAlert = <ThrowOnError extends boolean = false>(options: Opti
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * List every Project's pin, by Project
+ *
+ * Every projects/<project>/source.yaml on the Estate repository's default branch: the digest its source names, and a Pause or a Rollback recorded on it. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const listPins = <ThrowOnError extends boolean = false>(options?: Options<ListPinsData, ThrowOnError>): RequestResult<ListPinsResponses, ListPinsErrors, ThrowOnError> => (options?.client ?? client).get<ListPinsResponses, ListPinsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListPinsResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/estate/pins',
+    ...options
+});
+
+/**
+ * List the commits that moved a Project's pin, newest first
+ *
+ * The Estate repository's history of projects/<project>/source.yaml: its deploy log. A Project with no pin has none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const listDeploys = <ThrowOnError extends boolean = false>(options: Options<ListDeploysData, ThrowOnError>): RequestResult<ListDeploysResponses, ListDeploysErrors, ThrowOnError> => (options.client ?? client).get<ListDeploysResponses, ListDeploysErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zListDeploysPath,
+        query: zListDeploysQuery.optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListDeploysResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/estate/projects/{project}/deploys',
+    ...options
+});
+
+/**
+ * List the open issues, most recently updated first
+ *
+ * The Estate repository's open issues: one per Project condition the composition keeps open. At most one page of 100. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const listIssues = <ThrowOnError extends boolean = false>(options?: Options<ListIssuesData, ThrowOnError>): RequestResult<ListIssuesResponses, ListIssuesErrors, ThrowOnError> => (options?.client ?? client).get<ListIssuesResponses, ListIssuesErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListIssuesResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/estate/issues',
+    ...options
 });
 
 /**

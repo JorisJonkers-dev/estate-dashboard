@@ -44,6 +44,38 @@ func (UnimplementedHandler) ListAlerts(ctx context.Context) (r ListAlertsRes, _ 
 	return r, ht.ErrNotImplemented
 }
 
+// ListDeploys implements listDeploys operation.
+//
+// The Estate repository's history of projects//source.yaml: its deploy log. A Project with no pin has
+// none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+//
+// GET /api/v1/estate/projects/{project}/deploys
+func (UnimplementedHandler) ListDeploys(ctx context.Context, params ListDeploysParams) (r ListDeploysRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListIssues implements listIssues operation.
+//
+// The Estate repository's open issues: one per Project condition the composition keeps open. At most
+// one page of 100. A 503 means GitHub did not answer, or the dashboard runs without the Estate
+// repository.
+//
+// GET /api/v1/estate/issues
+func (UnimplementedHandler) ListIssues(ctx context.Context) (r ListIssuesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListPins implements listPins operation.
+//
+// Every projects//source.yaml on the Estate repository's default branch: the digest its source names,
+// and a Pause or a Rollback recorded on it. A 503 means GitHub did not answer, or the dashboard runs
+// without the Estate repository.
+//
+// GET /api/v1/estate/pins
+func (UnimplementedHandler) ListPins(ctx context.Context) (r ListPinsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListReleases implements listReleases operation.
 //
 // Every Application whose release-gate inputs the render wrote, by namespace and Application: each

@@ -19,6 +19,10 @@ servers:
 security:
   - sessionCookie: []
 tags:
+  - name: estate
+    description: >-
+      What the Estate repository says, read through a token that may read it and nothing else: each
+      Project's pin, the commits that moved it, and the open issues.
   - name: delivery
     description: >-
       What the cluster says about delivery, read through a ServiceAccount that may get, list and
@@ -108,6 +112,86 @@ paths:
         "400":
           $ref: "#/components/responses/Problem"
         "404":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/estate/pins:
+    get:
+      operationId: listPins
+      summary: List every Project's pin, by Project
+      description: >-
+        Every projects/<project>/source.yaml on the Estate repository's default branch: the digest its source names, and a Pause or a Rollback recorded on it. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+      tags: [estate]
+      responses:
+        "200":
+          description: What the Estate repository holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PinList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/estate/projects/{project}/deploys:
+    get:
+      operationId: listDeploys
+      summary: List the commits that moved a Project's pin, newest first
+      description: >-
+        The Estate repository's history of projects/<project>/source.yaml: its deploy log. A Project with no pin has none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+      tags: [estate]
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: The Project.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+            pattern: "^[a-z0-9_][a-z0-9_-]{0,62}$"
+        - name: limit
+          in: query
+          required: false
+          description: How many deploys to return.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: What the Estate repository holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/estate/issues:
+    get:
+      operationId: listIssues
+      summary: List the open issues, most recently updated first
+      description: >-
+        The Estate repository's open issues: one per Project condition the composition keeps open. At most one page of 100. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+      tags: [estate]
+      responses:
+        "200":
+          description: What the Estate repository holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssueList"
+        "401":
           $ref: "#/components/responses/Problem"
         "503":
           $ref: "#/components/responses/Problem"
@@ -222,6 +306,146 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    Pin:
+      description: One Project's pin.
+      type: object
+      additionalProperties: false
+      required: [project, digest]
+      properties:
+        project:
+          type: string
+          minLength: 1
+          maxLength: 63
+          description: The Project.
+          example: auth
+        digest:
+          type: string
+          maxLength: 128
+          description: The digest its source names; empty where the pin file holds no source.
+        paused:
+          $ref: "#/components/schemas/Pause"
+        rolledBack:
+          $ref: "#/components/schemas/Rollback"
+    Pause:
+      description: What a Pause or a Rollback recorded on a pin.
+      type: object
+      additionalProperties: false
+      required: [by, at, reason]
+      properties:
+        by:
+          type: string
+          maxLength: 255
+          description: The GitHub login that ran it.
+        at:
+          type: string
+          maxLength: 64
+          description: When, as recorded.
+        reason:
+          type: string
+          maxLength: 1024
+          description: The reason given.
+    Rollback:
+      description: The release a Rollback took the Project back to.
+      type: object
+      additionalProperties: false
+      required: [version, fragment]
+      properties:
+        version:
+          type: string
+          maxLength: 64
+          description: The release version.
+        fragment:
+          type: string
+          maxLength: 256
+          description: That release's fragment, by digest.
+    PinList:
+      description: Every Project's pin, by Project.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 1000
+          description: The pins.
+          items:
+            $ref: "#/components/schemas/Pin"
+    Deploy:
+      description: One commit that moved a pin.
+      type: object
+      additionalProperties: false
+      required: [commit, at, message]
+      properties:
+        commit:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: The commit.
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was committed.
+        message:
+          type: string
+          maxLength: 1024
+          description: Its subject line.
+    DeployList:
+      description: A Project's deploys, newest first.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          description: The deploys.
+          items:
+            $ref: "#/components/schemas/Deploy"
+    Issue:
+      description: One open issue of the Estate repository.
+      type: object
+      additionalProperties: false
+      required: [number, title, url, labels, updatedAt]
+      properties:
+        number:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+          description: The issue number.
+        title:
+          type: string
+          maxLength: 1024
+          description: Its title.
+        url:
+          type: string
+          maxLength: 1024
+          description: Where it is on GitHub.
+        labels:
+          type: array
+          maxItems: 100
+          description: Its labels.
+          items:
+            type: string
+            maxLength: 255
+        updatedAt:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it last changed.
+    IssueList:
+      description: The open issues, most recently updated first.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          description: The issues.
+          items:
+            $ref: "#/components/schemas/Issue"
     Source:
       description: One Flux OCIRepository.
       type: object

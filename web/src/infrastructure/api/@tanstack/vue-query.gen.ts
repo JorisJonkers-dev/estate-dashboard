@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/vue-query';
 
 import { client } from '../client.gen';
-import { getSession, listAlertHistory, listAlerts, listReleases, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
-import type { GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
+import { getSession, listAlertHistory, listAlerts, listDeploys, listIssues, listPins, listReleases, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
+import type { GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -97,6 +97,66 @@ export const silenceAlertMutation = (options?: Partial<Options<SilenceAlertData>
     };
     return mutationOptions;
 };
+
+export const listPinsQueryKey = (options?: Options<ListPinsData>) => createQueryKey('listPins', options);
+
+/**
+ * List every Project's pin, by Project
+ *
+ * Every projects/<project>/source.yaml on the Estate repository's default branch: the digest its source names, and a Pause or a Rollback recorded on it. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const listPinsOptions = (options?: Options<ListPinsData>) => queryOptions<ListPinsResponse, ListPinsError, ListPinsResponse, ReturnType<typeof listPinsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listPins({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listPinsQueryKey(options)
+});
+
+export const listDeploysQueryKey = (options: Options<ListDeploysData>) => createQueryKey('listDeploys', options);
+
+/**
+ * List the commits that moved a Project's pin, newest first
+ *
+ * The Estate repository's history of projects/<project>/source.yaml: its deploy log. A Project with no pin has none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const listDeploysOptions = (options: Options<ListDeploysData>) => queryOptions<ListDeploysResponse, ListDeploysError, ListDeploysResponse, ReturnType<typeof listDeploysQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listDeploys({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listDeploysQueryKey(options)
+});
+
+export const listIssuesQueryKey = (options?: Options<ListIssuesData>) => createQueryKey('listIssues', options);
+
+/**
+ * List the open issues, most recently updated first
+ *
+ * The Estate repository's open issues: one per Project condition the composition keeps open. At most one page of 100. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const listIssuesOptions = (options?: Options<ListIssuesData>) => queryOptions<ListIssuesResponse, ListIssuesError, ListIssuesResponse, ReturnType<typeof listIssuesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listIssues({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listIssuesQueryKey(options)
+});
 
 export const listSourcesQueryKey = (options?: Options<ListSourcesData>) => createQueryKey('listSources', options);
 

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,10 @@ import (
 	deliveryweb "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/adapters/web"
 	deliveryapp "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/app"
 	delivery "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/domain"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/estate/adapters/github"
+	estateweb "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/adapters/web"
+	estateapp "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/app"
+	estatedomain "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpapi"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oidc"
 )
@@ -76,7 +81,12 @@ func serveLive(t *testing.T, repo *memory, l *live) *httptest.Server {
 
 func serveAll(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases) *httptest.Server {
 	t.Helper()
-	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l, delivery)
+	return serveEstate(t, repo, l, delivery, estateapp.New(github.Absent{}))
+}
+
+func serveEstate(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases, estate estateweb.UseCases) *httptest.Server {
+	t.Helper()
+	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l, delivery, estate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,6 +327,76 @@ func TestAClusterThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 	}
 }
 
+// repository is the Estate repository read in memory; asked is each deploys read.
+type repository struct {
+	pins    []estatedomain.Pin
+	deploys []estatedomain.Deploy
+	issues  []estatedomain.Issue
+	err     error
+	asked   []string
+}
+
+func (r *repository) Pins(context.Context) ([]estatedomain.Pin, error) { return r.pins, r.err }
+
+func (r *repository) Deploys(_ context.Context, project string, limit int) ([]estatedomain.Deploy, error) {
+	r.asked = append(r.asked, project+" "+strconv.Itoa(limit))
+	return r.deploys, r.err
+}
+
+func (r *repository) Issues(context.Context) ([]estatedomain.Issue, error) { return r.issues, r.err }
+
+func TestTheEstateRepositoryIsServedInTheContractsShape(t *testing.T) {
+	at := time.Date(2026, 10, 3, 7, 0, 0, 0, time.UTC)
+	repo := &repository{
+		pins: []estatedomain.Pin{
+			{Project: "data", Digest: "sha256:d"},
+			{Project: "auth", Digest: "sha256:a", Paused: &estatedomain.Pause{By: "joris", At: "2026-10-03T07:00:00Z", Reason: "held"}, RolledBack: &estatedomain.Rollback{Version: "1.2.0", Fragment: "sha256:f"}},
+		},
+		deploys: []estatedomain.Deploy{{Commit: "abc", At: at, Message: "auth 1.3.0"}},
+		issues:  []estatedomain.Issue{{Number: 7, Title: "auth is held", URL: "https://github.com/x/7", Labels: []string{"held"}, UpdatedAt: at}},
+	}
+	srv := serveEstate(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(repo))
+
+	pins := call(t, srv, http.MethodGet, "/api/v1/estate/pins", "", true)
+	items, _ := pins.body["items"].([]any)
+	auth, _ := items[0].(map[string]any)
+	if pins.code != http.StatusOK || len(items) != 2 || auth["project"] != "auth" || auth["paused"].(map[string]any)["reason"] != "held" || auth["rolledBack"].(map[string]any)["version"] != "1.2.0" {
+		t.Fatalf("pins = %d %v", pins.code, pins.body)
+	}
+	if data := items[1].(map[string]any); len(data) != 2 {
+		t.Fatalf("a pin with nothing recorded = %v", data)
+	}
+	deploys := call(t, srv, http.MethodGet, "/api/v1/estate/projects/auth/deploys?limit=5", "", true)
+	if deploys.code != http.StatusOK || deploys.body["items"].([]any)[0].(map[string]any)["at"] != "2026-10-03T07:00:00Z" || repo.asked[0] != "auth 5" {
+		t.Fatalf("deploys = %d %v, asked %v", deploys.code, deploys.body, repo.asked)
+	}
+	issues := call(t, srv, http.MethodGet, "/api/v1/estate/issues", "", true)
+	if issues.code != http.StatusOK || issues.body["items"].([]any)[0].(map[string]any)["number"] != float64(7) {
+		t.Fatalf("issues = %d %v", issues.code, issues.body)
+	}
+	if got := call(t, srv, http.MethodGet, "/api/v1/estate/projects/NOT_A_NAME/deploys", "", true); got.code != http.StatusBadRequest {
+		t.Fatalf("a name that is no Project = %d", got.code)
+	}
+}
+
+func TestAnEstateRepositoryThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
+	for want, uc := range map[string]estateweb.UseCases{
+		"GitHub did not answer.":                                    estateapp.New(&repository{err: errors.New("rate limited")}),
+		"The dashboard runs without the Estate repository to read.": estateapp.New(github.Absent{}),
+	} {
+		srv := serveEstate(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), uc)
+		for _, path := range []string{"/api/v1/estate/pins", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys"} {
+			if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
+				t.Fatalf("%s = %d %v", path, got.code, got.body)
+			}
+		}
+	}
+	none := serveEstate(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(&repository{err: estatedomain.ErrNoProject}))
+	if got := call(t, none, http.MethodGet, "/api/v1/estate/projects/auth/deploys", "", true); got.code != http.StatusOK || len(got.body["items"].([]any)) != 0 {
+		t.Fatalf("a Project the repository does not know = %d %v", got.code, got.body)
+	}
+}
+
 func TestTheSessionIsTheAdminTheCookieBelongsTo(t *testing.T) {
 	srv := serve(t, &memory{})
 	got := call(t, srv, http.MethodGet, "/api/v1/session", "", true)
@@ -327,7 +407,7 @@ func TestTheSessionIsTheAdminTheCookieBelongsTo(t *testing.T) {
 
 func TestOnlyALiveAdminSessionReachesAnOperation(t *testing.T) {
 	srv := serve(t, &memory{})
-	for _, path := range []string{"/api/v1/session", "/api/v1/alerts/history", "/api/v1/alerts", "/api/v1/delivery/sources", "/api/v1/delivery/units", "/api/v1/delivery/releases"} {
+	for _, path := range []string{"/api/v1/session", "/api/v1/alerts/history", "/api/v1/alerts", "/api/v1/delivery/sources", "/api/v1/delivery/units", "/api/v1/delivery/releases", "/api/v1/estate/pins", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys"} {
 		for name, cookie := range map[string]string{"no cookie": "", "a cookie the gate does not admit": "someone-elses"} {
 			got := callWith(t, srv, http.MethodGet, path, "", cookie)
 			if got.code != http.StatusUnauthorized || got.body["status"] != float64(http.StatusUnauthorized) || got.body["detail"] != nil {

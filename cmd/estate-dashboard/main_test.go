@@ -80,6 +80,21 @@ func TestStartRefusesABadEnvironment(t *testing.T) {
 	}
 }
 
+func TestTheEnvironmentSaysWhichEstateRepositoryToRead(t *testing.T) {
+	if r, err := readEstate(env(map[string]string{})); err != nil || r == nil {
+		t.Fatalf("without a token: %T, %v", r, err)
+	}
+	if _, err := readEstate(env(map[string]string{"GITHUB_TOKEN": "t"})); err != nil {
+		t.Fatalf("with a token and the defaults: %v", err)
+	}
+	if _, err := readEstate(env(map[string]string{"GITHUB_TOKEN": "t", "ESTATE_REPOSITORY": "not-owner-name"})); err == nil {
+		t.Fatal("a repository that is not owner/name was read")
+	}
+	if _, err := readEstate(env(map[string]string{"GITHUB_TOKEN": "t", "GITHUB_API": "ftp://x"})); err == nil {
+		t.Fatal("an API that is no http(s) URL was read")
+	}
+}
+
 func TestTheEnvironmentSaysHowToSignIn(t *testing.T) {
 	dev, err := readSignIn(env(map[string]string{"DEV_USER": "dev"}))
 	if err != nil || dev.devUser != "dev" || dev.codec != nil {

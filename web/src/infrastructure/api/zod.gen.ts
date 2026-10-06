@@ -3,6 +3,74 @@
 import * as z from 'zod';
 
 /**
+ * What a Pause or a Rollback recorded on a pin.
+ */
+export const zPause = z.object({
+    by: z.string().max(255),
+    at: z.string().max(64),
+    reason: z.string().max(1024)
+});
+
+/**
+ * The release a Rollback took the Project back to.
+ */
+export const zRollback = z.object({
+    version: z.string().max(64),
+    fragment: z.string().max(256)
+});
+
+/**
+ * One Project's pin.
+ */
+export const zPin = z.object({
+    project: z.string().min(1).max(63),
+    digest: z.string().max(128),
+    paused: zPause.optional(),
+    rolledBack: zRollback.optional()
+});
+
+/**
+ * Every Project's pin, by Project.
+ */
+export const zPinList = z.object({
+    items: z.array(zPin).max(1000)
+});
+
+/**
+ * One commit that moved a pin.
+ */
+export const zDeploy = z.object({
+    commit: z.string().min(1).max(64),
+    at: z.iso.datetime({ offset: true }).max(64),
+    message: z.string().max(1024)
+});
+
+/**
+ * A Project's deploys, newest first.
+ */
+export const zDeployList = z.object({
+    items: z.array(zDeploy).max(100)
+});
+
+/**
+ * One open issue of the Estate repository.
+ */
+export const zIssue = z.object({
+    number: z.int().gte(1).lte(2147483647),
+    title: z.string().max(1024),
+    url: z.string().max(1024),
+    labels: z.array(z.string().max(255)).max(100),
+    updatedAt: z.iso.datetime({ offset: true }).max(64)
+});
+
+/**
+ * The open issues, most recently updated first.
+ */
+export const zIssueList = z.object({
+    items: z.array(zIssue).max(100)
+});
+
+/**
  * One Flux OCIRepository.
  */
 export const zSource = z.object({
@@ -191,6 +259,29 @@ export const zSilenceAlertPath = z.object({
  * The silence Alertmanager now holds.
  */
 export const zSilenceAlertResponse = zSilence;
+
+/**
+ * What the Estate repository holds.
+ */
+export const zListPinsResponse = zPinList;
+
+export const zListDeploysPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+export const zListDeploysQuery = z.object({
+    limit: z.int().gte(1).lte(100).optional().default(20)
+});
+
+/**
+ * What the Estate repository holds.
+ */
+export const zListDeploysResponse = zDeployList;
+
+/**
+ * What the Estate repository holds.
+ */
+export const zListIssuesResponse = zIssueList;
 
 /**
  * What the cluster holds.
