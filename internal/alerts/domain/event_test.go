@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -33,7 +34,7 @@ func TestNewEvent(t *testing.T) {
 	}
 	for name, event := range accepted {
 		got, err := domain.NewEvent(event)
-		if err != nil || got != event {
+		if err != nil || !reflect.DeepEqual(got, event) {
 			t.Errorf("%s: NewEvent = %+v, %v", name, got, err)
 		}
 	}

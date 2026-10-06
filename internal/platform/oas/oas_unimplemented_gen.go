@@ -33,6 +33,30 @@ func (UnimplementedHandler) ListAlertHistory(ctx context.Context, params ListAle
 	return r, ht.ErrNotImplemented
 }
 
+// ListAlerts implements listAlerts operation.
+//
+// Returns every alert Alertmanager holds now, silenced or not, newest first. Read from Alertmanager on
+// every request; nothing here is copied into the dashboard's database. A 503 means Alertmanager did
+// not answer.
+//
+// GET /api/v1/alerts
+func (UnimplementedHandler) ListAlerts(ctx context.Context) (r ListAlertsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// SilenceAlert implements silenceAlert operation.
+//
+// Silences one firing alert, matching every one of its labels exactly, for an hour, four hours, a day,
+// or until it resolves. The silence is set in Alertmanager, so Discord goes quiet too; it is the
+// dashboard's only write. A silence until resolved lasts at most seven days in Alertmanager and is
+// ended as soon as the dashboard sees the alert resolve. A 404 means the alert is not firing; a 503
+// that Alertmanager did not answer.
+//
+// POST /api/v1/alerts/{fingerprint}/silences
+func (UnimplementedHandler) SilenceAlert(ctx context.Context, req *SilenceRequest, params SilenceAlertParams) (r SilenceAlertRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // NewError creates *ProblemStatusCode from error returned by handler.
 //
 // Used for common default response.

@@ -1,7 +1,7 @@
 // Command estate-dashboard serves the API and the embedded web app, migrates its database at
 // startup, and drains on SIGTERM.
 //
-// Environment: DATABASE_URL (required) and ADDR (default :8080). Signing in goes through auth, so
+// Environment: DATABASE_URL and ALERTMANAGER_URL (both required), and ADDR (default :8080). Signing in goes through auth, so
 // a deployment also sets OIDC_ISSUER, OIDC_CLIENT_SECRET, OIDC_REDIRECT_URL and SESSION_KEY, and
 // may set OIDC_CLIENT_ID (default estate-dashboard). DEV_USER replaces all of those on a local
 // run: every request is that admin and nothing asks auth. It must never be set in a deployment.
@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/adapters/gateway"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/adapters/persistence"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/app"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpapi"
@@ -38,6 +39,11 @@ const (
 	defaultClientID = "estate-dashboard"
 	// sweepEvery is how often sessions past their end are deleted.
 	sweepEvery = time.Hour
+	// watchEvery is how often the dashboard looks at Alertmanager without being asked: the
+	// history and a silence until resolved are as fresh as this.
+	watchEvery = 30 * time.Second
+	// alertmanagerTimeout bounds one call to Alertmanager, so a request never waits on it longer.
+	alertmanagerTimeout = 10 * time.Second
 )
 
 func main() {
@@ -130,12 +136,32 @@ func sweep(ctx context.Context, logger *slog.Logger, sessions interface {
 	}
 }
 
+// watch records what Alertmanager holds, now and then every interval, until ctx is done.
+func watch(ctx context.Context, logger *slog.Logger, live interface{ Watch(context.Context) error }, every time.Duration) {
+	tick := time.NewTicker(every)
+	defer tick.Stop()
+	for {
+		if err := live.Watch(ctx); err != nil && ctx.Err() == nil {
+			logger.WarnContext(ctx, "watch Alertmanager", "error", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+	}
+}
+
 // run is the composition root: it reads the environment and builds the store, the use cases and
 // the server. httpapi assembles the contexts' web adapters into the one generated API.
 func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) error {
 	dbURL := getenv("DATABASE_URL")
 	if dbURL == "" {
 		return errors.New("DATABASE_URL is not set")
+	}
+	am, err := gateway.New(getenv("ALERTMANAGER_URL"), &http.Client{Timeout: alertmanagerTimeout})
+	if err != nil {
+		return fmt.Errorf("ALERTMANAGER_URL: %w", err)
 	}
 	admission, err := readSignIn(getenv)
 	if err != nil {
@@ -154,7 +180,10 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	if err != nil {
 		return err
 	}
-	api, err := httpapi.New(logger, gate, app.New(persistence.New(store.Queries())))
+	history := persistence.New(store.Queries())
+	live := app.NewLive(am, history, persistence.NewSilences(store.Queries()), time.Now, logger)
+	go watch(ctx, logger, live, watchEvery)
+	api, err := httpapi.New(logger, gate, app.New(history), live)
 	if err != nil {
 		return err
 	}

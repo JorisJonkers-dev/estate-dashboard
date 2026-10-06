@@ -22,7 +22,9 @@ tags:
   - name: session
     description: Who is signed in.
   - name: alerts
-    description: What the dashboard itself recorded about alerts.
+    description: >-
+      The alerts Alertmanager holds now, what the dashboard recorded about them, and the silences it
+      sets there, its one write.
 paths:
   /api/v1/session:
     get:
@@ -40,6 +42,70 @@ paths:
               schema:
                 $ref: "#/components/schemas/Session"
         "401":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/alerts:
+    get:
+      operationId: listAlerts
+      summary: List the alerts firing now, newest first
+      description: >-
+        Returns every alert Alertmanager holds now, silenced or not, newest first. Read from
+        Alertmanager on every request; nothing here is copied into the dashboard's database. A 503
+        means Alertmanager did not answer.
+      tags: [alerts]
+      responses:
+        "200":
+          description: The alerts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/alerts/{fingerprint}/silences:
+    post:
+      operationId: silenceAlert
+      summary: Silence an alert in Alertmanager
+      description: >-
+        Silences one firing alert, matching every one of its labels exactly, for an hour, four
+        hours, a day, or until it resolves. The silence is set in Alertmanager, so Discord goes
+        quiet too; it is the dashboard's only write. A silence until resolved lasts at most seven
+        days in Alertmanager and is ended as soon as the dashboard sees the alert resolve. A 404
+        means the alert is not firing; a 503 that Alertmanager did not answer.
+      tags: [alerts]
+      parameters:
+        - name: fingerprint
+          in: path
+          required: true
+          description: Alertmanager's fingerprint of the alert.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+            pattern: "^[0-9a-f]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SilenceRequest"
+      responses:
+        "201":
+          description: The silence Alertmanager now holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Silence"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "503":
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
@@ -92,6 +158,119 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    Alert:
+      description: One alert Alertmanager holds now.
+      type: object
+      additionalProperties: false
+      required: [fingerprint, name, startsAt, labels, silencedBy]
+      properties:
+        fingerprint:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Alertmanager's fingerprint of the alert.
+          example: 9f2c1a7b3d4e5f60
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: The alert's name, its alertname label.
+          example: ReleaseHeld
+        class:
+          type: string
+          enum: [business-hours, urgent, page]
+          description: >-
+            How loudly the alert wakes someone, from its alert_class label. Absent on an alert whose
+            rule carries no class the dashboard knows.
+          example: urgent
+        summary:
+          type: string
+          maxLength: 1024
+          description: The rule's summary annotation, where it carries one.
+          example: auth is held at its serving revision.
+        startsAt:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When this firing of the alert started.
+          example: "2026-10-03T07:00:00Z"
+        labels:
+          type: object
+          maxProperties: 64
+          description: Every label of the alert.
+          additionalProperties:
+            type: string
+            maxLength: 1024
+          example:
+            alertname: ReleaseHeld
+            namespace: auth-system
+        silencedBy:
+          type: array
+          maxItems: 64
+          description: The id of every silence that holds the alert quiet now; empty when none does.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+    AlertList:
+      description: The alerts firing now, newest first.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 1000
+          description: The alerts.
+          items:
+            $ref: "#/components/schemas/Alert"
+    SilenceRequest:
+      description: How long to silence an alert for.
+      type: object
+      additionalProperties: false
+      required: [length]
+      properties:
+        length:
+          type: string
+          enum: [1h, 4h, 1d, until-resolved]
+          description: An hour, four hours, a day, or until the alert resolves.
+          example: 4h
+    Silence:
+      description: A silence the dashboard set in Alertmanager.
+      type: object
+      additionalProperties: false
+      required: [id, fingerprint, createdBy, createdAt]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Alertmanager's id of the silence.
+          example: 6b3f1c2a-7d4e-4f50-8a91-0b2c3d4e5f60
+        fingerprint:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: The silenced alert's fingerprint.
+          example: 9f2c1a7b3d4e5f60
+        createdBy:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: The admin who set it.
+          example: joris
+        createdAt:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was set.
+          example: "2026-10-03T07:05:00Z"
+        endsAt:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it ends. Absent on a silence that lasts until the alert resolves.
+          example: "2026-10-03T11:05:00Z"
     AlertEvent:
       description: One state an alert was seen in.
       type: object

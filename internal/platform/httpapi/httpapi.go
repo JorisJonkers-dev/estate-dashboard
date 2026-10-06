@@ -24,6 +24,7 @@ type Gate interface {
 // api is the oas.Handler: one embedded web adapter per context, plus the shared error mapping.
 type api struct {
 	*alertsweb.Handler
+	*alertsweb.Live
 	logger *slog.Logger
 }
 
@@ -66,9 +67,9 @@ func (s admitted) HandleSessionCookie(ctx context.Context, _ oas.OperationName, 
 }
 
 // New returns the API's http.Handler, serving every path the contract declares under /api.
-func New(logger *slog.Logger, gate Gate, alerts alertsweb.UseCases) (http.Handler, error) {
+func New(logger *slog.Logger, gate Gate, alerts alertsweb.UseCases, live alertsweb.LiveUseCases) (http.Handler, error) {
 	return oas.NewServer(
-		&api{Handler: alertsweb.New(alerts), logger: logger},
+		&api{Handler: alertsweb.New(alerts), Live: alertsweb.NewLive(live, logger), logger: logger},
 		admitted{gate: gate},
 		oas.WithErrorHandler(func(_ context.Context, w http.ResponseWriter, _ *http.Request, err error) {
 			httpx.WriteProblem(w, ogenerrors.ErrorCode(err), "")

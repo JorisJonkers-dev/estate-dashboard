@@ -17,10 +17,18 @@ type Querier interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (uuid.UUID, error)
 	DeleteExpiredSessions(ctx context.Context, now time.Time) (int64, error)
 	DeleteSession(ctx context.Context, id uuid.UUID) ([]byte, error)
+	ExpireSilence(ctx context.Context, arg ExpireSilenceParams) error
 	GetSession(ctx context.Context, arg GetSessionParams) (GetSessionRow, error)
 	ListAlertHistory(ctx context.Context, limit int32) ([]ListAlertHistoryRow, error)
+	// Every firing with no resolution of the same firing recorded.
+	ListOpenFirings(ctx context.Context) ([]ListOpenFiringsRow, error)
+	ListUntilResolved(ctx context.Context, fingerprint string) ([]ListUntilResolvedRow, error)
 	// The row lock is what makes concurrent requests spend a rotating refresh token once.
 	LockSession(ctx context.Context, arg LockSessionParams) (LockSessionRow, error)
+	// Seeing the same state twice records it once: alert_history_one_row_per_state.
+	RecordAlertEvent(ctx context.Context, arg RecordAlertEventParams) error
+	// The silences the dashboard created in Alertmanager: its one write, mirrored here.
+	RecordSilence(ctx context.Context, arg RecordSilenceParams) error
 	// renewed_at always moves, so a request that loaded the session before sees it was renewed.
 	RenewSession(ctx context.Context, arg RenewSessionParams) (RenewSessionRow, error)
 }

@@ -22,6 +22,24 @@ type Handler interface {
 	//
 	// GET /api/v1/alerts/history
 	ListAlertHistory(ctx context.Context, params ListAlertHistoryParams) (ListAlertHistoryRes, error)
+	// ListAlerts implements listAlerts operation.
+	//
+	// Returns every alert Alertmanager holds now, silenced or not, newest first. Read from Alertmanager on
+	// every request; nothing here is copied into the dashboard's database. A 503 means Alertmanager did
+	// not answer.
+	//
+	// GET /api/v1/alerts
+	ListAlerts(ctx context.Context) (ListAlertsRes, error)
+	// SilenceAlert implements silenceAlert operation.
+	//
+	// Silences one firing alert, matching every one of its labels exactly, for an hour, four hours, a day,
+	// or until it resolves. The silence is set in Alertmanager, so Discord goes quiet too; it is the
+	// dashboard's only write. A silence until resolved lasts at most seven days in Alertmanager and is
+	// ended as soon as the dashboard sees the alert resolve. A 404 means the alert is not firing; a 503
+	// that Alertmanager did not answer.
+	//
+	// POST /api/v1/alerts/{fingerprint}/silences
+	SilenceAlert(ctx context.Context, req *SilenceRequest, params SilenceAlertParams) (SilenceAlertRes, error)
 	// NewError creates *ProblemStatusCode from error returned by handler.
 	//
 	// Used for common default response.

@@ -3,6 +3,53 @@
 import * as z from 'zod';
 
 /**
+ * One alert Alertmanager holds now.
+ */
+export const zAlert = z.object({
+    fingerprint: z.string().min(1).max(64),
+    name: z.string().min(1).max(255),
+    class: z.enum([
+        'business-hours',
+        'urgent',
+        'page'
+    ]).optional(),
+    summary: z.string().max(1024).optional(),
+    startsAt: z.iso.datetime({ offset: true }).max(64),
+    labels: z.record(z.string(), z.string().max(1024)),
+    silencedBy: z.array(z.string().min(1).max(64)).max(64)
+});
+
+/**
+ * The alerts firing now, newest first.
+ */
+export const zAlertList = z.object({
+    items: z.array(zAlert).max(1000)
+});
+
+/**
+ * How long to silence an alert for.
+ */
+export const zSilenceRequest = z.object({
+    length: z.enum([
+        '1h',
+        '4h',
+        '1d',
+        'until-resolved'
+    ])
+});
+
+/**
+ * A silence the dashboard set in Alertmanager.
+ */
+export const zSilence = z.object({
+    id: z.string().min(1).max(64),
+    fingerprint: z.string().min(1).max(64),
+    createdBy: z.string().min(1).max(255),
+    createdAt: z.iso.datetime({ offset: true }).max(64),
+    endsAt: z.iso.datetime({ offset: true }).max(64).optional()
+});
+
+/**
  * One state an alert was seen in.
  */
 export const zAlertEvent = z.object({
@@ -44,6 +91,22 @@ export const zProblem = z.object({
  * The signed-in admin.
  */
 export const zGetSessionResponse = zSession;
+
+/**
+ * The alerts.
+ */
+export const zListAlertsResponse = zAlertList;
+
+export const zSilenceAlertBody = zSilenceRequest;
+
+export const zSilenceAlertPath = z.object({
+    fingerprint: z.string().min(1).max(64).regex(/^[0-9a-f]+$/)
+});
+
+/**
+ * The silence Alertmanager now holds.
+ */
+export const zSilenceAlertResponse = zSilence;
 
 export const zListAlertHistoryQuery = z.object({
     limit: z.int().gte(1).lte(100).optional().default(50)

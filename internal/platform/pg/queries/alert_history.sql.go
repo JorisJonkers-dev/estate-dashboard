@@ -56,3 +56,83 @@ func (q *Queries) ListAlertHistory(ctx context.Context, limit int32) ([]ListAler
 	}
 	return items, nil
 }
+
+const listOpenFirings = `-- name: ListOpenFirings :many
+SELECT f.id, f.fingerprint, f.name, f.status, f.starts_at, f.ends_at, f.observed_at
+FROM alert_history f
+WHERE f.status = 'firing'
+  AND NOT EXISTS (
+    SELECT 1 FROM alert_history r
+    WHERE r.fingerprint = f.fingerprint AND r.starts_at = f.starts_at AND r.status = 'resolved'
+  )
+ORDER BY f.starts_at, f.fingerprint
+`
+
+type ListOpenFiringsRow struct {
+	ID          int64
+	Fingerprint string
+	Name        string
+	Status      string
+	StartsAt    time.Time
+	EndsAt      pgtype.Timestamptz
+	ObservedAt  time.Time
+}
+
+// Every firing with no resolution of the same firing recorded.
+func (q *Queries) ListOpenFirings(ctx context.Context) ([]ListOpenFiringsRow, error) {
+	rows, err := q.db.Query(ctx, listOpenFirings)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOpenFiringsRow{}
+	for rows.Next() {
+		var i ListOpenFiringsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Fingerprint,
+			&i.Name,
+			&i.Status,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.ObservedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const recordAlertEvent = `-- name: RecordAlertEvent :exec
+INSERT INTO alert_history (fingerprint, name, status, labels, starts_at, ends_at, observed_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT ON CONSTRAINT alert_history_one_row_per_state DO NOTHING
+`
+
+type RecordAlertEventParams struct {
+	Fingerprint string
+	Name        string
+	Status      string
+	Labels      []byte
+	StartsAt    time.Time
+	EndsAt      pgtype.Timestamptz
+	ObservedAt  time.Time
+}
+
+// Seeing the same state twice records it once: alert_history_one_row_per_state.
+func (q *Queries) RecordAlertEvent(ctx context.Context, arg RecordAlertEventParams) error {
+	_, err := q.db.Exec(ctx, recordAlertEvent,
+		arg.Fingerprint,
+		arg.Name,
+		arg.Status,
+		arg.Labels,
+		arg.StartsAt,
+		arg.EndsAt,
+		arg.ObservedAt,
+	)
+	return err
+}

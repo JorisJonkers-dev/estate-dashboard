@@ -5,6 +5,7 @@ vars:
   APP: estate-dashboard
   # The compose Postgres (compose.yaml).
   DATABASE_URL: postgres://app:app@localhost:55432/app?sslmode=disable
+  ALERTMANAGER_URL: http://localhost:59093
 
 tasks:
   default:
@@ -99,8 +100,8 @@ tasks:
       - CGO_ENABLED=0 go build -trimpath -o bin/{{.APP}} ./cmd/{{.APP}}
 
   db:
-    desc: Start the compose Postgres
-    cmd: docker compose up -d --wait postgres
+    desc: Start the compose Postgres and Alertmanager
+    cmd: docker compose up -d --wait postgres alertmanager
 
   e2e:
     desc: Playwright with axe against the built binary and the compose Postgres
@@ -110,6 +111,7 @@ tasks:
       - pnpm --filter @{{.APP}}/web e2e
     env:
       DATABASE_URL: "{{.DATABASE_URL}}"
+      ALERTMANAGER_URL: "{{.ALERTMANAGER_URL}}"
 
   secrets:
     desc: Scan the working tree for secrets
@@ -136,5 +138,5 @@ tasks:
     deps: [db, install]
     cmd: |
       trap 'kill 0' EXIT
-      DATABASE_URL='{{.DATABASE_URL}}' DEV_USER=dev go run ./cmd/{{.APP}} &
+      DATABASE_URL='{{.DATABASE_URL}}' ALERTMANAGER_URL='{{.ALERTMANAGER_URL}}' DEV_USER=dev go run ./cmd/{{.APP}} &
       pnpm --filter @{{.APP}}/web dev

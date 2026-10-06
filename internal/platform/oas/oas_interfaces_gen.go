@@ -8,3 +8,11 @@ type GetSessionRes interface {
 type ListAlertHistoryRes interface {
 	listAlertHistoryRes()
 }
+
+type ListAlertsRes interface {
+	listAlertsRes()
+}
+
+type SilenceAlertRes interface {
+	silenceAlertRes()
+}
