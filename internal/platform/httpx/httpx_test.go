@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpx"
@@ -33,9 +34,15 @@ func TestProblemOmitsAnEmptyDetail(t *testing.T) {
 func TestSecurityHeaders(t *testing.T) {
 	rec := httptest.NewRecorder()
 	httpx.SecurityHeaders(http.NotFoundHandler()).ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
-	for _, h := range []string{"Content-Security-Policy", "X-Content-Type-Options", "Referrer-Policy", "X-Frame-Options", "Strict-Transport-Security"} {
+	for _, h := range []string{"Content-Security-Policy", "X-Content-Type-Options", "Referrer-Policy", "X-Frame-Options", "Strict-Transport-Security", "Permissions-Policy"} {
 		if rec.Header().Get(h) == "" {
 			t.Errorf("missing %s", h)
 		}
+	}
+	if got := rec.Header().Get("Strict-Transport-Security"); got != "max-age=63072000; includeSubDomains" {
+		t.Errorf("HSTS = %q", got)
+	}
+	if got := rec.Header().Get("Content-Security-Policy"); !strings.Contains(got, "frame-ancestors 'none'") {
+		t.Errorf("CSP = %q", got)
 	}
 }
