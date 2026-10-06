@@ -5,6 +5,8 @@ package httpx
 import (
 	"net/http"
 
+	"github.com/JorisJonkers-dev/go-commons/secure"
+
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oas"
 )
 
@@ -35,15 +37,13 @@ func WriteProblem(w http.ResponseWriter, status int, detail string) {
 	_, _ = w.Write(body)
 }
 
-// SecurityHeaders sets the browser hardening headers on every response.
+// hsts is the dashboard's Strict-Transport-Security: two years, subdomains included.
+const hsts = "max-age=63072000; includeSubDomains"
+
+// SecurityHeaders sets the browser hardening headers on every response: go-commons' fixed set, and
+// the dashboard's own content security policy and HSTS.
 func SecurityHeaders(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h := w.Header()
-		h.Set("Content-Security-Policy", contentSecurityPolicy)
-		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		h.Set("X-Frame-Options", "DENY")
-		h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
-		next.ServeHTTP(w, r)
-	})
+	// Cannot fail: the policy names a content security policy.
+	wrap, _ := secure.Headers(secure.Policy{ContentSecurityPolicy: contentSecurityPolicy, HSTS: hsts})
+	return wrap(next)
 }

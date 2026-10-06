@@ -8,6 +8,7 @@ ignore node_modules
 tool github.com/ogen-go/ogen/cmd/ogen
 
 require (
+	github.com/JorisJonkers-dev/go-commons v0.1.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/go-faster/errors v0.8.0
 	github.com/go-faster/jx v1.2.0
