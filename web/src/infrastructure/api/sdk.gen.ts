@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
-import { zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
+import type { GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
+import { zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListReleasesResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -86,6 +86,69 @@ export const silenceAlert = <ThrowOnError extends boolean = false>(options: Opti
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * List the pin sources, by name
+ *
+ * Every Flux OCIRepository the render wrote: the artifact it names by digest, what Flux last fetched, and whether it is ready. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listSources = <ThrowOnError extends boolean = false>(options?: Options<ListSourcesData, ThrowOnError>): RequestResult<ListSourcesResponses, ListSourcesErrors, ThrowOnError> => (options?.client ?? client).get<ListSourcesResponses, ListSourcesErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListSourcesResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/delivery/sources',
+    ...options
+});
+
+/**
+ * List the Reconcile Units, by name
+ *
+ * Every Flux Kustomization the render wrote: its source, its path, the units it follows, what it last applied, and whether it is ready. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listUnits = <ThrowOnError extends boolean = false>(options?: Options<ListUnitsData, ThrowOnError>): RequestResult<ListUnitsResponses, ListUnitsErrors, ThrowOnError> => (options?.client ?? client).get<ListUnitsResponses, ListUnitsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListUnitsResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/delivery/units',
+    ...options
+});
+
+/**
+ * List the gated Applications and their releases
+ *
+ * Every Application whose release-gate inputs the render wrote, by namespace and Application: each member as Flagger switches it, the migration the gate may start, and what the Release Gate recorded it serves and saw pinned. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listReleases = <ThrowOnError extends boolean = false>(options?: Options<ListReleasesData, ThrowOnError>): RequestResult<ListReleasesResponses, ListReleasesErrors, ThrowOnError> => (options?.client ?? client).get<ListReleasesResponses, ListReleasesErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListReleasesResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/delivery/releases',
+    ...options
 });
 
 /**

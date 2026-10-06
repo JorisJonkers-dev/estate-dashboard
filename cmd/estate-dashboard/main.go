@@ -1,7 +1,9 @@
 // Command estate-dashboard serves the API and the embedded web app, migrates its database at
 // startup, and drains on SIGTERM.
 //
-// Environment: DATABASE_URL and ALERTMANAGER_URL (both required), and ADDR (default :8080). Signing in goes through auth, so
+// Environment: DATABASE_URL and ALERTMANAGER_URL (both required), and ADDR (default :8080). The
+// cluster is the one the dashboard runs in; on a local run KUBECONFIG may name one, and without
+// either the delivery reads answer that there is none. Signing in goes through auth, so
 // a deployment also sets OIDC_ISSUER, OIDC_CLIENT_SECRET, OIDC_REDIRECT_URL and SESSION_KEY, and
 // may set OIDC_CLIENT_ID (default estate-dashboard). DEV_USER replaces all of those on a local
 // run: every request is that admin and nothing asks auth. It must never be set in a deployment.
@@ -19,9 +21,13 @@ import (
 	"syscall"
 	"time"
 
+	"k8s.io/client-go/rest"
+
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/adapters/gateway"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/adapters/persistence"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/app"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/adapters/cluster"
+	deliveryapp "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/app"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpapi"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oidc"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/pg"
@@ -163,6 +169,10 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	if err != nil {
 		return fmt.Errorf("ALERTMANAGER_URL: %w", err)
 	}
+	kube, err := cluster.Connect(rest.InClusterConfig, getenv("KUBECONFIG"))
+	if err != nil {
+		return err
+	}
 	admission, err := readSignIn(getenv)
 	if err != nil {
 		return err
@@ -183,7 +193,7 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	history := persistence.New(store.Queries())
 	live := app.NewLive(am, history, persistence.NewSilences(store.Queries()), time.Now, logger)
 	go watch(ctx, logger, live, watchEvery)
-	api, err := httpapi.New(logger, gate, app.New(history), live)
+	api, err := httpapi.New(logger, gate, app.New(history), live, deliveryapp.New(kube))
 	if err != nil {
 		return err
 	}

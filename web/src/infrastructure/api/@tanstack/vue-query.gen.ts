@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/vue-query';
 
 import { client } from '../client.gen';
-import { getSession, listAlertHistory, listAlerts, type Options, silenceAlert } from '../sdk.gen';
-import type { GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
+import { getSession, listAlertHistory, listAlerts, listReleases, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
+import type { GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -97,6 +97,66 @@ export const silenceAlertMutation = (options?: Partial<Options<SilenceAlertData>
     };
     return mutationOptions;
 };
+
+export const listSourcesQueryKey = (options?: Options<ListSourcesData>) => createQueryKey('listSources', options);
+
+/**
+ * List the pin sources, by name
+ *
+ * Every Flux OCIRepository the render wrote: the artifact it names by digest, what Flux last fetched, and whether it is ready. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listSourcesOptions = (options?: Options<ListSourcesData>) => queryOptions<ListSourcesResponse, ListSourcesError, ListSourcesResponse, ReturnType<typeof listSourcesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listSources({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listSourcesQueryKey(options)
+});
+
+export const listUnitsQueryKey = (options?: Options<ListUnitsData>) => createQueryKey('listUnits', options);
+
+/**
+ * List the Reconcile Units, by name
+ *
+ * Every Flux Kustomization the render wrote: its source, its path, the units it follows, what it last applied, and whether it is ready. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listUnitsOptions = (options?: Options<ListUnitsData>) => queryOptions<ListUnitsResponse, ListUnitsError, ListUnitsResponse, ReturnType<typeof listUnitsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listUnits({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listUnitsQueryKey(options)
+});
+
+export const listReleasesQueryKey = (options?: Options<ListReleasesData>) => createQueryKey('listReleases', options);
+
+/**
+ * List the gated Applications and their releases
+ *
+ * Every Application whose release-gate inputs the render wrote, by namespace and Application: each member as Flagger switches it, the migration the gate may start, and what the Release Gate recorded it serves and saw pinned. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listReleasesOptions = (options?: Options<ListReleasesData>) => queryOptions<ListReleasesResponse, ListReleasesError, ListReleasesResponse, ReturnType<typeof listReleasesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listReleases({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listReleasesQueryKey(options)
+});
 
 export const listAlertHistoryQueryKey = (options?: Options<ListAlertHistoryData>) => createQueryKey('listAlertHistory', options);
 

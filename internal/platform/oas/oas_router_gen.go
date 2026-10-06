@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	rn7AllowedHeaders = map[string]string{
+	rn11AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
 )
@@ -161,7 +161,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn7AllowedHeaders,
+									allowedHeaders: rn11AllowedHeaders,
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -170,6 +170,95 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							return
 						}
 
+					}
+
+				}
+
+			case 'd': // Prefix: "delivery/"
+
+				if l := len("delivery/"); len(elem) >= l && elem[0:l] == "delivery/" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					break
+				}
+				switch elem[0] {
+				case 'r': // Prefix: "releases"
+
+					if l := len("releases"); len(elem) >= l && elem[0:l] == "releases" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "GET":
+							s.handleListReleasesRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: nil,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+
+				case 's': // Prefix: "sources"
+
+					if l := len("sources"); len(elem) >= l && elem[0:l] == "sources" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "GET":
+							s.handleListSourcesRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: nil,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+
+				case 'u': // Prefix: "units"
+
+					if l := len("units"); len(elem) >= l && elem[0:l] == "units" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "GET":
+							s.handleListUnitsRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: nil,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
 					}
 
 				}
@@ -400,6 +489,95 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							}
 						}
 
+					}
+
+				}
+
+			case 'd': // Prefix: "delivery/"
+
+				if l := len("delivery/"); len(elem) >= l && elem[0:l] == "delivery/" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					break
+				}
+				switch elem[0] {
+				case 'r': // Prefix: "releases"
+
+					if l := len("releases"); len(elem) >= l && elem[0:l] == "releases" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "GET":
+							r.name = ListReleasesOperation
+							r.summary = "List the gated Applications and their releases"
+							r.operationID = "listReleases"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/delivery/releases"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
+						}
+					}
+
+				case 's': // Prefix: "sources"
+
+					if l := len("sources"); len(elem) >= l && elem[0:l] == "sources" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "GET":
+							r.name = ListSourcesOperation
+							r.summary = "List the pin sources, by name"
+							r.operationID = "listSources"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/delivery/sources"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
+						}
+					}
+
+				case 'u': // Prefix: "units"
+
+					if l := len("units"); len(elem) >= l && elem[0:l] == "units" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "GET":
+							r.name = ListUnitsOperation
+							r.summary = "List the Reconcile Units, by name"
+							r.operationID = "listUnits"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/delivery/units"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
+						}
 					}
 
 				}
