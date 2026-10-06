@@ -1,5 +1,5 @@
-# Local Postgres for `task dev` and `task e2e`. Published on 55432 so a Postgres already running
-# on the default port does not collide with it.
+# Local Postgres and Alertmanager for `task dev` and `task e2e`. Published on 55432 and 59093 so
+# ones already running on the default ports do not collide with them.
 services:
   postgres:
     image: postgres:16-alpine
@@ -13,3 +13,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U app"]
       interval: 2s
       retries: 30
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    ports:
+      - "59093:9093"

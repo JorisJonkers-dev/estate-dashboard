@@ -8,4 +8,6 @@ type OperationName = string
 const (
 	GetSessionOperation       OperationName = "GetSession"
 	ListAlertHistoryOperation OperationName = "ListAlertHistory"
+	ListAlertsOperation       OperationName = "ListAlerts"
+	SilenceAlertOperation     OperationName = "SilenceAlert"
 )

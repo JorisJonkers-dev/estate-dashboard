@@ -15,8 +15,14 @@ import (
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/pg/pgtest"
 )
 
+// env reads vars, and an Alertmanager somewhere unless vars names one, even as empty.
 func env(vars map[string]string) func(string) string {
-	return func(key string) string { return vars[key] }
+	return func(key string) string {
+		if value, named := vars[key]; named || key != "ALERTMANAGER_URL" {
+			return value
+		}
+		return "http://alertmanager.test"
+	}
 }
 
 const unreachable = "postgres://nobody@127.0.0.1:1/none?sslmode=disable&connect_timeout=1"
@@ -62,6 +68,8 @@ func TestStartRefusesABadEnvironment(t *testing.T) {
 		"no redirect URL":      signedInThrough(anywhere, map[string]string{"DATABASE_URL": unreachable, "OIDC_REDIRECT_URL": ""}),
 		"no session key":       signedInThrough(anywhere, map[string]string{"DATABASE_URL": unreachable, "SESSION_KEY": ""}),
 		"a short session key":  signedInThrough(anywhere, map[string]string{"DATABASE_URL": unreachable, "SESSION_KEY": "short"}),
+		"no Alertmanager":      {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": ""},
+		"no Alertmanager URL":  {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": "alertmanager:9093"},
 	}
 	for name, vars := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -130,6 +138,44 @@ type sweeper struct {
 func (s *sweeper) Sweep(context.Context) (int64, error) {
 	s.calls.Add(1)
 	return s.swept, s.err
+}
+
+type watcher struct {
+	calls atomic.Int32
+	err   error
+}
+
+func (w *watcher) Watch(context.Context) error {
+	w.calls.Add(1)
+	return w.err
+}
+
+func TestAlertmanagerIsWatchedAtOnceAndThenOnEveryTick(t *testing.T) {
+	for name, w := range map[string]*watcher{"it answers": {}, "it is away": {err: errors.New("away")}} {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			done := make(chan struct{})
+			go func() {
+				watch(ctx, slog.New(slog.DiscardHandler), w, time.Millisecond)
+				close(done)
+			}()
+			deadline := time.After(5 * time.Second)
+			for w.calls.Load() < 3 {
+				select {
+				case <-deadline:
+					t.Fatalf("watched %d times", w.calls.Load())
+				default:
+					time.Sleep(time.Millisecond)
+				}
+			}
+			cancel()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				t.Fatal("the watch outlives its context")
+			}
+		})
+	}
 }
 
 func TestExpiredSessionsAreSweptAtOnceAndThenOnEveryTick(t *testing.T) {

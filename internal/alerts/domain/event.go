@@ -44,6 +44,9 @@ type Event struct {
 	// EndsAt is set exactly when the alert resolved.
 	EndsAt     *time.Time
 	ObservedAt time.Time
+	// Labels is the alert's label set when it was seen, kept with a firing; History does not
+	// read it back.
+	Labels map[string]string
 }
 
 // NewEvent checks the rules an event's status and times obey together.
@@ -62,4 +65,8 @@ func NewEvent(e Event) (Event, error) {
 type Repository interface {
 	// History returns at most limit events, newest first.
 	History(ctx context.Context, limit int) ([]Event, error)
+	// Record keeps one event; an event already kept is kept once.
+	Record(ctx context.Context, e Event) error
+	// Open returns every firing recorded with no resolution recorded after it.
+	Open(ctx context.Context) ([]Event, error)
 }

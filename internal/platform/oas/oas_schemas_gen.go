@@ -13,6 +13,146 @@ func (s *ProblemStatusCode) Error() string {
 	return fmt.Sprintf("code %d: %+v", s.StatusCode, s.Response)
 }
 
+// One alert Alertmanager holds now.
+// Ref: #/components/schemas/Alert
+type Alert struct {
+	// Alertmanager's fingerprint of the alert.
+	Fingerprint string `json:"fingerprint"`
+	// The alert's name, its alertname label.
+	Name string `json:"name"`
+	// How loudly the alert wakes someone, from its alert_class label. Absent on an alert whose rule
+	// carries no class the dashboard knows.
+	Class OptAlertClass `json:"class"`
+	// The rule's summary annotation, where it carries one.
+	Summary OptString `json:"summary"`
+	// When this firing of the alert started.
+	StartsAt time.Time `json:"startsAt"`
+	// Every label of the alert.
+	Labels AlertLabels `json:"labels"`
+	// The id of every silence that holds the alert quiet now; empty when none does.
+	SilencedBy []string `json:"silencedBy"`
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *Alert) GetFingerprint() string {
+	return s.Fingerprint
+}
+
+// GetName returns the value of Name.
+func (s *Alert) GetName() string {
+	return s.Name
+}
+
+// GetClass returns the value of Class.
+func (s *Alert) GetClass() OptAlertClass {
+	return s.Class
+}
+
+// GetSummary returns the value of Summary.
+func (s *Alert) GetSummary() OptString {
+	return s.Summary
+}
+
+// GetStartsAt returns the value of StartsAt.
+func (s *Alert) GetStartsAt() time.Time {
+	return s.StartsAt
+}
+
+// GetLabels returns the value of Labels.
+func (s *Alert) GetLabels() AlertLabels {
+	return s.Labels
+}
+
+// GetSilencedBy returns the value of SilencedBy.
+func (s *Alert) GetSilencedBy() []string {
+	return s.SilencedBy
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *Alert) SetFingerprint(val string) {
+	s.Fingerprint = val
+}
+
+// SetName sets the value of Name.
+func (s *Alert) SetName(val string) {
+	s.Name = val
+}
+
+// SetClass sets the value of Class.
+func (s *Alert) SetClass(val OptAlertClass) {
+	s.Class = val
+}
+
+// SetSummary sets the value of Summary.
+func (s *Alert) SetSummary(val OptString) {
+	s.Summary = val
+}
+
+// SetStartsAt sets the value of StartsAt.
+func (s *Alert) SetStartsAt(val time.Time) {
+	s.StartsAt = val
+}
+
+// SetLabels sets the value of Labels.
+func (s *Alert) SetLabels(val AlertLabels) {
+	s.Labels = val
+}
+
+// SetSilencedBy sets the value of SilencedBy.
+func (s *Alert) SetSilencedBy(val []string) {
+	s.SilencedBy = val
+}
+
+// How loudly the alert wakes someone, from its alert_class label. Absent on an alert whose rule
+// carries no class the dashboard knows.
+type AlertClass string
+
+const (
+	AlertClassBusinessHours AlertClass = "business-hours"
+	AlertClassUrgent        AlertClass = "urgent"
+	AlertClassPage          AlertClass = "page"
+)
+
+// AllValues returns all AlertClass values.
+func (AlertClass) AllValues() []AlertClass {
+	return []AlertClass{
+		AlertClassBusinessHours,
+		AlertClassUrgent,
+		AlertClassPage,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AlertClass) MarshalText() ([]byte, error) {
+	switch s {
+	case AlertClassBusinessHours:
+		return []byte(s), nil
+	case AlertClassUrgent:
+		return []byte(s), nil
+	case AlertClassPage:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AlertClass) UnmarshalText(data []byte) error {
+	switch AlertClass(data) {
+	case AlertClassBusinessHours:
+		*s = AlertClassBusinessHours
+		return nil
+	case AlertClassUrgent:
+		*s = AlertClassUrgent
+		return nil
+	case AlertClassPage:
+		*s = AlertClassPage
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // One state an alert was seen in.
 // Ref: #/components/schemas/AlertEvent
 type AlertEvent struct {
@@ -162,6 +302,91 @@ func (s *AlertHistory) SetItems(val []AlertEvent) {
 }
 
 func (*AlertHistory) listAlertHistoryRes() {}
+
+// Every label of the alert.
+type AlertLabels map[string]string
+
+func (s *AlertLabels) init() AlertLabels {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
+	}
+	return m
+}
+
+// The alerts firing now, newest first.
+// Ref: #/components/schemas/AlertList
+type AlertList struct {
+	// The alerts.
+	Items []Alert `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *AlertList) GetItems() []Alert {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *AlertList) SetItems(val []Alert) {
+	s.Items = val
+}
+
+func (*AlertList) listAlertsRes() {}
+
+type ListAlertsServiceUnavailable ProblemStatusCode
+
+func (*ListAlertsServiceUnavailable) listAlertsRes() {}
+
+type ListAlertsUnauthorized ProblemStatusCode
+
+func (*ListAlertsUnauthorized) listAlertsRes() {}
+
+// NewOptAlertClass returns new OptAlertClass with value set to v.
+func NewOptAlertClass(v AlertClass) OptAlertClass {
+	return OptAlertClass{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAlertClass is optional AlertClass.
+type OptAlertClass struct {
+	Value AlertClass
+	Set   bool
+}
+
+// IsSet returns true if OptAlertClass was set.
+func (o OptAlertClass) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAlertClass) Reset() {
+	var v AlertClass
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAlertClass) SetTo(v AlertClass) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAlertClass) Get() (v AlertClass, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAlertClass) Or(d AlertClass) AlertClass {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
 
 // NewOptDateTime returns new OptDateTime with value set to v.
 func NewOptDateTime(v time.Time) OptDateTime {
@@ -437,4 +662,156 @@ func (s *SessionCookie) SetAPIKey(val string) {
 // SetRoles sets the value of Roles.
 func (s *SessionCookie) SetRoles(val []string) {
 	s.Roles = val
+}
+
+// A silence the dashboard set in Alertmanager.
+// Ref: #/components/schemas/Silence
+type Silence struct {
+	// Alertmanager's id of the silence.
+	ID string `json:"id"`
+	// The silenced alert's fingerprint.
+	Fingerprint string `json:"fingerprint"`
+	// The admin who set it.
+	CreatedBy string `json:"createdBy"`
+	// When it was set.
+	CreatedAt time.Time `json:"createdAt"`
+	// When it ends. Absent on a silence that lasts until the alert resolves.
+	EndsAt OptDateTime `json:"endsAt"`
+}
+
+// GetID returns the value of ID.
+func (s *Silence) GetID() string {
+	return s.ID
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *Silence) GetFingerprint() string {
+	return s.Fingerprint
+}
+
+// GetCreatedBy returns the value of CreatedBy.
+func (s *Silence) GetCreatedBy() string {
+	return s.CreatedBy
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *Silence) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetEndsAt returns the value of EndsAt.
+func (s *Silence) GetEndsAt() OptDateTime {
+	return s.EndsAt
+}
+
+// SetID sets the value of ID.
+func (s *Silence) SetID(val string) {
+	s.ID = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *Silence) SetFingerprint(val string) {
+	s.Fingerprint = val
+}
+
+// SetCreatedBy sets the value of CreatedBy.
+func (s *Silence) SetCreatedBy(val string) {
+	s.CreatedBy = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *Silence) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetEndsAt sets the value of EndsAt.
+func (s *Silence) SetEndsAt(val OptDateTime) {
+	s.EndsAt = val
+}
+
+func (*Silence) silenceAlertRes() {}
+
+type SilenceAlertBadRequest ProblemStatusCode
+
+func (*SilenceAlertBadRequest) silenceAlertRes() {}
+
+type SilenceAlertNotFound ProblemStatusCode
+
+func (*SilenceAlertNotFound) silenceAlertRes() {}
+
+type SilenceAlertServiceUnavailable ProblemStatusCode
+
+func (*SilenceAlertServiceUnavailable) silenceAlertRes() {}
+
+// How long to silence an alert for.
+// Ref: #/components/schemas/SilenceRequest
+type SilenceRequest struct {
+	// An hour, four hours, a day, or until the alert resolves.
+	Length SilenceRequestLength `json:"length"`
+}
+
+// GetLength returns the value of Length.
+func (s *SilenceRequest) GetLength() SilenceRequestLength {
+	return s.Length
+}
+
+// SetLength sets the value of Length.
+func (s *SilenceRequest) SetLength(val SilenceRequestLength) {
+	s.Length = val
+}
+
+// An hour, four hours, a day, or until the alert resolves.
+type SilenceRequestLength string
+
+const (
+	SilenceRequestLength1h            SilenceRequestLength = "1h"
+	SilenceRequestLength4h            SilenceRequestLength = "4h"
+	SilenceRequestLength1d            SilenceRequestLength = "1d"
+	SilenceRequestLengthUntilResolved SilenceRequestLength = "until-resolved"
+)
+
+// AllValues returns all SilenceRequestLength values.
+func (SilenceRequestLength) AllValues() []SilenceRequestLength {
+	return []SilenceRequestLength{
+		SilenceRequestLength1h,
+		SilenceRequestLength4h,
+		SilenceRequestLength1d,
+		SilenceRequestLengthUntilResolved,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SilenceRequestLength) MarshalText() ([]byte, error) {
+	switch s {
+	case SilenceRequestLength1h:
+		return []byte(s), nil
+	case SilenceRequestLength4h:
+		return []byte(s), nil
+	case SilenceRequestLength1d:
+		return []byte(s), nil
+	case SilenceRequestLengthUntilResolved:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SilenceRequestLength) UnmarshalText(data []byte) error {
+	switch SilenceRequestLength(data) {
+	case SilenceRequestLength1h:
+		*s = SilenceRequestLength1h
+		return nil
+	case SilenceRequestLength4h:
+		*s = SilenceRequestLength4h
+		return nil
+	case SilenceRequestLength1d:
+		*s = SilenceRequestLength1d
+		return nil
+	case SilenceRequestLengthUntilResolved:
+		*s = SilenceRequestLengthUntilResolved
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }

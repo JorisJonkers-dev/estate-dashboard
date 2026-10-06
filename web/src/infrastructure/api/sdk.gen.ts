@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses } from './types.gen';
-import { zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse } from './zod.gen';
+import type { GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
+import { zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -40,6 +40,52 @@ export const getSession = <ThrowOnError extends boolean = false>(options?: Optio
         }],
     url: '/api/v1/session',
     ...options
+});
+
+/**
+ * List the alerts firing now, newest first
+ *
+ * Returns every alert Alertmanager holds now, silenced or not, newest first. Read from Alertmanager on every request; nothing here is copied into the dashboard's database. A 503 means Alertmanager did not answer.
+ */
+export const listAlerts = <ThrowOnError extends boolean = false>(options?: Options<ListAlertsData, ThrowOnError>): RequestResult<ListAlertsResponses, ListAlertsErrors, ThrowOnError> => (options?.client ?? client).get<ListAlertsResponses, ListAlertsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListAlertsResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/alerts',
+    ...options
+});
+
+/**
+ * Silence an alert in Alertmanager
+ *
+ * Silences one firing alert, matching every one of its labels exactly, for an hour, four hours, a day, or until it resolves. The silence is set in Alertmanager, so Discord goes quiet too; it is the dashboard's only write. A silence until resolved lasts at most seven days in Alertmanager and is ended as soon as the dashboard sees the alert resolve. A 404 means the alert is not firing; a 503 that Alertmanager did not answer.
+ */
+export const silenceAlert = <ThrowOnError extends boolean = false>(options: Options<SilenceAlertData, ThrowOnError>): RequestResult<SilenceAlertResponses, SilenceAlertErrors, ThrowOnError> => (options.client ?? client).post<SilenceAlertResponses, SilenceAlertErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zSilenceAlertBody,
+        path: zSilenceAlertPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zSilenceAlertResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/alerts/{fingerprint}/silences',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

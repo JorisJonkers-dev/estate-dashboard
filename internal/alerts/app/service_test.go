@@ -21,6 +21,10 @@ func (r *repository) History(_ context.Context, limit int) ([]domain.Event, erro
 	return r.events, r.err
 }
 
+func (*repository) Record(context.Context, domain.Event) error { return nil }
+
+func (*repository) Open(context.Context) ([]domain.Event, error) { return nil, nil }
+
 func TestHistoryClampsTheLimit(t *testing.T) {
 	for asked, want := range map[int]int{-1: app.DefaultLimit, 0: app.DefaultLimit, 1: 1, 100: 100, 101: app.MaxLimit} {
 		repo := &repository{events: []domain.Event{{Fingerprint: "a"}}}

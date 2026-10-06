@@ -43,6 +43,24 @@ type Invoker interface {
 	//
 	// GET /api/v1/alerts/history
 	ListAlertHistory(ctx context.Context, params ListAlertHistoryParams) (ListAlertHistoryRes, error)
+	// ListAlerts invokes listAlerts operation.
+	//
+	// Returns every alert Alertmanager holds now, silenced or not, newest first. Read from Alertmanager on
+	// every request; nothing here is copied into the dashboard's database. A 503 means Alertmanager did
+	// not answer.
+	//
+	// GET /api/v1/alerts
+	ListAlerts(ctx context.Context) (ListAlertsRes, error)
+	// SilenceAlert invokes silenceAlert operation.
+	//
+	// Silences one firing alert, matching every one of its labels exactly, for an hour, four hours, a day,
+	// or until it resolves. The silence is set in Alertmanager, so Discord goes quiet too; it is the
+	// dashboard's only write. A silence until resolved lasts at most seven days in Alertmanager and is
+	// ended as soon as the dashboard sees the alert resolve. A 404 means the alert is not firing; a 503
+	// that Alertmanager did not answer.
+	//
+	// POST /api/v1/alerts/{fingerprint}/silences
+	SilenceAlert(ctx context.Context, request *SilenceRequest, params SilenceAlertParams) (SilenceAlertRes, error)
 }
 
 // Client implements OAS client.
@@ -328,6 +346,260 @@ func (c *Client) sendListAlertHistory(ctx context.Context, params ListAlertHisto
 
 	stage = "DecodeResponse"
 	result, err := decodeListAlertHistoryResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListAlerts invokes listAlerts operation.
+//
+// Returns every alert Alertmanager holds now, silenced or not, newest first. Read from Alertmanager on
+// every request; nothing here is copied into the dashboard's database. A 503 means Alertmanager did
+// not answer.
+//
+// GET /api/v1/alerts
+func (c *Client) ListAlerts(ctx context.Context) (ListAlertsRes, error) {
+	res, err := c.sendListAlerts(ctx)
+	return res, err
+}
+
+func (c *Client) sendListAlerts(ctx context.Context) (res ListAlertsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listAlerts"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/v1/alerts"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListAlertsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/api/v1/alerts"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListAlertsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeListAlertsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// SilenceAlert invokes silenceAlert operation.
+//
+// Silences one firing alert, matching every one of its labels exactly, for an hour, four hours, a day,
+// or until it resolves. The silence is set in Alertmanager, so Discord goes quiet too; it is the
+// dashboard's only write. A silence until resolved lasts at most seven days in Alertmanager and is
+// ended as soon as the dashboard sees the alert resolve. A 404 means the alert is not firing; a 503
+// that Alertmanager did not answer.
+//
+// POST /api/v1/alerts/{fingerprint}/silences
+func (c *Client) SilenceAlert(ctx context.Context, request *SilenceRequest, params SilenceAlertParams) (SilenceAlertRes, error) {
+	res, err := c.sendSilenceAlert(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendSilenceAlert(ctx context.Context, request *SilenceRequest, params SilenceAlertParams) (res SilenceAlertRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("silenceAlert"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/api/v1/alerts/{fingerprint}/silences"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, SilenceAlertOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/api/v1/alerts/"
+	{
+		// Encode "fingerprint" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "fingerprint",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.Fingerprint))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/silences"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeSilenceAlertRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, SilenceAlertOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeSilenceAlertResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

@@ -3,8 +3,11 @@ package persistence
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
+
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/pg/queries"
@@ -34,6 +37,54 @@ func (r *Repository) History(ctx context.Context, limit int) ([]domain.Event, er
 	events := make([]domain.Event, 0, len(rows))
 	for _, row := range rows {
 		event, err := toDomain(row)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	return events, nil
+}
+
+// Record keeps one event; the same state seen twice is kept once.
+func (r *Repository) Record(ctx context.Context, e domain.Event) error {
+	checked, err := domain.NewEvent(e)
+	if err != nil {
+		return err
+	}
+	labels := checked.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	encoded, err := json.Marshal(labels)
+	if err != nil {
+		return fmt.Errorf("encode the labels of alert %s: %w", checked.Fingerprint, err)
+	}
+	params := queries.RecordAlertEventParams{
+		Fingerprint: checked.Fingerprint,
+		Name:        checked.Name,
+		Status:      string(checked.Status),
+		Labels:      encoded,
+		StartsAt:    checked.StartsAt,
+		ObservedAt:  checked.ObservedAt,
+	}
+	if checked.EndsAt != nil {
+		params.EndsAt = pgtype.Timestamptz{Time: *checked.EndsAt, Valid: true}
+	}
+	if err := r.q.RecordAlertEvent(ctx, params); err != nil {
+		return fmt.Errorf("insert alert event %s: %w", checked.Fingerprint, err)
+	}
+	return nil
+}
+
+// Open returns every firing with no resolution recorded.
+func (r *Repository) Open(ctx context.Context) ([]domain.Event, error) {
+	rows, err := r.q.ListOpenFirings(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("select open firings: %w", err)
+	}
+	events := make([]domain.Event, 0, len(rows))
+	for _, row := range rows {
+		event, err := toDomain(queries.ListAlertHistoryRow(row))
 		if err != nil {
 			return nil, err
 		}

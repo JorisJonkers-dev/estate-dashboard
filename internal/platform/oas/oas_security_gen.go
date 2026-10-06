@@ -39,6 +39,8 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 var operationRolesSessionCookie = map[string][]string{
 	GetSessionOperation:       []string{},
 	ListAlertHistoryOperation: []string{},
+	ListAlertsOperation:       []string{},
+	SilenceAlertOperation:     []string{},
 }
 
 // GetRolesForSessionCookie returns the required roles for the given operation.

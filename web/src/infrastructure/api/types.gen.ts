@@ -5,6 +5,88 @@ export type ClientOptions = {
 };
 
 /**
+ * One alert Alertmanager holds now.
+ */
+export type Alert = {
+    /**
+     * Alertmanager's fingerprint of the alert.
+     */
+    fingerprint: string;
+    /**
+     * The alert's name, its alertname label.
+     */
+    name: string;
+    /**
+     * How loudly the alert wakes someone, from its alert_class label. Absent on an alert whose rule carries no class the dashboard knows.
+     */
+    class?: 'business-hours' | 'urgent' | 'page';
+    /**
+     * The rule's summary annotation, where it carries one.
+     */
+    summary?: string;
+    /**
+     * When this firing of the alert started.
+     */
+    startsAt: string;
+    /**
+     * Every label of the alert.
+     */
+    labels: {
+        [key: string]: string;
+    };
+    /**
+     * The id of every silence that holds the alert quiet now; empty when none does.
+     */
+    silencedBy: Array<string>;
+};
+
+/**
+ * The alerts firing now, newest first.
+ */
+export type AlertList = {
+    /**
+     * The alerts.
+     */
+    items: Array<Alert>;
+};
+
+/**
+ * How long to silence an alert for.
+ */
+export type SilenceRequest = {
+    /**
+     * An hour, four hours, a day, or until the alert resolves.
+     */
+    length: '1h' | '4h' | '1d' | 'until-resolved';
+};
+
+/**
+ * A silence the dashboard set in Alertmanager.
+ */
+export type Silence = {
+    /**
+     * Alertmanager's id of the silence.
+     */
+    id: string;
+    /**
+     * The silenced alert's fingerprint.
+     */
+    fingerprint: string;
+    /**
+     * The admin who set it.
+     */
+    createdBy: string;
+    /**
+     * When it was set.
+     */
+    createdAt: string;
+    /**
+     * When it ends. Absent on a silence that lasts until the alert resolves.
+     */
+    endsAt?: string;
+};
+
+/**
  * One state an alert was seen in.
  */
 export type AlertEvent = {
@@ -112,6 +194,81 @@ export type GetSessionResponses = {
 };
 
 export type GetSessionResponse = GetSessionResponses[keyof GetSessionResponses];
+
+export type ListAlertsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/alerts';
+};
+
+export type ListAlertsErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListAlertsError = ListAlertsErrors[keyof ListAlertsErrors];
+
+export type ListAlertsResponses = {
+    /**
+     * The alerts.
+     */
+    200: AlertList;
+};
+
+export type ListAlertsResponse = ListAlertsResponses[keyof ListAlertsResponses];
+
+export type SilenceAlertData = {
+    body: SilenceRequest;
+    path: {
+        /**
+         * Alertmanager's fingerprint of the alert.
+         */
+        fingerprint: string;
+    };
+    query?: never;
+    url: '/api/v1/alerts/{fingerprint}/silences';
+};
+
+export type SilenceAlertErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    400: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    404: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type SilenceAlertError = SilenceAlertErrors[keyof SilenceAlertErrors];
+
+export type SilenceAlertResponses = {
+    /**
+     * The silence Alertmanager now holds.
+     */
+    201: Silence;
+};
+
+export type SilenceAlertResponse = SilenceAlertResponses[keyof SilenceAlertResponses];
 
 export type ListAlertHistoryData = {
     body?: never;

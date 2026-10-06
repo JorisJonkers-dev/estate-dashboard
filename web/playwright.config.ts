@@ -24,6 +24,7 @@ export default defineConfig({
     env: {
       ADDR: new URL(origin).host,
       DATABASE_URL: process.env.DATABASE_URL ?? 'postgres://app:app@localhost:55432/app?sslmode=disable',
+      ALERTMANAGER_URL: process.env.ALERTMANAGER_URL ?? 'http://localhost:59093',
       // A local run signs nobody in through auth; every request is this admin.
       DEV_USER: 'e2e',
     },

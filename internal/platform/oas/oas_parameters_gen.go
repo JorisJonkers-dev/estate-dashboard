@@ -4,6 +4,7 @@ package oas
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/go-faster/errors"
 	"github.com/ogen-go/ogen/conv"
@@ -102,6 +103,92 @@ func decodeListAlertHistoryParams(args [0]string, argsEscaped bool, r *http.Requ
 		return params, &ogenerrors.DecodeParamError{
 			Name: "limit",
 			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// SilenceAlertParams is parameters of silenceAlert operation.
+type SilenceAlertParams struct {
+	// Alertmanager's fingerprint of the alert.
+	Fingerprint string
+}
+
+func unpackSilenceAlertParams(packed middleware.Parameters) (params SilenceAlertParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "fingerprint",
+			In:   "path",
+		}
+		params.Fingerprint = packed[key].(string)
+	}
+	return params
+}
+
+func decodeSilenceAlertParams(args [1]string, argsEscaped bool, r *http.Request) (params SilenceAlertParams, _ error) {
+	// Decode path: fingerprint.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "fingerprint",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.Fingerprint = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     64,
+					MaxLengthSet:  true,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[0-9a-f]+$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(params.Fingerprint)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "fingerprint",
+			In:   "path",
 			Err:  err,
 		}
 	}

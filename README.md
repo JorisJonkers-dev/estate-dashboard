@@ -29,10 +29,10 @@ template's [`docs/blueprints/`](https://github.com/JorisJonkers-dev/template-go-
 | `web/src/infrastructure/api/` | The TypeScript client, generated: types, a fetch SDK that zod-validates every response, vue-query options |
 | `db/migrations/` | goose migrations, embedded and applied by the binary at startup; linted by squawk |
 | `db/queries/`, `internal/platform/pg/queries/` | SQL, and the Go sqlc generates from it |
-| `internal/alerts/` | The first bounded context: `domain` (pure), `app` (use cases), `adapters/persistence` and `adapters/web` |
+| `internal/alerts/` | The first bounded context: `domain` (pure), `app` (use cases), `adapters/persistence`, `adapters/gateway` (Alertmanager's v2 API) and `adapters/web` |
 | `internal/platform/` | Postgres (`pg`, with `pgtest` for a migrated database per test, and the session store), `oidc` (sign-in through auth), `session` (the cookie and refresh-token seal), `httpapi` (assembles the ogen server and admits only an admin), `httpx`, `webui` |
 | `internal/server/` | Probes, `/api/` to the API, `/auth/` to sign-in, everything else to the SPA, graceful drain |
-| `cmd/estate-dashboard/` | The composition root; reads `DATABASE_URL`, `ADDR` (default `:8080`), the sign-in environment below, and `DEV_USER` |
+| `cmd/estate-dashboard/` | The composition root; reads `DATABASE_URL`, `ALERTMANAGER_URL`, `ADDR` (default `:8080`), the sign-in environment below, and `DEV_USER` |
 | `web/` | The Vue 3 SPA, and `embed.go`, which embeds its build (`web/dist`) in the binary |
 | `web/tests/e2e/` | Playwright with axe, on a desktop and a phone, against the built binary |
 | `mise.toml`, `Taskfile.yml` | The pinned toolchain, and every command: `task` lists them |
@@ -98,3 +98,21 @@ readable for five minutes. Signing out ends the dashboard's session only.
 
 On a local run `DEV_USER` replaces all five: every request is that admin and nothing asks auth.
 Never set `DEV_USER` in a deployment.
+
+## Alertmanager
+
+`ALERTMANAGER_URL` (required) is Alertmanager's address. The dashboard reads alerts from it on
+every request (`GET /api/v1/alerts`) and copies none into its database. Every 30 seconds it also
+watches it: a firing it has not seen is recorded in `alert_history`, and a recorded firing
+Alertmanager no longer holds is recorded as resolved. That is the history the detail pane reads,
+since Alertmanager forgets a resolved alert.
+
+Its one write anywhere is a silence (`POST /api/v1/alerts/{fingerprint}/silences`): every label of
+the alert matched exactly, for 1h, 4h, 1d or until it resolves, set as the signed-in admin and
+mirrored in `silences`. Alertmanager wants an end, so a silence until resolved is set for seven
+days and expired by the watch as soon as the alert resolves. A failure to mirror is logged and the
+silence still holds; an Alertmanager that does not answer is a 503.
+
+An alert's class is its `alert_class` label (`business-hours`, `urgent` or `page`), as the alert
+rules write it; an alert with none is shown unclassed. `task db` starts a local Alertmanager on
+59093 beside Postgres.
