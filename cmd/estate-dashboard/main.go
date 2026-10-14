@@ -19,8 +19,10 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -57,7 +59,9 @@ const (
 	// alertmanagerTimeout bounds one call to Alertmanager, so a request never waits on it longer.
 	alertmanagerTimeout = 10 * time.Second
 	// githubTimeout bounds one call to GitHub.
-	githubTimeout    = 10 * time.Second
+	githubTimeout = 10 * time.Second
+	// gateTimeout bounds one call to the Release Gate.
+	gateTimeout      = 10 * time.Second
 	defaultGitHubAPI = "https://api.github.com"
 	defaultEstate    = "JorisJonkers-dev/estate"
 )
@@ -168,6 +172,19 @@ func readEstate(getenv func(string) string) (estatedomain.Repository, error) {
 	return github.New(api, repository, token, &http.Client{Timeout: githubTimeout})
 }
 
+// readGate reads the Release Gate's address: RELEASE_GATE_HOST and RELEASE_GATE_PORT, the two
+// coordinates of the dashboard's edge to it, or neither on a run that reads no releases.
+func readGate(getenv func(string) string) (*url.URL, error) {
+	host, port := getenv("RELEASE_GATE_HOST"), getenv("RELEASE_GATE_PORT")
+	if host == "" && port == "" {
+		return nil, nil //nolint:nilnil // no gate is a configuration, not a failure
+	}
+	if n, err := strconv.Atoi(port); host == "" || err != nil || n < 1 || n > 65535 {
+		return nil, fmt.Errorf("RELEASE_GATE_HOST %q and RELEASE_GATE_PORT %q are not one address", host, port)
+	}
+	return &url.URL{Scheme: "http", Host: net.JoinHostPort(host, port)}, nil
+}
+
 // watch records what Alertmanager holds, now and then every interval, until ctx is done.
 func watch(ctx context.Context, logger *slog.Logger, live interface{ Watch(context.Context) error }, every time.Duration) {
 	tick := time.NewTicker(every)
@@ -195,7 +212,11 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	if err != nil {
 		return fmt.Errorf("ALERTMANAGER_URL: %w", err)
 	}
-	kube, err := cluster.Connect(rest.InClusterConfig, getenv("KUBECONFIG"))
+	releaseGate, err := readGate(getenv)
+	if err != nil {
+		return err
+	}
+	kube, err := cluster.Connect(rest.InClusterConfig, getenv("KUBECONFIG"), releaseGate, &http.Client{Timeout: gateTimeout})
 	if err != nil {
 		return err
 	}

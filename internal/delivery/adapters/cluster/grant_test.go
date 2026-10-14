@@ -11,9 +11,10 @@ import (
 
 // The dashboard's Kubernetes API access is what its project file declares, which deploy-kit
 // renders into its ClusterRole as written (deploy-kit spec/v1/16-dependencies.md). Read-only by
-// design: every verb it holds reads, it holds the four kinds the adapter reads and no other, and
-// a ConfigMap it may only get by name, never list or watch, since ConfigMaps hold anything.
-func TestTheDeclaredGrantReadsTheFourKindsAndWritesNothing(t *testing.T) {
+// design: every verb it holds reads, and it holds the three kinds the adapter reads and no other.
+// No ConfigMap above all: a ClusterRole cannot name which, and ConfigMaps hold anything. What it
+// shows of the gate's ConfigMaps it asks the gate for (JorisJonkers-dev/estate-dashboard#15).
+func TestTheDeclaredGrantReadsTheThreeKindsAndWritesNothing(t *testing.T) {
 	raw, err := os.ReadFile("../../../../deploy/estate-dashboard.project.yml")
 	if err != nil {
 		t.Fatal(err)
@@ -57,12 +58,9 @@ func TestTheDeclaredGrantReadsTheFourKindsAndWritesNothing(t *testing.T) {
 			}
 		}
 	}
-	if !slices.Contains(granted, "core/configmaps:get") || slices.Contains(granted, "core/configmaps:list") || slices.Contains(granted, "core/configmaps:watch") {
-		t.Errorf("ConfigMaps are got by name and never listed: %v", granted)
-	}
 	granted = slices.DeleteFunc(granted, func(g string) bool { return strings.Contains(g, ":") })
 	slices.Sort(granted)
-	want := []string{"core/configmaps", "flagger.app/canaries", "kustomize.toolkit.fluxcd.io/kustomizations", "source.toolkit.fluxcd.io/ocirepositories"}
+	want := []string{"flagger.app/canaries", "kustomize.toolkit.fluxcd.io/kustomizations", "source.toolkit.fluxcd.io/ocirepositories"}
 	if !slices.Equal(granted, want) {
 		t.Fatalf("granted %v, want %v", granted, want)
 	}

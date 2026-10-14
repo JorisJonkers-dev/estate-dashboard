@@ -32,7 +32,7 @@ template's [`docs/blueprints/`](https://github.com/JorisJonkers-dev/template-go-
 | `internal/alerts/` | The first bounded context: `domain` (pure), `app` (use cases), `adapters/persistence`, `adapters/gateway` (Alertmanager's v2 API) and `adapters/web` |
 | `internal/platform/` | Postgres (`pg`, with `pgtest` for a migrated database per test, and the session store), `oidc` (sign-in through auth), `session` (the cookie and refresh-token seal), `httpapi` (assembles the ogen server and admits only an admin), `httpx`, `webui` |
 | `internal/server/` | Probes, `/api/` to the API, `/auth/` to sign-in, everything else to the SPA, graceful drain |
-| `cmd/estate-dashboard/` | The composition root; reads `DATABASE_URL`, `ALERTMANAGER_URL`, `ADDR` (default `:8080`), the sign-in environment below, and `DEV_USER` |
+| `cmd/estate-dashboard/` | The composition root; reads `DATABASE_URL`, `ALERTMANAGER_URL`, `ADDR` (default `:8080`), `RELEASE_GATE_HOST` and `RELEASE_GATE_PORT`, the sign-in environment below, and `DEV_USER` |
 | `web/` | The Vue 3 SPA, and `embed.go`, which embeds its build (`web/dist`) in the binary |
 | `web/tests/e2e/` | Playwright with axe, on a desktop and a phone, against the built binary |
 | `mise.toml`, `Taskfile.yml` | The pinned toolchain, and every command: `task` lists them |
@@ -128,16 +128,23 @@ the `api` block of `deploy/estate-dashboard.project.yml`:
 | `GET /api/v1/delivery/units` | every Flux `Kustomization` the render wrote: source, path, the units it follows, what it applied, Ready |
 | `GET /api/v1/delivery/releases` | every gated Application, found from the Canaries the render wrote: each member's phase and revision, the migration, and the Release Gate's record of what serves |
 
-It may get, list and watch OCIRepositories, Kustomizations and Canaries, and get a ConfigMap by
-name; it writes nothing. A release's inputs and record are read by name and never listed, at most
-256 Applications are read per request and every list is one page of at most 1000, so nothing
-anyone can create in the cluster grows a request; a read that stopped short says `truncated`, so
-nothing is left out unseen. Inputs or a record that do not read mark that
-one release `unreadable` and keep the others from failing with it. The ConfigMap `get` is still
-cluster-wide: https://github.com/JorisJonkers-dev/estate-dashboard/issues/15.
+It may get, list and watch OCIRepositories, Kustomizations and Canaries, and nothing else; it
+writes nothing. It holds no ConfigMap access: a ClusterRole cannot say which ConfigMaps, and
+ConfigMaps hold anything. A release's release-gate inputs and the Release Gate's record of it are
+the gate's to read, so the dashboard asks the gate for every Application's at once, at its
+`GET /releases`, over the edge the project file declares to the gate's `http` surface. That edge
+is what the gate's derived policy admits it by, and `RELEASE_GATE_HOST` and `RELEASE_GATE_PORT`
+are its two coordinates.
+
+At most 256 Applications are shown per request, every list is one page of at most 1000, and one
+answer of the gate is read up to 4 MiB, so nothing anyone can create in the cluster grows a
+request; a read that stopped short says `truncated`, so nothing is left out unseen. Inputs or a
+record the gate could not read mark that one release `unreadable` and keep the others from
+failing with it. A gate that does not answer fails the read, as the cluster refusing does.
 
 The cluster is the one the dashboard runs in. On a local run `KUBECONFIG` may name one; without
-either, the three reads answer 503, "the dashboard runs without a cluster to read".
+either, the three reads answer 503, "the dashboard runs without a cluster to read". A cluster
+with no gate address reads sources and units, and no release.
 
 ## The Estate repository
 

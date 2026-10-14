@@ -1,7 +1,8 @@
 // Package cluster implements the delivery context's Cluster port on the Kubernetes API, through a
 // ServiceAccount that may get, list and watch Flux's OCIRepositories and Kustomizations and
-// Flagger's Canaries, and get a ConfigMap by name, and nothing else: each gated Application's
-// release-gate inputs and the Release Gate's record of it are read by name, never listed.
+// Flagger's Canaries, and nothing else. Each gated Application's release-gate inputs and the
+// Release Gate's record of it are the gate's to read: the dashboard asks the gate for both, at
+// GET /releases, and holds no ConfigMap access (JorisJonkers-dev/estate-dashboard#15).
 package cluster
 
 import (
@@ -9,14 +10,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -34,22 +36,24 @@ var (
 const (
 	// rendered selects what the render wrote (deploy-kit spec/v1/10-project-intent.md#the-label-set).
 	rendered = "app.kubernetes.io/managed-by=deploy-kit"
-	partOf   = "app.kubernetes.io/part-of"
-	// inputsSuffix and inputsKey name an Application's release-gate inputs.
-	inputsSuffix = "-release-gate"
-	inputsKey    = "releaseGate.json"
-	// recordNamespace, recordSuffix and recordKey name the Release Gate's record of one
-	// Application: `<namespace>.<application>-release-record` in the gate's own namespace.
-	recordNamespace = "delivery-system"
-	recordSuffix    = "-release-record"
-	recordKey       = "record.json"
+	// releasesPath is where the Release Gate serves what it holds of every gated Application.
+	releasesPath = "/releases"
+	// maxGateAnswer bounds what one answer of the gate is read up to: a thousand Applications
+	// of a few hundred bytes each.
+	maxGateAnswer = 4 << 20
 )
 
-// Kube reads the cluster.
+// Kube reads the cluster, and the Release Gate in it.
 type Kube struct {
-	Client  kubernetes.Interface
 	Dynamic dynamic.Interface
+	// Gate is the Release Gate's address, http://<host>:<port>; nil where the dashboard knows
+	// none, and then no release can be read.
+	Gate *url.URL
+	HTTP *http.Client
 }
+
+// ErrNoGate is returned where the dashboard reads a cluster but knows no Release Gate to ask.
+var ErrNoGate = errors.New("no Release Gate is configured")
 
 var _ domain.Cluster = Kube{}
 
@@ -57,8 +61,8 @@ var _ domain.Cluster = Kube{}
 // holds more answers with the first page, so no request grows with what anyone can create.
 const maxListed = 1000
 
-// maxReleases is the most Applications one read of the releases reads the inputs and record of:
-// two reads each, so a cluster full of Canaries never turns one request into thousands.
+// maxReleases is the most Applications one read of the releases carries: what the contract's
+// list carries, so a cluster full of Canaries never turns one answer into thousands.
 const maxReleases = 256
 
 // list reads one page of what the render wrote of a kind, and whether the cluster holds more.
@@ -138,24 +142,20 @@ func (k Kube) Units(ctx context.Context) (domain.Page[domain.Unit], error) {
 	return domain.Page[domain.Unit]{Items: units, Truncated: more}, nil
 }
 
-// inputs is as much of the rendered release-gate inputs as a screen shows.
-type inputs struct {
-	Members []struct {
-		Process string `json:"process"`
-	} `json:"members"`
-	Migration *struct {
-		Identity         string  `json:"identity"`
-		TestedAgainst    *string `json:"testedAgainst"`
-		NonTransactional bool    `json:"nonTransactional"`
+// gateRelease is one gated Application as the Release Gate serves it at GET /releases.
+type gateRelease struct {
+	Namespace   string   `json:"namespace"`
+	Application string   `json:"application"`
+	Members     []string `json:"members"`
+	Migration   *struct {
+		Identity         string `json:"identity"`
+		TestedAgainst    string `json:"testedAgainst"`
+		NonTransactional bool   `json:"nonTransactional"`
 	} `json:"migration"`
-}
-
-// record is the Release Gate's record of one Application.
-type record struct {
-	Namespace string    `json:"namespace"`
-	Serving   string    `json:"serving"`
-	Pinned    string    `json:"pinned"`
-	Since     time.Time `json:"since"`
+	Serving    string     `json:"serving"`
+	Pinned     string     `json:"pinned"`
+	Since      *time.Time `json:"since"`
+	Unreadable string     `json:"unreadable"`
 }
 
 // maxMembers is the most members one Application's inputs may name: what the contract carries.
@@ -183,12 +183,15 @@ func readCanary(o unstructured.Unstructured) canaryOf {
 }
 
 // Releases implements domain.Cluster. The gated Applications are found from the Canaries the
-// render wrote, whose webhooks name their Application, so no ConfigMap is ever listed: each
-// Application's inputs and the gate's record of it are read by name. Its members are the Canaries
-// already listed. One Application whose data cannot be read is reported as such and keeps no other
-// from being read.
+// render wrote, whose webhooks name their Application; each one's inputs and the gate's record of
+// it are what the gate serves, read in one request. Its members are the Canaries already listed.
+// One Application whose data cannot be read is reported as such and keeps no other from being read.
 func (k Kube) Releases(ctx context.Context) (domain.Page[domain.Release], error) {
 	items, more, err := k.list(ctx, Canaries)
+	if err != nil {
+		return domain.Page[domain.Release]{}, err
+	}
+	served, err := k.gate(ctx)
 	if err != nil {
 		return domain.Page[domain.Release]{}, err
 	}
@@ -212,75 +215,76 @@ func (k Kube) Releases(ctx context.Context) (domain.Page[domain.Release], error)
 	}
 	releases := make([]domain.Release, 0, len(order))
 	for _, at := range order {
-		release, err := k.release(ctx, at[0], at[1], byApplication[at])
-		if err != nil {
-			return domain.Page[domain.Release]{}, err
-		}
-		releases = append(releases, release)
+		releases = append(releases, release(at[0], at[1], served[at], byApplication[at]))
 	}
 	return domain.Page[domain.Release]{Items: releases, Truncated: more}, nil
 }
 
-// release reads one Application's inputs and the gate's record of it. An error is the cluster's;
-// data that does not read is the release's own Unreadable.
-func (k Kube) release(ctx context.Context, namespace, application string, canaries map[string]domain.Member) (domain.Release, error) {
-	release := domain.Release{Namespace: namespace, Application: application}
-	cm, err := k.Client.CoreV1().ConfigMaps(namespace).Get(ctx, application+inputsSuffix, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		release.Unreadable = "no release-gate inputs"
-		return release, nil
+// gate asks the Release Gate what it holds of every gated Application. A gate that does not
+// answer, or answers with something else, is the cluster's failure, not a release's data.
+func (k Kube) gate(ctx context.Context) (map[[2]string]*gateRelease, error) {
+	if k.Gate == nil {
+		return nil, ErrNoGate
 	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, k.Gate.JoinPath(releasesPath).String(), nil)
 	if err != nil {
-		return domain.Release{}, fmt.Errorf("read the release-gate inputs of %s/%s: %w", namespace, application, err)
+		return nil, fmt.Errorf("ask the Release Gate: %w", err)
 	}
-	var in inputs
+	req.Header.Set("Accept", "application/json")
+	resp, err := k.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("ask the Release Gate: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ask the Release Gate: %s", resp.Status)
+	}
+	var answer struct {
+		Releases []gateRelease `json:"releases"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxGateAnswer)).Decode(&answer); err != nil {
+		return nil, fmt.Errorf("read the Release Gate's answer: %w", err)
+	}
+	served := make(map[[2]string]*gateRelease, len(answer.Releases))
+	for i := range answer.Releases {
+		r := &answer.Releases[i]
+		served[[2]string{r.Namespace, r.Application}] = r
+	}
+	return served, nil
+}
+
+// release is one Application as the gate serves it, its members joined with their Canaries. An
+// Application the gate does not serve has no release-gate inputs it could read.
+func release(namespace, application string, served *gateRelease, canaries map[string]domain.Member) domain.Release {
+	release := domain.Release{Namespace: namespace, Application: application}
 	switch {
-	case json.Unmarshal([]byte(cm.Data[inputsKey]), &in) != nil:
-		release.Unreadable = "release-gate inputs that do not parse"
-		return release, nil //nolint:nilerr // data that does not parse is the release's own state, not the cluster's failure
-	case len(in.Members) > maxMembers:
+	case served == nil:
+		release.Unreadable = "no release-gate inputs"
+		return release
+	case served.Unreadable != "":
+		release.Unreadable = served.Unreadable
+		return release
+	case len(served.Members) > maxMembers:
 		release.Unreadable = "more members than an Application has"
-		return release, nil
+		return release
 	}
-	if m := in.Migration; m != nil {
-		release.Migration = &domain.Migration{Identity: m.Identity, NonTransactional: m.NonTransactional}
-		if m.TestedAgainst != nil {
-			release.Migration.TestedAgainst = *m.TestedAgainst
-		}
+	if m := served.Migration; m != nil {
+		release.Migration = &domain.Migration{Identity: m.Identity, TestedAgainst: m.TestedAgainst, NonTransactional: m.NonTransactional}
 	}
-	for _, m := range in.Members {
-		member, seen := canaries[m.Process]
+	for _, process := range served.Members {
+		member, seen := canaries[process]
 		if !seen {
 			// Flagger has not made its Canary yet, or it names another Application.
-			member = domain.Member{Process: m.Process}
+			member = domain.Member{Process: process}
 		}
 		release.Members = append(release.Members, member)
 	}
-	return release, k.recorded(ctx, &release)
-}
-
-// recorded adds the Release Gate's record of the Application, where there is one that names the
-// Application's own namespace, and marks the release unreadable where there is one that does not.
-func (k Kube) recorded(ctx context.Context, release *domain.Release) error {
-	name := release.Namespace + "." + release.Application + recordSuffix
-	cm, err := k.Client.CoreV1().ConfigMaps(recordNamespace).Get(ctx, name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read the release record of %s/%s: %w", release.Namespace, release.Application, err)
-	}
-	var r record
-	if err := json.Unmarshal([]byte(cm.Data[recordKey]), &r); err != nil || r.Namespace != release.Namespace {
-		release.Unreadable = "a release record the gate did not write for it"
-		return nil //nolint:nilerr // a record that does not read is the release's own state, not the cluster's failure
-	}
-	release.Serving, release.Pinned = r.Serving, r.Pinned
-	if !r.Since.IsZero() {
-		since := r.Since.UTC()
+	release.Serving, release.Pinned = served.Serving, served.Pinned
+	if served.Since != nil {
+		since := served.Since.UTC()
 		release.Since = &since
 	}
-	return nil
+	return release
 }
 
 // Absent is the cluster of a dashboard that runs without one: every read is domain.ErrNoCluster.
@@ -304,8 +308,9 @@ func (Absent) Releases(context.Context) (domain.Page[domain.Release], error) {
 }
 
 // Connect reads the cluster the dashboard runs in, or the one KUBECONFIG names on a local run,
-// and none where there is neither: then every read says so.
-func Connect(inCluster func() (*rest.Config, error), kubeconfig string) (domain.Cluster, error) {
+// and none where there is neither: then every read says so. gate is the Release Gate's address,
+// or nil.
+func Connect(inCluster func() (*rest.Config, error), kubeconfig string, gate *url.URL, client *http.Client) (domain.Cluster, error) {
 	config, err := inCluster()
 	if errors.Is(err, rest.ErrNotInCluster) {
 		if kubeconfig == "" {
@@ -316,10 +321,9 @@ func Connect(inCluster func() (*rest.Config, error), kubeconfig string) (domain.
 	if err != nil {
 		return nil, fmt.Errorf("reach the cluster: %w", err)
 	}
-	client, typed := kubernetes.NewForConfig(config)
-	dyn, untyped := dynamic.NewForConfig(config)
-	if err := errors.Join(typed, untyped); err != nil {
+	dyn, err := dynamic.NewForConfig(config)
+	if err != nil {
 		return nil, fmt.Errorf("reach the cluster: %w", err)
 	}
-	return Kube{Client: client, Dynamic: dyn}, nil
+	return Kube{Dynamic: dyn, Gate: gate, HTTP: client}, nil
 }
