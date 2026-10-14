@@ -45,6 +45,10 @@ applications:
             credentials: { rotation: { tolerates: restart } } # pgxpool reads its URL once
           # Signing in and every renewal call auth: discovery, its keys and its token endpoint.
           - { application: auth, surface: http }
+          # Each gated Application's release-gate inputs and the gate's record of it, from the
+          # gate's GET /releases, so the dashboard holds no ConfigMap access of its own. This edge
+          # is what the gate's derived policy admits it by.
+          - { application: release-gate, surface: http }
 
         # What signing in needs and nobody else reads: the client secret auth registered for
         # `estate-dashboard`, and the key the session cookie and the stored refresh tokens are
@@ -62,8 +66,7 @@ applications:
         api:
           reason: >-
             the dashboard shows each Project's Flux source and unit and each member's Canary, so it
-            gets, lists and watches those; and each gated Application's release-gate inputs and the
-            Release Gate's record of it, which it gets by name and never lists
+            gets, lists and watches those, and nothing else
           rules:
             - group: source.toolkit.fluxcd.io
               objects: [ocirepositories]
@@ -74,9 +77,6 @@ applications:
             - group: flagger.app
               objects: [canaries]
               verbs: [get, list, watch]
-            - group: core
-              objects: [configmaps]
-              verbs: [get]
 
         placement:
           memory: 96Mi

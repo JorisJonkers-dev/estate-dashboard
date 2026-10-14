@@ -2,19 +2,20 @@ package cluster_test
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	k8stesting "k8s.io/client-go/testing"
 
@@ -46,17 +47,50 @@ func ready(status, reason, message string) map[string]any {
 	}}
 }
 
-func kube(core []runtime.Object, custom ...runtime.Object) cluster.Kube {
+// gate is a Release Gate that answers GET /releases with what it is handed, and counts the asks.
+type gate struct {
+	*httptest.Server
+	asked atomic.Int32
+}
+
+func serveGate(t *testing.T, status int, body string) *gate {
+	t.Helper()
+	g := &gate{}
+	g.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		g.asked.Add(1)
+		if r.Method != http.MethodGet || r.URL.Path != "/releases" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(g.Close)
+	return g
+}
+
+// kube is a cluster holding custom, whose Release Gate answers releases.
+func kube(t *testing.T, releases string, custom ...runtime.Object) cluster.Kube {
+	t.Helper()
+	g := serveGate(t, http.StatusOK, `{"releases":[`+releases+`],"truncated":false}`)
+	return kubeAsking(g, custom...)
+}
+
+func kubeAsking(g *gate, custom ...runtime.Object) cluster.Kube {
 	kinds := map[schema.GroupVersionResource]string{
 		cluster.OCIRepositories: "OCIRepositoryList", cluster.Kustomizations: "KustomizationList", cluster.Canaries: "CanaryList",
 	}
-	return cluster.Kube{Client: fake.NewClientset(core...), Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), kinds, custom...)}
+	address, _ := url.Parse(g.URL)
+	return cluster.Kube{
+		Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), kinds, custom...),
+		Gate:    address, HTTP: g.Client(),
+	}
 }
 
 func TestTheSourcesAreTheRendersOCIRepositoriesWithWhatFluxSaysOfThem(t *testing.T) {
 	stored := ready("True", "Succeeded", "stored artifact")
 	stored["artifact"] = map[string]any{"revision": "sha256:1"}
-	k := kube(nil,
+	k := kube(t, "",
 		object(cluster.OCIRepositories, "OCIRepository", "flux-system", "project-auth", rendered,
 			map[string]any{"url": "oci://r/auth", "ref": map[string]any{"digest": "sha256:1"}}, stored),
 		object(cluster.OCIRepositories, "OCIRepository", "flux-system", "project-new", rendered,
@@ -81,7 +115,7 @@ func TestTheSourcesAreTheRendersOCIRepositoriesWithWhatFluxSaysOfThem(t *testing
 }
 
 func TestTheUnitsAreTheRendersKustomizations(t *testing.T) {
-	k := kube(nil, object(cluster.Kustomizations, "Kustomization", "flux-system", "apps-auth", rendered,
+	k := kube(t, "", object(cluster.Kustomizations, "Kustomization", "flux-system", "apps-auth", rendered,
 		map[string]any{
 			"sourceRef": map[string]any{"kind": "OCIRepository", "name": "project-auth"}, "path": "./apps/auth",
 			"dependsOn": []any{map[string]any{"name": "apps-data"}, "not a reference", map[string]any{"name": int64(7)}, map[string]any{"name": "estate-vso-secrets"}},
@@ -102,14 +136,6 @@ func TestTheUnitsAreTheRendersKustomizations(t *testing.T) {
 	}
 }
 
-func inputs(namespace, application, data string) *corev1.ConfigMap {
-	return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: application + "-release-gate", Namespace: namespace}, Data: map[string]string{"releaseGate.json": data}}
-}
-
-func recordOf(namespace, application, data string) *corev1.ConfigMap {
-	return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: namespace + "." + application + "-release-record", Namespace: "delivery-system"}, Data: map[string]string{"record.json": data}}
-}
-
 // canary is a member's Canary as the render writes it, its webhooks naming the Application.
 func canary(namespace, application, process, revision string, status map[string]any) *unstructured.Unstructured {
 	webhooks := []any{}
@@ -119,7 +145,10 @@ func canary(namespace, application, process, revision string, status map[string]
 	return object(cluster.Canaries, "Canary", namespace, process, rendered, map[string]any{"analysis": map[string]any{"webhooks": webhooks}}, status)
 }
 
-const authGate = `{"members":[{"process":"auth-api"},{"process":"auth-ui"}],"migration":{"identity":"auth-migration","testedAgainst":"sha256:s","nonTransactional":true}}`
+// authServed is auth as the gate serves it: its inputs' members and migration, and its record.
+const authServed = `{"namespace":"auth-system","application":"auth","members":["auth-api","auth-ui"],` +
+	`"migration":{"identity":"auth-migration","testedAgainst":"sha256:s","nonTransactional":true},` +
+	`"serving":"sha256:s","pinned":"sha256:p","since":"2026-10-03T09:00:00+02:00"}`
 
 func byApplication(t *testing.T, k cluster.Kube) map[string]domain.Release {
 	t.Helper()
@@ -134,12 +163,10 @@ func byApplication(t *testing.T, k cluster.Kube) map[string]domain.Release {
 	return out
 }
 
-func TestAReleaseIsTheGatesInputsItsMembersCanariesAndTheGatesRecord(t *testing.T) {
-	k := kube([]runtime.Object{
-		inputs("auth-system", "auth", authGate),
-		recordOf("auth-system", "auth", `{"namespace":"auth-system","serving":"sha256:s","pinned":"sha256:p","since":"2026-10-03T09:00:00+02:00"}`),
-		inputs("mail-system", "mail", `{"members":[{"process":"mail"}]}`),
-	},
+func TestAReleaseIsWhatTheGateServesJoinedWithItsMembersCanaries(t *testing.T) {
+	k := kube(t, authServed+`,{"namespace":"mail-system","application":"mail","members":["mail"]}`+
+		// An Application the gate serves and no Canary names is none the dashboard shows.
+		`,{"namespace":"idle-system","application":"idle","members":["idle"]}`,
 		canary("auth-system", "auth", "auth-api", "sha256:p", map[string]any{"phase": "Progressing", "iterations": int64(2)}),
 		canary("mail-system", "mail", "mail", "sha256:m", nil),
 		// A Canary whose webhooks name no Application is none of a release's.
@@ -163,21 +190,15 @@ func TestAReleaseIsTheGatesInputsItsMembersCanariesAndTheGatesRecord(t *testing.
 }
 
 func TestOneReleaseThatDoesNotReadKeepsNoOtherFromBeingRead(t *testing.T) {
-	many := `{"members":[` + strings.Repeat(`{"process":"p"},`, 64) + `{"process":"p"}]}`
-	k := kube([]runtime.Object{
-		inputs("auth-system", "auth", authGate),
-		inputs("broken", "broken", "{"),
-		inputs("crowded", "crowded", many),
-		inputs("forged", "forged", `{"members":[]}`),
-		recordOf("forged", "forged", `{"namespace":"elsewhere","serving":"sha256:x"}`),
-		inputs("garbled", "garbled", `{"members":[]}`),
-		recordOf("garbled", "garbled", `x`),
-	},
+	many := `"members":[` + strings.Repeat(`"p",`, 64) + `"p"]`
+	k := kube(t, authServed+
+		`,{"namespace":"broken","application":"broken","unreadable":"release-gate inputs that do not parse"}`+
+		`,{"namespace":"crowded","application":"crowded",`+many+`}`+
+		`,{"namespace":"forged","application":"forged","members":["f"],"unreadable":"a release record the gate did not write for it"}`,
 		canary("auth-system", "auth", "auth-api", "sha256:p", nil),
 		canary("broken", "broken", "b", "", nil),
 		canary("crowded", "crowded", "c", "", nil),
 		canary("forged", "forged", "f", "", nil),
-		canary("garbled", "garbled", "g", "", nil),
 		canary("orphan", "orphan", "o", "", nil),
 	)
 	got := byApplication(t, k)
@@ -185,7 +206,6 @@ func TestOneReleaseThatDoesNotReadKeepsNoOtherFromBeingRead(t *testing.T) {
 		"broken/broken":   "release-gate inputs that do not parse",
 		"crowded/crowded": "more members than an Application has",
 		"forged/forged":   "a release record the gate did not write for it",
-		"garbled/garbled": "a release record the gate did not write for it",
 		"orphan/orphan":   "no release-gate inputs",
 	} {
 		if r := got[at]; r.Unreadable != why || r.Serving != "" || len(r.Members) != 0 {
@@ -203,18 +223,13 @@ func TestNoReadGrowsWithWhatAnyoneCanCreate(t *testing.T) {
 		app := "app" + strconv.Itoa(i)
 		canaries = append(canaries, canary("ns", app, app, "", nil))
 	}
-	k := kube(nil, canaries...)
-	var gets int
-	k.Client.(*fake.Clientset).PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
-		gets++
-		return false, nil, nil
-	})
-	got, err := k.Releases(t.Context())
-	if err != nil || len(got.Items) != 256 || gets != 256 || !got.Truncated {
-		t.Fatalf("read %d releases with %d gets, truncated %v, %v", len(got.Items), gets, got.Truncated, err)
+	g := serveGate(t, http.StatusOK, `{"releases":[],"truncated":false}`)
+	got, err := kubeAsking(g, canaries...).Releases(t.Context())
+	if err != nil || len(got.Items) != 256 || g.asked.Load() != 1 || !got.Truncated {
+		t.Fatalf("read %d releases with %d asks, truncated %v, %v", len(got.Items), g.asked.Load(), got.Truncated, err)
 	}
 	// A cluster holding more than one page says so.
-	more := kube(nil)
+	more := kube(t, "")
 	more.Dynamic.(*dynamicfake.FakeDynamicClient).PrependReactor("list", "*", func(k8stesting.Action) (bool, runtime.Object, error) {
 		list := &unstructured.UnstructuredList{Object: map[string]any{"apiVersion": "v1", "kind": "List"}}
 		list.SetContinue("next")
@@ -226,12 +241,16 @@ func TestNoReadGrowsWithWhatAnyoneCanCreate(t *testing.T) {
 	if errors.Join(e1, e2, e3) != nil || !sources.Truncated || !units.Truncated || !releases.Truncated {
 		t.Fatalf("a cluster holding more: %v %v %v", sources.Truncated, units.Truncated, releases.Truncated)
 	}
+	// An answer of the gate is read up to a bound, so a gate cannot make the dashboard hold more.
+	huge := serveGate(t, http.StatusOK, `{"releases":[`+strings.Repeat(authServed+",", 40000)+authServed+`]}`)
+	if _, err := kubeAsking(huge, canary("auth-system", "auth", "auth-api", "", nil)).Releases(t.Context()); err == nil {
+		t.Fatal("an answer past the bound was read whole")
+	}
 }
 
-func TestAClusterThatRefusesIsAnError(t *testing.T) {
+func TestAClusterOrAGateThatRefusesIsAnError(t *testing.T) {
 	refuse := func(k8stesting.Action) (bool, runtime.Object, error) { return true, nil, errors.New("forbidden") }
-	k := kube(nil)
-	k.Client.(*fake.Clientset).PrependReactor("*", "*", refuse)
+	k := kube(t, "")
 	k.Dynamic.(*dynamicfake.FakeDynamicClient).PrependReactor("*", "*", refuse)
 	_, e1 := k.Sources(t.Context())
 	_, e2 := k.Units(t.Context())
@@ -241,28 +260,35 @@ func TestAClusterThatRefusesIsAnError(t *testing.T) {
 			t.Fatal("a refusal read as an answer")
 		}
 	}
-	// The inputs or the record the cluster will not hand over is the cluster's failure, not a
-	// release's data.
-	for name, failing := range map[string]func(k8stesting.Action) bool{
-		"the inputs": func(a k8stesting.Action) bool { return a.GetNamespace() == "auth-system" },
-		"the record": func(a k8stesting.Action) bool { return a.GetNamespace() == "delivery-system" },
+	// What the gate will not hand over is the cluster's failure, not a release's data.
+	gone := serveGate(t, http.StatusOK, "")
+	gone.Close()
+	for name, g := range map[string]*gate{
+		"a 503":               serveGate(t, http.StatusServiceUnavailable, "the gate could not read the cluster"),
+		"an answer not JSON":  serveGate(t, http.StatusOK, "<html>"),
+		"a gate that is gone": gone,
 	} {
-		k := kube([]runtime.Object{inputs("auth-system", "auth", authGate)}, canary("auth-system", "auth", "auth-api", "", nil))
-		k.Client.(*fake.Clientset).PrependReactor("get", "configmaps", func(a k8stesting.Action) (bool, runtime.Object, error) {
-			if failing(a) {
-				return true, nil, errors.New("forbidden")
-			}
-			return false, nil, nil
-		})
-		if _, err := k.Releases(t.Context()); err == nil {
-			t.Errorf("%s refused read as an answer", name)
+		if _, err := kubeAsking(g, canary("auth-system", "auth", "auth-api", "", nil)).Releases(t.Context()); err == nil {
+			t.Errorf("%s read as an answer", name)
 		}
+	}
+	// A dashboard that knows no gate reads no release.
+	none := kube(t, "")
+	none.Gate = nil
+	if _, err := none.Releases(t.Context()); !errors.Is(err, cluster.ErrNoGate) {
+		t.Fatalf("without a gate: %v", err)
+	}
+	// An address that does not make a request is the dashboard's failure, read as one.
+	broken := kube(t, "")
+	broken.Gate = &url.URL{Scheme: "http", Host: "bad host"}
+	if _, err := broken.Releases(t.Context()); err == nil {
+		t.Fatal("a gate address that is not one was asked")
 	}
 }
 
 func TestWithoutAClusterEveryReadSaysSo(t *testing.T) {
 	notIn := func() (*rest.Config, error) { return nil, rest.ErrNotInCluster }
-	c, err := cluster.Connect(notIn, "")
+	c, err := cluster.Connect(notIn, "", nil, http.DefaultClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,13 +300,13 @@ func TestWithoutAClusterEveryReadSaysSo(t *testing.T) {
 			t.Fatalf("error = %v", err)
 		}
 	}
-	if _, err := cluster.Connect(notIn, "/nonexistent/kubeconfig"); err == nil {
+	if _, err := cluster.Connect(notIn, "/nonexistent/kubeconfig", nil, http.DefaultClient); err == nil {
 		t.Fatal("a kubeconfig that is not there connected")
 	}
-	if _, err := cluster.Connect(func() (*rest.Config, error) { return nil, errors.New("no token") }, ""); err == nil {
+	if _, err := cluster.Connect(func() (*rest.Config, error) { return nil, errors.New("no token") }, "", nil, http.DefaultClient); err == nil {
 		t.Fatal("a broken in-cluster configuration connected")
 	}
-	in, err := cluster.Connect(func() (*rest.Config, error) { return &rest.Config{Host: "https://kubernetes.default.svc"}, nil }, "")
+	in, err := cluster.Connect(func() (*rest.Config, error) { return &rest.Config{Host: "https://kubernetes.default.svc"}, nil }, "", nil, http.DefaultClient)
 	if _, isKube := in.(cluster.Kube); err != nil || !isKube {
 		t.Fatalf("in a cluster = %T, %v", in, err)
 	}

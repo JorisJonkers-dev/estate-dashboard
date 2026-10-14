@@ -70,6 +70,7 @@ func TestStartRefusesABadEnvironment(t *testing.T) {
 		"a short session key":  signedInThrough(anywhere, map[string]string{"DATABASE_URL": unreachable, "SESSION_KEY": "short"}),
 		"no Alertmanager":      {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": ""},
 		"no Alertmanager URL":  {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": "alertmanager:9093"},
+		"half a gate address":  {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": "http://alertmanager:9093", "RELEASE_GATE_HOST": "release-gate"},
 	}
 	for name, vars := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -220,5 +221,25 @@ func TestExpiredSessionsAreSweptAtOnceAndThenOnEveryTick(t *testing.T) {
 				t.Fatal("the sweep outlives its context")
 			}
 		})
+	}
+}
+
+func TestTheReleaseGateIsTheTwoCoordinatesOfTheEdgeToItOrNone(t *testing.T) {
+	env := func(host, port string) func(string) string {
+		return func(k string) string {
+			return map[string]string{"RELEASE_GATE_HOST": host, "RELEASE_GATE_PORT": port}[k]
+		}
+	}
+	if gate, err := readGate(env("", "")); gate != nil || err != nil {
+		t.Fatalf("no coordinates = %v, %v", gate, err)
+	}
+	gate, err := readGate(env("release-gate.delivery-system.svc.cluster.local", "8080"))
+	if err != nil || gate.String() != "http://release-gate.delivery-system.svc.cluster.local:8080" {
+		t.Fatalf("gate = %v, %v", gate, err)
+	}
+	for _, c := range [][2]string{{"release-gate", ""}, {"", "8080"}, {"release-gate", "http"}, {"release-gate", "0"}, {"release-gate", "65536"}} {
+		if _, err := readGate(env(c[0], c[1])); err == nil {
+			t.Errorf("%q:%q read as an address", c[0], c[1])
+		}
 	}
 }
