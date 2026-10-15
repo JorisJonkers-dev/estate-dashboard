@@ -247,7 +247,10 @@ const runs = {
 const declarations: Record<string, unknown> = {
   auth: {
     version: '3.4.2',
-    applications: [{ id: 'auth', processes: [{ name: 'auth-api', switchover: 'blue-green', replicas: 2 }, { name: 'auth-ui', switchover: 'blue-green', replicas: 1 }],
+    applications: [{ id: 'auth', processes: [
+      { name: 'auth-api', description: 'Signs users in and issues their tokens.', switchover: 'blue-green', replicas: 2 },
+      { name: 'auth-ui', description: 'The sign-in pages.', switchover: 'blue-green', replicas: 1 },
+    ],
       migration: { runner: 'liquibase', identity: 'auth-migration', provenAgainst: '3.4.2', undo: 'allowed' } }],
     grants: [
       { process: 'auth-api', path: 'secret/data/platform/postgres/auth', access: 'read' },
@@ -258,10 +261,23 @@ const declarations: Record<string, unknown> = {
   },
   notes: {
     version: '0.9.1',
-    applications: [{ id: 'notes', processes: [{ name: 'notes', switchover: 'interrupted', replicas: 1 }],
+    applications: [{ id: 'notes', processes: [{ name: 'notes', description: 'The notes wiki.', switchover: 'interrupted', replicas: 1 }],
       migration: { runner: 'liquibase', identity: 'notes-migration', provenAgainst: '0.9.1', undo: 'blocked', reason: '0.10.0 has a non-transactional changeset' } }],
     grants: [{ process: 'notes', path: 'secret/data/platform/outline', access: 'read' }],
     rollback: ['Back up notes_db. Keep it 7 days.', 'Compose notes at 0.9.1, then pause it'],
+  },
+  delivery: {
+    version: '0.6.0',
+    applications: [
+      { id: 'delivery', processes: [
+        { name: 'collector', description: 'Saves the state of the cluster to the estate repository every 10 minutes.', switchover: 'continuous', replicas: 1 },
+        { name: 'reporter', description: 'Turns Flux and Flagger events into GitHub deployment statuses.', switchover: 'continuous', replicas: 1 },
+        { name: 'release-gate', description: 'Holds a new release until its checks pass, and runs the down migration when one is held.', switchover: 'continuous', replicas: 2 },
+        { name: 'flagger', description: 'Switches traffic from the old version to the new one.', switchover: 'continuous', replicas: 1 },
+      ] },
+    ],
+    grants: [{ process: 'collector', path: 'secret/data/delivery/github-app', access: 'read' }],
+    rollback: [],
   },
 }
 

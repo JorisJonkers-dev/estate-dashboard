@@ -6,7 +6,9 @@ import { listAlertHistoryOptions, listAlertsOptions, listAlertsQueryKey, listIss
 import { useNow } from '../../../infrastructure/useNow'
 import { toneText } from '../../../shared/tone'
 import EmptyPlate from '../../../shared/ui/EmptyPlate.vue'
+import { glossary } from '../../../shared/glossary'
 import HeadBand from '../../../shared/ui/HeadBand.vue'
+import TermHint from '../../../shared/ui/TermHint.vue'
 import { age } from '../../overview/domain/overview'
 import { describeError } from '../composables/useAlertHistory'
 import { describeEvent } from '../domain/eventText'
@@ -121,9 +123,11 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
                 <option value="until-resolved">until resolved</option>
               </select>
             </label>
-            <button type="button" :disabled="silence.isPending.value" class="min-h-10 cursor-pointer rounded-md border border-accent bg-accent px-4 font-sans text-[15px] font-medium text-[#1c1c1c] transition-colors hover:bg-transparent hover:text-accent disabled:opacity-50" @click="silencePicked">
-              Silence
-            </button>
+            <TermHint :text="glossary.silence">
+              <button type="button" :disabled="silence.isPending.value" class="min-h-10 cursor-pointer rounded-md border border-accent bg-accent px-4 font-sans text-[15px] font-medium text-[#1c1c1c] transition-colors hover:bg-transparent hover:text-accent disabled:opacity-50" @click="silencePicked">
+                Silence
+              </button>
+            </TermHint>
           </template>
           <RouterLink v-if="picked.link && picked.link.href.startsWith('/')" :to="picked.link.href" class="inline-flex min-h-10 items-center rounded-md border border-control px-4 text-[15px] font-medium no-underline hover:border-accent">{{ picked.link.label }}</RouterLink>
           <a v-else-if="picked.link" :href="picked.link.href" target="_blank" rel="noopener" class="inline-flex min-h-10 items-center rounded-md border border-control px-4 text-[15px] font-medium no-underline hover:border-accent">{{ picked.link.label }}<span class="sr-only"> (opens in a new tab)</span></a>

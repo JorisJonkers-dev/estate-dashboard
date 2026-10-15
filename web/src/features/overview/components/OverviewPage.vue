@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useNow } from '../../../infrastructure/useNow'
+import { explain } from '../../../shared/glossary'
 import { toneText } from '../../../shared/tone'
 import EmptyPlate from '../../../shared/ui/EmptyPlate.vue'
 import HeadBand from '../../../shared/ui/HeadBand.vue'
+import TermHint from '../../../shared/ui/TermHint.vue'
 import { useOverview } from '../composables/useOverview'
 import { age } from '../domain/overview'
 import ProjectsList from './ProjectsList.vue'
@@ -27,7 +29,7 @@ const isExternal = (href: string) => href.startsWith('https://')
             class="flex flex-col gap-0.5 border-line py-4 pr-4 md:px-6 md:first:pl-0"
             :class="{ 'border-l pl-4': i % 2 === 1, 'md:border-l md:pl-6': i > 0, 'border-t md:border-t-0': i > 1 }"
           >
-            <dt class="text-xs font-semibold tracking-[0.12em] text-text-muted uppercase">{{ h.name }}</dt>
+            <dt class="text-xs font-semibold tracking-[0.12em] text-text-muted uppercase"><TermHint :text="explain(h.name.toLowerCase())" term>{{ h.name }}</TermHint></dt>
             <dd class="m-0">
               <span class="block text-xl font-semibold md:text-2xl" :class="toneText[h.tone]">{{ h.status }}</span>
               <span class="block text-sm text-text-muted">{{ h.detail }}</span>

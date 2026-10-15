@@ -11,7 +11,8 @@ async function at(path: string) {
   return router
 }
 
-describe('a read refused mid-visit', () => {
+// The first push compiles its lazy page on demand, which on a cold run can take longer than the default.
+describe('a read refused mid-visit', { timeout: 20_000 }, () => {
   it('sends the browser to sign in, to come back to the page it was on', async () => {
     const router = await at('/alerts?x=1')
     backToSignIn(router)(unauthorized)

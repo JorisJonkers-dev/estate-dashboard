@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { useQuery } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { getDeclarationOptions } from '../../../infrastructure/api/@tanstack/vue-query.gen'
 import type { Stream } from '../../../infrastructure/api/types.gen'
 import { useNow } from '../../../infrastructure/useNow'
+import { explain, glossary } from '../../../shared/glossary'
 import { toneText } from '../../../shared/tone'
 import ActionLink from '../../../shared/ui/ActionLink.vue'
 import EmptyPlate from '../../../shared/ui/EmptyPlate.vue'
@@ -10,6 +13,7 @@ import HeadBand from '../../../shared/ui/HeadBand.vue'
 import SideDrawer from '../../../shared/ui/SideDrawer.vue'
 import StateTag from '../../../shared/ui/StateTag.vue'
 import StatusMark from '../../../shared/ui/StatusMark.vue'
+import TermHint from '../../../shared/ui/TermHint.vue'
 import { age, shortDigest } from '../../overview/domain/overview'
 import { useProject } from '../composables/useProject'
 import { byProcess, isRunning, ofRelease, type ProcessLogs } from '../domain/logs'
@@ -25,6 +29,9 @@ const { isLoading, row, repository, pin, unit, cluster, alerts, deploys, release
 const now = useNow()
 
 const legacy = computed(() => row.value?.path === 'legacy')
+// What each Process does, from the declaration, where it says.
+const declaration = useQuery(computed(() => ({ ...getDeclarationOptions({ path: { project: name.value } }), retry: false })))
+const description = computed(() => new Map((declaration.data.value?.applications ?? []).flatMap((a) => a.processes.map((p) => [p.name, p.description] as const))))
 const running = computed(() => serving(releases.value))
 // The serving release's containers. Without one, whatever is running.
 const current = computed(() => byProcess(running.value ? ofRelease(streams.value, running.value) : streams.value.filter((s) => isRunning(s, now.value)), now.value))
@@ -67,28 +74,28 @@ const button =
   <div class="flex flex-col gap-10">
     <HeadBand :eyebrow="legacy ? 'Old path, deployed by fleet-infra' : 'Estate path'" :title="name" :tone="row?.tone ?? 'none'">
       <template #title><span v-if="row?.version" class="ml-3 text-2xl font-normal text-text-muted">{{ row.version }}</span></template>
-      <StateTag v-if="row" :tone="row.tone">{{ row.state }}</StateTag>
+      <StateTag v-if="row" :tone="row.tone" :hint="explain(row.state)">{{ row.state }}</StateTag>
       <span v-else-if="!isLoading">This project isn't in the estate.</span>
       <template #acts>
-        <ActionLink v-if="row?.tone === 'info'" :to="`/projects/${name}/release`" primary>Release in flight</ActionLink>
-        <ActionLink v-if="repository" :to="links.repository(repository)" :primary="row?.tone !== 'info'">Repository</ActionLink>
+        <ActionLink v-if="row?.tone === 'info'" :to="`/projects/${name}/release`" :hint="glossary.releaseInFlight" primary>Release in flight</ActionLink>
+        <ActionLink v-if="repository" :to="links.repository(repository)" :hint="glossary.repository" :primary="row?.tone !== 'info'">Repository</ActionLink>
         <template v-if="!legacy && pin">
-          <ActionLink :to="links.workflow(pin.paused ? 'resume' : 'pause')">{{ pin.paused ? 'Resume' : 'Pause' }}</ActionLink>
-          <ActionLink :to="links.workflow('rollback')">Roll back</ActionLink>
+          <ActionLink :to="links.workflow(pin.paused ? 'resume' : 'pause')" :hint="pin.paused ? glossary.resume : glossary.pause">{{ pin.paused ? 'Resume' : 'Pause' }}</ActionLink>
+          <ActionLink :to="links.workflow('rollback')" :hint="glossary.rollBack">Roll back</ActionLink>
         </template>
       </template>
       <template v-if="pin" #facts>
         <dl class="m-0 grid grid-cols-2 gap-x-10 gap-y-3 md:flex md:flex-wrap">
           <div>
-            <dt :class="label">Namespace</dt>
+            <dt :class="label"><TermHint :text="glossary.namespace" term>Namespace</TermHint></dt>
             <dd class="m-0 font-mono text-sm">{{ name }}-system</dd>
           </div>
           <div v-if="unit">
-            <dt :class="label">Unit</dt>
+            <dt :class="label"><TermHint :text="glossary.unit" term>Unit</TermHint></dt>
             <dd class="m-0 font-mono text-sm">{{ unit.name }}<span v-if="unit.dependsOn.length" class="text-text-muted"> after {{ unit.dependsOn.join(', ') }}</span></dd>
           </div>
           <div>
-            <dt :class="label">Pin</dt>
+            <dt :class="label"><TermHint :text="glossary.pin" term>Pin</TermHint></dt>
             <dd class="m-0 font-mono text-sm"><a :href="links.pin(name)">{{ shortDigest(pin.digest) }}</a></dd>
           </div>
           <div v-if="pin.paused">
@@ -114,15 +121,18 @@ const button =
           <ul v-else class="m-0 list-none border-t border-line p-0">
             <li v-for="p in runningProcesses" :key="p.process" class="flex items-center gap-3 border-b border-line-soft py-2.5">
               <StatusMark state="live" />
-              <span class="font-medium">{{ p.process }}</span>
-              <span class="text-sm text-text-muted">{{ p.running }} running</span>
-              <button type="button" :class="[button, 'ml-auto']" @click="showLogs(p, running?.version)">Logs</button>
+              <span class="min-w-0">
+                <span class="font-medium">{{ p.process }}</span>
+                <span class="ml-2 text-sm text-text-muted">{{ p.running }} running</span>
+                <span v-if="description.get(p.process)" class="block text-sm text-text-muted">{{ description.get(p.process) }}</span>
+              </span>
+              <TermHint :text="glossary.logs"><button type="button" :class="[button, 'ml-auto shrink-0']" @click="showLogs(p, running?.version)">Logs</button></TermHint>
             </li>
             <li v-for="p in finishedRuns" :key="p.process" class="flex items-center gap-3 border-b border-line-soft py-2.5">
               <StatusMark state="past" />
               <span class="font-medium">{{ p.process }}</span>
               <span v-if="p.streams[0]?.last" class="text-sm text-text-muted">finished {{ age(p.streams[0].last, now) }} ago</span>
-              <button type="button" :class="[button, 'ml-auto']" @click="showLogs(p, running?.version)">Logs</button>
+              <TermHint :text="glossary.logs"><button type="button" :class="[button, 'ml-auto shrink-0']" @click="showLogs(p, running?.version)">Logs</button></TermHint>
             </li>
           </ul>
           <p v-if="unversioned" class="m-0 mt-2 text-sm text-dim">These pods have no version label yet, so they are matched to a release by when they started.</p>
@@ -137,12 +147,14 @@ const button =
               <div class="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
                 <StatusMark :state="r.state" />
                 <span class="text-lg font-semibold">{{ r.version }}</span>
-                <span v-if="r.pins > 1" class="rounded-full border border-control px-2 text-xs text-text-muted" :title="`Pinned ${String(r.pins)} times`">×{{ r.pins }}</span>
+                <TermHint v-if="r.pins > 1" :text="glossary.pinnedTwice">
+                  <span tabindex="0" class="cursor-help rounded-full border border-control px-2 text-xs text-text-muted">×{{ r.pins }}<span class="sr-only"> pinned</span></span>
+                </TermHint>
                 <time class="text-sm text-text-muted" :datetime="r.at" :title="when.format(new Date(r.at))">{{ age(r.at, now) }}</time>
                 <span class="ml-auto flex flex-wrap gap-2">
-                  <button v-if="repository" type="button" :class="button" @click="showNotes(r.version)">Changelog</button>
-                  <a v-if="r.run" :href="r.run" target="_blank" rel="noopener" :class="button">Run<span class="sr-only"> (opens in a new tab)</span></a>
-                  <button type="button" :class="button" :aria-expanded="open === r.key" @click="toggle(r.key)">{{ open === r.key ? 'Hide' : 'Details' }}</button>
+                  <TermHint v-if="repository" :text="glossary.changelog"><button type="button" :class="button" @click="showNotes(r.version)">Changelog</button></TermHint>
+                  <TermHint v-if="r.run" :text="glossary.run"><a :href="r.run" target="_blank" rel="noopener" :class="button">Run<span class="sr-only"> (opens in a new tab)</span></a></TermHint>
+                  <TermHint :text="glossary.details"><button type="button" :class="button" :aria-expanded="open === r.key" @click="toggle(r.key)">{{ open === r.key ? 'Hide' : 'Details' }}</button></TermHint>
                 </span>
               </div>
               <div v-if="open === r.key" class="mb-4 ml-7 flex flex-col gap-4">
@@ -181,7 +193,7 @@ const button =
           <ul v-else class="m-0 list-none border-t border-line p-0">
             <li v-for="c in cluster" :key="c.kind + c.name" class="flex flex-col gap-0.5 border-b border-line-soft py-3">
               <span class="flex items-baseline justify-between gap-3">
-                <span class="font-medium">{{ c.kind }}</span>
+                <span class="font-medium"><TermHint :text="explain(c.kind)" term>{{ c.kind }}</TermHint></span>
                 <span class="font-medium" :class="toneText[c.tone]">{{ c.word }}</span>
               </span>
               <span class="font-mono text-xs text-text-muted">{{ c.name }}</span>

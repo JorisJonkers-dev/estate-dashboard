@@ -2,7 +2,9 @@
 import { ToggleGroupItem, ToggleGroupRoot } from 'reka-ui'
 import { computed, ref } from 'vue'
 import { useNow } from '../../../infrastructure/useNow'
+import { explain, glossary } from '../../../shared/glossary'
 import StateTag from '../../../shared/ui/StateTag.vue'
+import TermHint from '../../../shared/ui/TermHint.vue'
 import { age, filters, passes, type Filter, type ProjectRow } from '../domain/overview'
 
 const { projects, loading } = defineProps<{ projects: ProjectRow[]; loading?: boolean }>()
@@ -72,7 +74,7 @@ const head = 'py-2.5 pr-4 text-left text-xs font-semibold tracking-[0.12em] text
             <!-- The link covers the row. -->
             <RouterLink :to="`/projects/${p.name}`" class="text-text-primary no-underline after:absolute after:inset-0 hover:text-text-primary">{{ p.name }}</RouterLink>
           </th>
-          <td class="md:py-3 md:pr-4"><StateTag :tone="p.tone">{{ p.state }}</StateTag></td>
+          <td class="md:py-3 md:pr-4"><StateTag :tone="p.tone" :hint="explain(p.state)">{{ p.state }}</StateTag></td>
           <td class="col-span-2 text-sm text-text-muted md:col-span-1 md:py-3 md:pr-4 md:text-base md:text-text-primary">
             <span v-if="p.version" class="mr-2 font-medium">{{ p.version }}</span>
             <span class="font-mono text-xs text-dim">{{ p.path === 'legacy' ? 'fleet-infra' : (p.pin ?? '') }}</span>
@@ -80,7 +82,9 @@ const head = 'py-2.5 pr-4 text-left text-xs font-semibold tracking-[0.12em] text
           <td class="hidden text-text-muted md:table-cell md:py-3 md:pr-4">
             <time v-if="p.deployedAt" :datetime="p.deployedAt">{{ age(p.deployedAt, now) }} ago</time>
           </td>
-          <td class="hidden text-text-muted md:table-cell md:py-3">{{ p.path === 'legacy' ? 'old path' : 'estate path' }}</td>
+          <td class="hidden text-text-muted md:table-cell md:py-3">
+            <TermHint :text="p.path === 'legacy' ? glossary.oldPath : glossary.estatePath" term>{{ p.path === 'legacy' ? 'old path' : 'estate path' }}</TermHint>
+          </td>
         </tr>
       </tbody>
     </table>
