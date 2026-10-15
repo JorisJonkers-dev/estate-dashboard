@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.3.1...v0.3.2) (2026-10-15)
+
+
+### Bug Fixes
+
+* drop the collector's lines about a gone container, read a pod from when it started, and name pods by role ([#44](https://github.com/JorisJonkers-dev/estate-dashboard/issues/44)) ([86b4dde](https://github.com/JorisJonkers-dev/estate-dashboard/commit/86b4dde0aa58f4eea65605a11435785f4da4481f))
+
 ## [0.3.1](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.3.0...v0.3.1) (2026-10-15)
 
 
