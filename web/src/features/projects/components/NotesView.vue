@@ -16,7 +16,7 @@ const failure = computed(() => (notes.error.value ? describeError(notes.error.va
   <div class="px-6 py-5">
     <p v-if="notes.isPending.value" class="m-0 text-text-muted">Loading…</p>
     <p v-else-if="failure" class="m-0 text-text-muted">{{ failure }}</p>
-    <p v-else-if="blocks.length === 0" class="m-0 text-text-muted">This release has no notes.</p>
+    <p v-else-if="blocks.length === 0" class="m-0 text-text-muted">This release has no changelog.</p>
     <template v-for="(b, i) in blocks" v-else :key="i">
       <h3 v-if="b.kind === 'heading'" class="mt-5 mb-2 text-sm font-semibold tracking-[0.12em] text-text-muted uppercase first:mt-0">
         <template v-for="(s, j) in b.spans" :key="j">{{ s.text }}</template>

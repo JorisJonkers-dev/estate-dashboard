@@ -122,7 +122,7 @@ func (h *Estate) GetReleaseNotes(ctx context.Context, params oas.GetReleaseNotes
 	notes, err := h.uc.Notes(ctx, params.Repository, params.Version)
 	switch {
 	case errors.Is(err, domain.ErrNoRelease), errors.Is(err, domain.ErrForeignRepository):
-		missing := oas.GetReleaseNotesNotFound{StatusCode: http.StatusNotFound, Response: httpx.Problem(http.StatusNotFound, "This release has no notes.")}
+		missing := oas.GetReleaseNotesNotFound{StatusCode: http.StatusNotFound, Response: httpx.Problem(http.StatusNotFound, "This release has no changelog.")}
 		return &missing, nil
 	case err != nil:
 		down := oas.GetReleaseNotesServiceUnavailable(h.unavailable(ctx, "notes", err))
