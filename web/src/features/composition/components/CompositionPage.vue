@@ -51,7 +51,7 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
       v-else
       class="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)] lg:items-start lg:gap-12"
     >
-      <ul aria-label="Runs" class="m-0 list-none border-t border-line p-0">
+      <ul aria-label="Runs" class="scroll-pane m-0 list-none border-t border-line p-0">
         <li v-for="r in items" :key="r.id">
           <button
             type="button"
@@ -73,7 +73,11 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
         </li>
       </ul>
 
-      <section v-if="picked" aria-labelledby="run-h" class="flex flex-col gap-5 lg:border-l lg:border-line lg:pl-8">
+      <section
+        v-if="picked"
+        aria-labelledby="run-h"
+        class="scroll-pane flex flex-col gap-5 lg:border-l lg:border-line lg:pl-8"
+      >
         <div class="flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="run-h" class="m-0 text-xl font-semibold">{{ when.format(new Date(picked.at)) }}</h2>
           <a
