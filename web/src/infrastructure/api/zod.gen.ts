@@ -37,6 +37,14 @@ export const zPinList = z.object({
 });
 
 /**
+ * Which delivery path each Project is on.
+ */
+export const zHandover = z.object({
+    estate: z.array(z.string().max(63)).max(1000),
+    legacy: z.array(z.string().max(63)).max(1000)
+});
+
+/**
  * One commit that moved a pin.
  */
 export const zDeploy = z.object({
@@ -60,7 +68,9 @@ export const zIssue = z.object({
     title: z.string().max(1024),
     url: z.string().max(1024),
     labels: z.array(z.string().max(255)).max(100),
-    updatedAt: z.iso.datetime({ offset: true }).max(64)
+    updatedAt: z.iso.datetime({ offset: true }).max(64),
+    project: z.string().max(63).optional(),
+    condition: z.string().max(64).optional()
 });
 
 /**
@@ -100,6 +110,8 @@ export const zUnit = z.object({
     path: z.string().max(1024),
     dependsOn: z.array(z.string().max(253)).max(256),
     applied: z.string().max(128).optional(),
+    version: z.string().max(128).optional(),
+    repository: z.string().max(256).optional(),
     ready: z.boolean(),
     reason: z.string().max(256).optional(),
     message: z.string().max(4096).optional()
@@ -264,6 +276,11 @@ export const zSilenceAlertResponse = zSilence;
  * What the Estate repository holds.
  */
 export const zListPinsResponse = zPinList;
+
+/**
+ * What the Estate repository holds.
+ */
+export const zGetHandoverResponse = zHandover;
 
 export const zListDeploysPath = z.object({
     project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)

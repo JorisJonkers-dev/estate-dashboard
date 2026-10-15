@@ -13,6 +13,18 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// GetHandover implements getHandover operation.
+//
+// The handover ledger of the Platform document, platform.intent.yml on the Estate repository's default
+// branch: the Projects delivered by their pins, and those fleet-infra still delivers. A Platform
+// document without a ledger has handed every Project over, and lists none as legacy. A 503 means
+// GitHub did not answer, or the dashboard runs without the Estate repository.
+//
+// GET /api/v1/estate/handover
+func (UnimplementedHandler) GetHandover(ctx context.Context) (r GetHandoverRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetSession implements getSession operation.
 //
 // Returns the admin the session cookie belongs to. A request without a session, or with one auth no

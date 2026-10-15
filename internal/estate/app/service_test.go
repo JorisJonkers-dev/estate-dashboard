@@ -12,12 +12,15 @@ import (
 
 type repository struct {
 	pins   []domain.Pin
+	ledger domain.Handover
 	issues []domain.Issue
 	asked  int
 	err    error
 }
 
 func (r *repository) Pins(context.Context) ([]domain.Pin, error) { return r.pins, r.err }
+
+func (r *repository) Handover(context.Context) (domain.Handover, error) { return r.ledger, r.err }
 
 func (r *repository) Deploys(_ context.Context, _ string, limit int) ([]domain.Deploy, error) {
 	r.asked = limit
@@ -42,6 +45,14 @@ func TestPinsAreByProjectAndIssuesTheMostRecentlyUpdatedFirst(t *testing.T) {
 	}
 }
 
+func TestTheHandoverLedgerIsByName(t *testing.T) {
+	s := app.New(&repository{ledger: domain.Handover{Estate: []string{"delivery", "app"}, Legacy: []string{"notes", "auth"}}})
+	ledger, err := s.Handover(t.Context())
+	if err != nil || ledger.Estate[0] != "app" || ledger.Legacy[0] != "auth" {
+		t.Fatalf("ledger = %+v, %v", ledger, err)
+	}
+}
+
 func TestDeploysClampsTheLimit(t *testing.T) {
 	for asked, want := range map[int]int{-1: app.DefaultDeploys, 0: app.DefaultDeploys, 1: 1, 100: 100, 101: app.MaxDeploys} {
 		repo := &repository{}
@@ -56,7 +67,8 @@ func TestEveryReadReportsTheRepositorysFailure(t *testing.T) {
 	_, e1 := s.Pins(t.Context())
 	_, e2 := s.Deploys(t.Context(), "auth", 1)
 	_, e3 := s.Issues(t.Context())
-	for _, err := range []error{e1, e2, e3} {
+	_, e4 := s.Handover(t.Context())
+	for _, err := range []error{e1, e2, e3, e4} {
 		if !errors.Is(err, domain.ErrNoRepository) {
 			t.Fatalf("error = %v", err)
 		}

@@ -1,4 +1,4 @@
-// Package web is the estate context's inbound HTTP adapter: the three reads of the Estate
+// Package web is the estate context's inbound HTTP adapter: the reads of the Estate
 // repository, mapped from the domain to the contract's types.
 package web
 
@@ -16,6 +16,7 @@ import (
 // UseCases is what the adapter needs from the application layer.
 type UseCases interface {
 	Pins(ctx context.Context) ([]domain.Pin, error)
+	Handover(ctx context.Context) (domain.Handover, error)
 	Deploys(ctx context.Context, project string, limit int) ([]domain.Deploy, error)
 	Issues(ctx context.Context) ([]domain.Issue, error)
 }
@@ -63,6 +64,16 @@ func (h *Estate) ListPins(ctx context.Context) (oas.ListPinsRes, error) {
 	return &oas.PinList{Items: items}, nil
 }
 
+// GetHandover implements getHandover.
+func (h *Estate) GetHandover(ctx context.Context) (oas.GetHandoverRes, error) {
+	ledger, err := h.uc.Handover(ctx)
+	if err != nil {
+		down := oas.GetHandoverServiceUnavailable(h.unavailable(ctx, "handover", err))
+		return &down, nil //nolint:nilerr // the cause is logged; the contract's 503 is the answer
+	}
+	return &oas.Handover{Estate: append([]string{}, ledger.Estate...), Legacy: append([]string{}, ledger.Legacy...)}, nil
+}
+
 // ListDeploys implements listDeploys. The contract's pattern admits only a Project name, so a
 // name the domain refuses is a Project with no deploys.
 func (h *Estate) ListDeploys(ctx context.Context, params oas.ListDeploysParams) (oas.ListDeploysRes, error) {
@@ -90,7 +101,19 @@ func (h *Estate) ListIssues(ctx context.Context) (oas.ListIssuesRes, error) {
 	}
 	items := make([]oas.Issue, 0, len(issues))
 	for _, i := range issues {
-		items = append(items, oas.Issue{Number: int32(min(max(i.Number, 1), 1<<31-1)), Title: i.Title, URL: i.URL, Labels: append([]string{}, i.Labels...), UpdatedAt: i.UpdatedAt}) //nolint:gosec // clamped to the int32 range
+		items = append(items, oas.Issue{
+			Number: int32(min(max(i.Number, 1), 1<<31-1)), //nolint:gosec // clamped to the int32 range
+			Title:  i.Title, URL: i.URL, Labels: append([]string{}, i.Labels...), UpdatedAt: i.UpdatedAt,
+			Project: opt(i.Project), Condition: opt(i.Condition),
+		})
 	}
 	return &oas.IssueList{Items: items}, nil
+}
+
+// opt is an optional string of the contract: absent where s is empty.
+func opt(s string) oas.OptString {
+	if s == "" {
+		return oas.OptString{}
+	}
+	return oas.NewOptString(s)
 }

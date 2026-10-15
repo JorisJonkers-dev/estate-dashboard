@@ -37,6 +37,17 @@ func (s *Service) Pins(ctx context.Context) ([]domain.Pin, error) {
 	return pins, nil
 }
 
+// Handover returns which delivery path each Project is on, each list by name.
+func (s *Service) Handover(ctx context.Context) (domain.Handover, error) {
+	ledger, err := s.repo.Handover(ctx)
+	if err != nil {
+		return domain.Handover{}, fmt.Errorf("read the handover ledger: %w", err)
+	}
+	slices.Sort(ledger.Estate)
+	slices.Sort(ledger.Legacy)
+	return ledger, nil
+}
+
 // Deploys returns up to limit commits that moved a Project's pin, newest first. A limit below 1
 // means DefaultDeploys.
 func (s *Service) Deploys(ctx context.Context, project string, limit int) ([]domain.Deploy, error) {

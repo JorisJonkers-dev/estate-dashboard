@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/vue-query';
 
 import { client } from '../client.gen';
-import { getSession, listAlertHistory, listAlerts, listDeploys, listIssues, listPins, listReleases, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
-import type { GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
+import { getHandover, getSession, listAlertHistory, listAlerts, listDeploys, listIssues, listPins, listReleases, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
+import type { GetHandoverData, GetHandoverError, GetHandoverResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -116,6 +116,26 @@ export const listPinsOptions = (options?: Options<ListPinsData>) => queryOptions
         return data;
     },
     queryKey: listPinsQueryKey(options)
+});
+
+export const getHandoverQueryKey = (options?: Options<GetHandoverData>) => createQueryKey('getHandover', options);
+
+/**
+ * Say which delivery path each Project is on
+ *
+ * The handover ledger of the Platform document, platform.intent.yml on the Estate repository's default branch: the Projects delivered by their pins, and those fleet-infra still delivers. A Platform document without a ledger has handed every Project over, and lists none as legacy. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const getHandoverOptions = (options?: Options<GetHandoverData>) => queryOptions<GetHandoverResponse, GetHandoverError, GetHandoverResponse, ReturnType<typeof getHandoverQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getHandover({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getHandoverQueryKey(options)
 });
 
 export const listDeploysQueryKey = (options: Options<ListDeploysData>) => createQueryKey('listDeploys', options);

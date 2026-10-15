@@ -284,7 +284,7 @@ func TestTheClusterIsServedInTheContractsShape(t *testing.T) {
 			{Name: "project-b", URL: "oci://r/b", Digest: "sha256:0"},
 			{Name: "project-a", URL: "oci://r/a", Digest: "sha256:1", Revision: "sha256:1", Condition: delivery.Condition{Ready: true, Reason: "Succeeded", Message: "stored"}},
 		},
-		units: []delivery.Unit{{Name: "apps-a", Source: "project-a", Path: "./apps/a", DependsOn: []string{"estate-vso-secrets"}, Applied: "sha256:1", Condition: delivery.Condition{Ready: true}}},
+		units: []delivery.Unit{{Name: "apps-a", Source: "project-a", Path: "./apps/a", DependsOn: []string{"estate-vso-secrets"}, Applied: "sha256:1", Version: "1.2.0", Repository: "JorisJonkers-dev/a", Condition: delivery.Condition{Ready: true}}},
 		releases: []delivery.Release{{
 			Namespace: "auth-system", Application: "auth", Serving: "sha256:s", Pinned: "sha256:p", Since: &since,
 			Members:   []delivery.Member{{Process: "auth-api", Phase: "Progressing", Revision: "sha256:p", Iterations: 2}, {Process: "auth-ui"}},
@@ -302,7 +302,7 @@ func TestTheClusterIsServedInTheContractsShape(t *testing.T) {
 	}
 	units := call(t, srv, http.MethodGet, "/api/v1/delivery/units", "", true)
 	unit := units.body["items"].([]any)[0].(map[string]any)
-	if units.code != http.StatusOK || units.body["truncated"] != false || unit["dependsOn"].([]any)[0] != "estate-vso-secrets" || unit["applied"] != "sha256:1" || unit["ready"] != true {
+	if units.code != http.StatusOK || units.body["truncated"] != false || unit["dependsOn"].([]any)[0] != "estate-vso-secrets" || unit["applied"] != "sha256:1" || unit["version"] != "1.2.0" || unit["repository"] != "JorisJonkers-dev/a" || unit["ready"] != true {
 		t.Fatalf("units = %d %v", units.code, units.body)
 	}
 	releases := call(t, srv, http.MethodGet, "/api/v1/delivery/releases", "", true)
@@ -336,6 +336,7 @@ func TestAClusterThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 // repository is the Estate repository read in memory; asked is each deploys read.
 type repository struct {
 	pins    []estatedomain.Pin
+	ledger  estatedomain.Handover
 	deploys []estatedomain.Deploy
 	issues  []estatedomain.Issue
 	err     error
@@ -343,6 +344,8 @@ type repository struct {
 }
 
 func (r *repository) Pins(context.Context) ([]estatedomain.Pin, error) { return r.pins, r.err }
+
+func (r *repository) Handover(context.Context) (estatedomain.Handover, error) { return r.ledger, r.err }
 
 func (r *repository) Deploys(_ context.Context, project string, limit int) ([]estatedomain.Deploy, error) {
 	r.asked = append(r.asked, project+" "+strconv.Itoa(limit))
@@ -358,6 +361,7 @@ func TestTheEstateRepositoryIsServedInTheContractsShape(t *testing.T) {
 			{Project: "data", Digest: "sha256:d"},
 			{Project: "auth", Digest: "sha256:a", Paused: &estatedomain.Pause{By: "joris", At: "2026-10-03T07:00:00Z", Reason: "held"}, RolledBack: &estatedomain.Rollback{Version: "1.2.0", Fragment: "sha256:f"}},
 		},
+		ledger:  estatedomain.Handover{Estate: []string{"delivery", "auth"}, Legacy: []string{"data"}},
 		deploys: []estatedomain.Deploy{{Commit: "abc", At: at, Message: "auth 1.3.0"}},
 		issues:  []estatedomain.Issue{{Number: 7, Title: "auth is held", URL: "https://github.com/x/7", Labels: []string{"held"}, UpdatedAt: at}},
 	}
@@ -371,6 +375,10 @@ func TestTheEstateRepositoryIsServedInTheContractsShape(t *testing.T) {
 	}
 	if data := items[1].(map[string]any); len(data) != 2 {
 		t.Fatalf("a pin with nothing recorded = %v", data)
+	}
+	ledger := call(t, srv, http.MethodGet, "/api/v1/estate/handover", "", true)
+	if ledger.code != http.StatusOK || ledger.body["estate"].([]any)[0] != "auth" || ledger.body["legacy"].([]any)[0] != "data" {
+		t.Fatalf("handover = %d %v", ledger.code, ledger.body)
 	}
 	deploys := call(t, srv, http.MethodGet, "/api/v1/estate/projects/auth/deploys?limit=5", "", true)
 	if deploys.code != http.StatusOK || deploys.body["items"].([]any)[0].(map[string]any)["at"] != "2026-10-03T07:00:00Z" || repo.asked[0] != "auth 5" {
@@ -391,7 +399,7 @@ func TestAnEstateRepositoryThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 		"The dashboard runs without the Estate repository to read.": estateapp.New(github.Absent{}),
 	} {
 		srv := serveEstate(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), uc)
-		for _, path := range []string{"/api/v1/estate/pins", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys"} {
+		for _, path := range []string{"/api/v1/estate/pins", "/api/v1/estate/handover", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys"} {
 			if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
 				t.Fatalf("%s = %d %v", path, got.code, got.body)
 			}
@@ -413,7 +421,7 @@ func TestTheSessionIsTheAdminTheCookieBelongsTo(t *testing.T) {
 
 func TestOnlyALiveAdminSessionReachesAnOperation(t *testing.T) {
 	srv := serve(t, &memory{})
-	for _, path := range []string{"/api/v1/session", "/api/v1/alerts/history", "/api/v1/alerts", "/api/v1/delivery/sources", "/api/v1/delivery/units", "/api/v1/delivery/releases", "/api/v1/estate/pins", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys"} {
+	for _, path := range []string{"/api/v1/session", "/api/v1/alerts/history", "/api/v1/alerts", "/api/v1/delivery/sources", "/api/v1/delivery/units", "/api/v1/delivery/releases", "/api/v1/estate/pins", "/api/v1/estate/handover", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys"} {
 		for name, cookie := range map[string]string{"no cookie": "", "a cookie the gate does not admit": "someone-elses"} {
 			got := callWith(t, srv, http.MethodGet, path, "", cookie)
 			if got.code != http.StatusUnauthorized || got.body["status"] != float64(http.StatusUnauthorized) || got.body["detail"] != nil {

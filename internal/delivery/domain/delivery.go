@@ -35,6 +35,10 @@ type Unit struct {
 	DependsOn []string
 	// Applied is the source revision Flux last applied.
 	Applied string
+	// Version and Repository are the release the unit's pin names and where it was published
+	// from, as composition annotates the unit; empty on a unit no composition wrote.
+	Version    string
+	Repository string
 	Condition
 }
 

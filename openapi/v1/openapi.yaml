@@ -138,6 +138,29 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/estate/handover:
+    get:
+      operationId: getHandover
+      summary: Say which delivery path each Project is on
+      description: >-
+        The handover ledger of the Platform document, platform.intent.yml on the Estate repository's
+        default branch: the Projects delivered by their pins, and those fleet-infra still delivers. A
+        Platform document without a ledger has handed every Project over, and lists none as legacy. A
+        503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+      tags: [estate]
+      responses:
+        "200":
+          description: What the Estate repository holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Handover"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/estate/projects/{project}/deploys:
     get:
       operationId: listDeploys
@@ -371,6 +394,26 @@ components:
           description: The pins.
           items:
             $ref: "#/components/schemas/Pin"
+    Handover:
+      description: Which delivery path each Project is on.
+      type: object
+      additionalProperties: false
+      required: [estate, legacy]
+      properties:
+        estate:
+          type: array
+          maxItems: 1000
+          description: The Projects delivered by their pins, by name.
+          items:
+            type: string
+            maxLength: 63
+        legacy:
+          type: array
+          maxItems: 1000
+          description: The Projects fleet-infra still delivers, by name.
+          items:
+            type: string
+            maxLength: 63
     Deploy:
       description: One commit that moved a pin.
       type: object
@@ -435,6 +478,18 @@ components:
           format: date-time
           maxLength: 64
           description: When it last changed.
+        project:
+          type: string
+          maxLength: 63
+          description: >-
+            The Project of the condition composition keeps this issue for, from the marker its body
+            ends with; absent on an issue a person opened.
+          example: knowledge
+        condition:
+          type: string
+          maxLength: 64
+          description: The condition, likewise.
+          example: isolated
     IssueList:
       description: The open issues, most recently updated first.
       type: object
@@ -533,6 +588,20 @@ components:
           type: string
           maxLength: 128
           description: The source revision Flux last applied, where it applied anything.
+        version:
+          type: string
+          maxLength: 128
+          description: >-
+            The release the unit's pin names, from the event.toolkit.fluxcd.io/version annotation
+            composition writes on it; absent on a unit no composition wrote.
+          example: 0.6.0
+        repository:
+          type: string
+          maxLength: 256
+          description: >-
+            The repository that release was published from, from the
+            event.toolkit.fluxcd.io/repository annotation; absent likewise.
+          example: JorisJonkers-dev/delivery
         ready:
           type: boolean
           description: Whether Flux reports the object Ready.

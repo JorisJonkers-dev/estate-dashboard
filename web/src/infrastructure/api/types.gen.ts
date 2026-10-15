@@ -63,6 +63,20 @@ export type PinList = {
 };
 
 /**
+ * Which delivery path each Project is on.
+ */
+export type Handover = {
+    /**
+     * The Projects delivered by their pins, by name.
+     */
+    estate: Array<string>;
+    /**
+     * The Projects fleet-infra still delivers, by name.
+     */
+    legacy: Array<string>;
+};
+
+/**
  * One commit that moved a pin.
  */
 export type Deploy = {
@@ -114,6 +128,14 @@ export type Issue = {
      * When it last changed.
      */
     updatedAt: string;
+    /**
+     * The Project of the condition composition keeps this issue for, from the marker its body ends with; absent on an issue a person opened.
+     */
+    project?: string;
+    /**
+     * The condition, likewise.
+     */
+    condition?: string;
 };
 
 /**
@@ -198,6 +220,14 @@ export type Unit = {
      * The source revision Flux last applied, where it applied anything.
      */
     applied?: string;
+    /**
+     * The release the unit's pin names, from the event.toolkit.fluxcd.io/version annotation composition writes on it; absent on a unit no composition wrote.
+     */
+    version?: string;
+    /**
+     * The repository that release was published from, from the event.toolkit.fluxcd.io/repository annotation; absent likewise.
+     */
+    repository?: string;
     /**
      * Whether Flux reports the object Ready.
      */
@@ -613,6 +643,39 @@ export type ListPinsResponses = {
 };
 
 export type ListPinsResponse = ListPinsResponses[keyof ListPinsResponses];
+
+export type GetHandoverData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/estate/handover';
+};
+
+export type GetHandoverErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type GetHandoverError = GetHandoverErrors[keyof GetHandoverErrors];
+
+export type GetHandoverResponses = {
+    /**
+     * What the Estate repository holds.
+     */
+    200: Handover;
+};
+
+export type GetHandoverResponse = GetHandoverResponses[keyof GetHandoverResponses];
 
 export type ListDeploysData = {
     body?: never;

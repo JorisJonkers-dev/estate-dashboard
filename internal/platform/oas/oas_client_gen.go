@@ -29,6 +29,15 @@ func trimTrailingSlashes(u *url.URL) {
 
 // Invoker invokes operations described by OpenAPI v3 specification.
 type Invoker interface {
+	// GetHandover invokes getHandover operation.
+	//
+	// The handover ledger of the Platform document, platform.intent.yml on the Estate repository's default
+	// branch: the Projects delivered by their pins, and those fleet-infra still delivers. A Platform
+	// document without a ledger has handed every Project over, and lists none as legacy. A 503 means
+	// GitHub did not answer, or the dashboard runs without the Estate repository.
+	//
+	// GET /api/v1/estate/handover
+	GetHandover(ctx context.Context) (GetHandoverRes, error)
 	// GetSession invokes getSession operation.
 	//
 	// Returns the admin the session cookie belongs to. A request without a session, or with one auth no
@@ -148,6 +157,122 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 		return c.serverURL
 	}
 	return u
+}
+
+// GetHandover invokes getHandover operation.
+//
+// The handover ledger of the Platform document, platform.intent.yml on the Estate repository's default
+// branch: the Projects delivered by their pins, and those fleet-infra still delivers. A Platform
+// document without a ledger has handed every Project over, and lists none as legacy. A 503 means
+// GitHub did not answer, or the dashboard runs without the Estate repository.
+//
+// GET /api/v1/estate/handover
+func (c *Client) GetHandover(ctx context.Context) (GetHandoverRes, error) {
+	res, err := c.sendGetHandover(ctx)
+	return res, err
+}
+
+func (c *Client) sendGetHandover(ctx context.Context) (res GetHandoverRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getHandover"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/v1/estate/handover"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetHandoverOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/api/v1/estate/handover"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetHandoverOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetHandoverResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
 }
 
 // GetSession invokes getSession operation.

@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
-import { zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListPinsResponse, zListReleasesResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
+import type { GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
+import { zGetHandoverResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListPinsResponse, zListReleasesResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -106,6 +106,27 @@ export const listPins = <ThrowOnError extends boolean = false>(options?: Options
             type: 'apiKey'
         }],
     url: '/api/v1/estate/pins',
+    ...options
+});
+
+/**
+ * Say which delivery path each Project is on
+ *
+ * The handover ledger of the Platform document, platform.intent.yml on the Estate repository's default branch: the Projects delivered by their pins, and those fleet-infra still delivers. A Platform document without a ledger has handed every Project over, and lists none as legacy. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const getHandover = <ThrowOnError extends boolean = false>(options?: Options<GetHandoverData, ThrowOnError>): RequestResult<GetHandoverResponses, GetHandoverErrors, ThrowOnError> => (options?.client ?? client).get<GetHandoverResponses, GetHandoverErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zGetHandoverResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/estate/handover',
     ...options
 });
 

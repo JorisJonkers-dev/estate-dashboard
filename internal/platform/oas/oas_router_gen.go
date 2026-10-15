@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	rn18AllowedHeaders = map[string]string{
+	rn19AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
 )
@@ -161,7 +161,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn18AllowedHeaders,
+									allowedHeaders: rn19AllowedHeaders,
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -275,6 +275,31 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 				switch elem[0] {
+				case 'h': // Prefix: "handover"
+
+					if l := len("handover"); len(elem) >= l && elem[0:l] == "handover" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "GET":
+							s.handleGetHandoverRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: nil,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+
 				case 'i': // Prefix: "issues"
 
 					if l := len("issues"); len(elem) >= l && elem[0:l] == "issues" {
@@ -722,6 +747,31 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					break
 				}
 				switch elem[0] {
+				case 'h': // Prefix: "handover"
+
+					if l := len("handover"); len(elem) >= l && elem[0:l] == "handover" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "GET":
+							r.name = GetHandoverOperation
+							r.summary = "Say which delivery path each Project is on"
+							r.operationID = "getHandover"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/estate/handover"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
+						}
+					}
+
 				case 'i': // Prefix: "issues"
 
 					if l := len("issues"); len(elem) >= l && elem[0:l] == "issues" {

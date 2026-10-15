@@ -394,6 +394,45 @@ func (s *DeployList) SetItems(val []Deploy) {
 
 func (*DeployList) listDeploysRes() {}
 
+type GetHandoverServiceUnavailable ProblemStatusCode
+
+func (*GetHandoverServiceUnavailable) getHandoverRes() {}
+
+type GetHandoverUnauthorized ProblemStatusCode
+
+func (*GetHandoverUnauthorized) getHandoverRes() {}
+
+// Which delivery path each Project is on.
+// Ref: #/components/schemas/Handover
+type Handover struct {
+	// The Projects delivered by their pins, by name.
+	Estate []string `json:"estate"`
+	// The Projects fleet-infra still delivers, by name.
+	Legacy []string `json:"legacy"`
+}
+
+// GetEstate returns the value of Estate.
+func (s *Handover) GetEstate() []string {
+	return s.Estate
+}
+
+// GetLegacy returns the value of Legacy.
+func (s *Handover) GetLegacy() []string {
+	return s.Legacy
+}
+
+// SetEstate sets the value of Estate.
+func (s *Handover) SetEstate(val []string) {
+	s.Estate = val
+}
+
+// SetLegacy sets the value of Legacy.
+func (s *Handover) SetLegacy(val []string) {
+	s.Legacy = val
+}
+
+func (*Handover) getHandoverRes() {}
+
 // One open issue of the Estate repository.
 // Ref: #/components/schemas/Issue
 type Issue struct {
@@ -407,6 +446,11 @@ type Issue struct {
 	Labels []string `json:"labels"`
 	// When it last changed.
 	UpdatedAt time.Time `json:"updatedAt"`
+	// The Project of the condition composition keeps this issue for, from the marker its body ends with;
+	// absent on an issue a person opened.
+	Project OptString `json:"project"`
+	// The condition, likewise.
+	Condition OptString `json:"condition"`
 }
 
 // GetNumber returns the value of Number.
@@ -434,6 +478,16 @@ func (s *Issue) GetUpdatedAt() time.Time {
 	return s.UpdatedAt
 }
 
+// GetProject returns the value of Project.
+func (s *Issue) GetProject() OptString {
+	return s.Project
+}
+
+// GetCondition returns the value of Condition.
+func (s *Issue) GetCondition() OptString {
+	return s.Condition
+}
+
 // SetNumber sets the value of Number.
 func (s *Issue) SetNumber(val int32) {
 	s.Number = val
@@ -457,6 +511,16 @@ func (s *Issue) SetLabels(val []string) {
 // SetUpdatedAt sets the value of UpdatedAt.
 func (s *Issue) SetUpdatedAt(val time.Time) {
 	s.UpdatedAt = val
+}
+
+// SetProject sets the value of Project.
+func (s *Issue) SetProject(val OptString) {
+	s.Project = val
+}
+
+// SetCondition sets the value of Condition.
+func (s *Issue) SetCondition(val OptString) {
+	s.Condition = val
 }
 
 // The open issues, most recently updated first.
@@ -1647,6 +1711,12 @@ type Unit struct {
 	DependsOn []string `json:"dependsOn"`
 	// The source revision Flux last applied, where it applied anything.
 	Applied OptString `json:"applied"`
+	// The release the unit's pin names, from the event.toolkit.fluxcd.io/version annotation composition
+	// writes on it; absent on a unit no composition wrote.
+	Version OptString `json:"version"`
+	// The repository that release was published from, from the event.toolkit.fluxcd.io/repository
+	// annotation; absent likewise.
+	Repository OptString `json:"repository"`
 	// Whether Flux reports the object Ready.
 	Ready bool `json:"ready"`
 	// The Ready condition's reason, where there is one.
@@ -1678,6 +1748,16 @@ func (s *Unit) GetDependsOn() []string {
 // GetApplied returns the value of Applied.
 func (s *Unit) GetApplied() OptString {
 	return s.Applied
+}
+
+// GetVersion returns the value of Version.
+func (s *Unit) GetVersion() OptString {
+	return s.Version
+}
+
+// GetRepository returns the value of Repository.
+func (s *Unit) GetRepository() OptString {
+	return s.Repository
 }
 
 // GetReady returns the value of Ready.
@@ -1718,6 +1798,16 @@ func (s *Unit) SetDependsOn(val []string) {
 // SetApplied sets the value of Applied.
 func (s *Unit) SetApplied(val OptString) {
 	s.Applied = val
+}
+
+// SetVersion sets the value of Version.
+func (s *Unit) SetVersion(val OptString) {
+	s.Version = val
+}
+
+// SetRepository sets the value of Repository.
+func (s *Unit) SetRepository(val OptString) {
+	s.Repository = val
 }
 
 // SetReady sets the value of Ready.

@@ -6,6 +6,7 @@ package oas
 type OperationName = string
 
 const (
+	GetHandoverOperation      OperationName = "GetHandover"
 	GetSessionOperation       OperationName = "GetSession"
 	ListAlertHistoryOperation OperationName = "ListAlertHistory"
 	ListAlertsOperation       OperationName = "ListAlerts"
