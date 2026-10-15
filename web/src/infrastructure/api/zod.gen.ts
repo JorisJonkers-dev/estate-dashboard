@@ -116,6 +116,102 @@ export const zReleaseNotes = z.object({
 });
 
 /**
+ * One fragment a run read.
+ */
+export const zCompositionFragment = z.object({
+    project: z.string().max(63),
+    version: z.string().max(64),
+    outcome: z.enum([
+        'moved',
+        'unchanged',
+        'isolated',
+        'stale',
+        'held'
+    ]),
+    reason: z.string().max(512).optional(),
+    published: z.iso.datetime({ offset: true }).max(64)
+});
+
+/**
+ * One composition run.
+ */
+export const zCompositionRun = z.object({
+    id: z.coerce.bigint().gte(BigInt(1)).lte(BigInt(9007199254740991)),
+    at: z.iso.datetime({ offset: true }).max(64),
+    trigger: z.string().max(256),
+    outcome: z.enum([
+        'composed',
+        'isolated',
+        'failed'
+    ]),
+    lock: z.string().max(128).optional(),
+    toolkit: z.string().max(64).optional(),
+    snapshotAt: z.iso.datetime({ offset: true }).max(64).optional(),
+    moved: z.array(z.string().max(63)).max(1000),
+    fragments: z.array(zCompositionFragment).max(1000),
+    url: z.string().max(2048)
+});
+
+/**
+ * Composition runs, newest first.
+ */
+export const zCompositionRunList = z.object({
+    items: z.array(zCompositionRun).max(100)
+});
+
+/**
+ * One Process an Application declares.
+ */
+export const zDeclaredProcess = z.object({
+    name: z.string().max(63),
+    switchover: z.enum([
+        'blue-green',
+        'continuous',
+        'interrupted'
+    ]),
+    replicas: z.int().gte(0).lte(1000)
+});
+
+/**
+ * How an Application moves its schema.
+ */
+export const zDeclaredMigration = z.object({
+    runner: z.string().max(64),
+    identity: z.string().max(128).optional(),
+    provenAgainst: z.string().max(64).optional(),
+    undo: z.enum(['allowed', 'blocked']),
+    reason: z.string().max(256).optional()
+});
+
+/**
+ * One Application a Project declares.
+ */
+export const zDeclaredApplication = z.object({
+    id: z.string().max(63),
+    processes: z.array(zDeclaredProcess).max(64),
+    migration: zDeclaredMigration.optional()
+});
+
+/**
+ * One secret a Process may read or use.
+ */
+export const zGrant = z.object({
+    process: z.string().max(63),
+    path: z.string().max(512),
+    access: z.string().max(32)
+});
+
+/**
+ * What a Project declares at its pinned release.
+ */
+export const zDeclaration = z.object({
+    version: z.string().max(64),
+    applications: z.array(zDeclaredApplication).max(64),
+    grants: z.array(zGrant).max(512),
+    rollback: z.array(z.string().max(256)).max(16)
+});
+
+/**
  * One commit that moved a pin.
  */
 export const zDeploy = z.object({
@@ -418,6 +514,20 @@ export const zGetReleaseNotesQuery = z.object({
  * The notes.
  */
 export const zGetReleaseNotesResponse = zReleaseNotes;
+
+/**
+ * The runs.
+ */
+export const zListCompositionRunsResponse = zCompositionRunList;
+
+export const zGetDeclarationPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+/**
+ * The declaration.
+ */
+export const zGetDeclarationResponse = zDeclaration;
 
 /**
  * What the Estate repository holds.

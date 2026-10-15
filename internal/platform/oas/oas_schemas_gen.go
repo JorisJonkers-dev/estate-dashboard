@@ -334,6 +334,619 @@ func (s *AlertList) SetItems(val []Alert) {
 
 func (*AlertList) listAlertsRes() {}
 
+// One fragment a run read.
+// Ref: #/components/schemas/CompositionFragment
+type CompositionFragment struct {
+	// The Project.
+	Project string `json:"project"`
+	// Its release.
+	Version string `json:"version"`
+	// What the run did with it.
+	Outcome CompositionFragmentOutcome `json:"outcome"`
+	// Why, where it was set aside or held.
+	Reason OptString `json:"reason"`
+	// When it was published.
+	Published time.Time `json:"published"`
+}
+
+// GetProject returns the value of Project.
+func (s *CompositionFragment) GetProject() string {
+	return s.Project
+}
+
+// GetVersion returns the value of Version.
+func (s *CompositionFragment) GetVersion() string {
+	return s.Version
+}
+
+// GetOutcome returns the value of Outcome.
+func (s *CompositionFragment) GetOutcome() CompositionFragmentOutcome {
+	return s.Outcome
+}
+
+// GetReason returns the value of Reason.
+func (s *CompositionFragment) GetReason() OptString {
+	return s.Reason
+}
+
+// GetPublished returns the value of Published.
+func (s *CompositionFragment) GetPublished() time.Time {
+	return s.Published
+}
+
+// SetProject sets the value of Project.
+func (s *CompositionFragment) SetProject(val string) {
+	s.Project = val
+}
+
+// SetVersion sets the value of Version.
+func (s *CompositionFragment) SetVersion(val string) {
+	s.Version = val
+}
+
+// SetOutcome sets the value of Outcome.
+func (s *CompositionFragment) SetOutcome(val CompositionFragmentOutcome) {
+	s.Outcome = val
+}
+
+// SetReason sets the value of Reason.
+func (s *CompositionFragment) SetReason(val OptString) {
+	s.Reason = val
+}
+
+// SetPublished sets the value of Published.
+func (s *CompositionFragment) SetPublished(val time.Time) {
+	s.Published = val
+}
+
+// What the run did with it.
+type CompositionFragmentOutcome string
+
+const (
+	CompositionFragmentOutcomeMoved     CompositionFragmentOutcome = "moved"
+	CompositionFragmentOutcomeUnchanged CompositionFragmentOutcome = "unchanged"
+	CompositionFragmentOutcomeIsolated  CompositionFragmentOutcome = "isolated"
+	CompositionFragmentOutcomeStale     CompositionFragmentOutcome = "stale"
+	CompositionFragmentOutcomeHeld      CompositionFragmentOutcome = "held"
+)
+
+// AllValues returns all CompositionFragmentOutcome values.
+func (CompositionFragmentOutcome) AllValues() []CompositionFragmentOutcome {
+	return []CompositionFragmentOutcome{
+		CompositionFragmentOutcomeMoved,
+		CompositionFragmentOutcomeUnchanged,
+		CompositionFragmentOutcomeIsolated,
+		CompositionFragmentOutcomeStale,
+		CompositionFragmentOutcomeHeld,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CompositionFragmentOutcome) MarshalText() ([]byte, error) {
+	switch s {
+	case CompositionFragmentOutcomeMoved:
+		return []byte(s), nil
+	case CompositionFragmentOutcomeUnchanged:
+		return []byte(s), nil
+	case CompositionFragmentOutcomeIsolated:
+		return []byte(s), nil
+	case CompositionFragmentOutcomeStale:
+		return []byte(s), nil
+	case CompositionFragmentOutcomeHeld:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CompositionFragmentOutcome) UnmarshalText(data []byte) error {
+	switch CompositionFragmentOutcome(data) {
+	case CompositionFragmentOutcomeMoved:
+		*s = CompositionFragmentOutcomeMoved
+		return nil
+	case CompositionFragmentOutcomeUnchanged:
+		*s = CompositionFragmentOutcomeUnchanged
+		return nil
+	case CompositionFragmentOutcomeIsolated:
+		*s = CompositionFragmentOutcomeIsolated
+		return nil
+	case CompositionFragmentOutcomeStale:
+		*s = CompositionFragmentOutcomeStale
+		return nil
+	case CompositionFragmentOutcomeHeld:
+		*s = CompositionFragmentOutcomeHeld
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// One composition run.
+// Ref: #/components/schemas/CompositionRun
+type CompositionRun struct {
+	// The workflow run's id.
+	ID int64 `json:"id"`
+	// When it ran.
+	At time.Time `json:"at"`
+	// What started it.
+	Trigger string `json:"trigger"`
+	// All composed, some set aside, or the run failed.
+	Outcome CompositionRunOutcome `json:"outcome"`
+	// The composition lock it published.
+	Lock OptString `json:"lock"`
+	// The deploy-kit release it composed with.
+	Toolkit OptString `json:"toolkit"`
+	// When the cluster snapshot it read was taken.
+	SnapshotAt OptDateTime `json:"snapshotAt"`
+	// The Projects whose pin it moved.
+	Moved []string `json:"moved"`
+	// Every fragment it read.
+	Fragments []CompositionFragment `json:"fragments"`
+	// The workflow run.
+	URL string `json:"url"`
+}
+
+// GetID returns the value of ID.
+func (s *CompositionRun) GetID() int64 {
+	return s.ID
+}
+
+// GetAt returns the value of At.
+func (s *CompositionRun) GetAt() time.Time {
+	return s.At
+}
+
+// GetTrigger returns the value of Trigger.
+func (s *CompositionRun) GetTrigger() string {
+	return s.Trigger
+}
+
+// GetOutcome returns the value of Outcome.
+func (s *CompositionRun) GetOutcome() CompositionRunOutcome {
+	return s.Outcome
+}
+
+// GetLock returns the value of Lock.
+func (s *CompositionRun) GetLock() OptString {
+	return s.Lock
+}
+
+// GetToolkit returns the value of Toolkit.
+func (s *CompositionRun) GetToolkit() OptString {
+	return s.Toolkit
+}
+
+// GetSnapshotAt returns the value of SnapshotAt.
+func (s *CompositionRun) GetSnapshotAt() OptDateTime {
+	return s.SnapshotAt
+}
+
+// GetMoved returns the value of Moved.
+func (s *CompositionRun) GetMoved() []string {
+	return s.Moved
+}
+
+// GetFragments returns the value of Fragments.
+func (s *CompositionRun) GetFragments() []CompositionFragment {
+	return s.Fragments
+}
+
+// GetURL returns the value of URL.
+func (s *CompositionRun) GetURL() string {
+	return s.URL
+}
+
+// SetID sets the value of ID.
+func (s *CompositionRun) SetID(val int64) {
+	s.ID = val
+}
+
+// SetAt sets the value of At.
+func (s *CompositionRun) SetAt(val time.Time) {
+	s.At = val
+}
+
+// SetTrigger sets the value of Trigger.
+func (s *CompositionRun) SetTrigger(val string) {
+	s.Trigger = val
+}
+
+// SetOutcome sets the value of Outcome.
+func (s *CompositionRun) SetOutcome(val CompositionRunOutcome) {
+	s.Outcome = val
+}
+
+// SetLock sets the value of Lock.
+func (s *CompositionRun) SetLock(val OptString) {
+	s.Lock = val
+}
+
+// SetToolkit sets the value of Toolkit.
+func (s *CompositionRun) SetToolkit(val OptString) {
+	s.Toolkit = val
+}
+
+// SetSnapshotAt sets the value of SnapshotAt.
+func (s *CompositionRun) SetSnapshotAt(val OptDateTime) {
+	s.SnapshotAt = val
+}
+
+// SetMoved sets the value of Moved.
+func (s *CompositionRun) SetMoved(val []string) {
+	s.Moved = val
+}
+
+// SetFragments sets the value of Fragments.
+func (s *CompositionRun) SetFragments(val []CompositionFragment) {
+	s.Fragments = val
+}
+
+// SetURL sets the value of URL.
+func (s *CompositionRun) SetURL(val string) {
+	s.URL = val
+}
+
+// Composition runs, newest first.
+// Ref: #/components/schemas/CompositionRunList
+type CompositionRunList struct {
+	// The runs.
+	Items []CompositionRun `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *CompositionRunList) GetItems() []CompositionRun {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *CompositionRunList) SetItems(val []CompositionRun) {
+	s.Items = val
+}
+
+func (*CompositionRunList) listCompositionRunsRes() {}
+
+// All composed, some set aside, or the run failed.
+type CompositionRunOutcome string
+
+const (
+	CompositionRunOutcomeComposed CompositionRunOutcome = "composed"
+	CompositionRunOutcomeIsolated CompositionRunOutcome = "isolated"
+	CompositionRunOutcomeFailed   CompositionRunOutcome = "failed"
+)
+
+// AllValues returns all CompositionRunOutcome values.
+func (CompositionRunOutcome) AllValues() []CompositionRunOutcome {
+	return []CompositionRunOutcome{
+		CompositionRunOutcomeComposed,
+		CompositionRunOutcomeIsolated,
+		CompositionRunOutcomeFailed,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CompositionRunOutcome) MarshalText() ([]byte, error) {
+	switch s {
+	case CompositionRunOutcomeComposed:
+		return []byte(s), nil
+	case CompositionRunOutcomeIsolated:
+		return []byte(s), nil
+	case CompositionRunOutcomeFailed:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CompositionRunOutcome) UnmarshalText(data []byte) error {
+	switch CompositionRunOutcome(data) {
+	case CompositionRunOutcomeComposed:
+		*s = CompositionRunOutcomeComposed
+		return nil
+	case CompositionRunOutcomeIsolated:
+		*s = CompositionRunOutcomeIsolated
+		return nil
+	case CompositionRunOutcomeFailed:
+		*s = CompositionRunOutcomeFailed
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// What a Project declares at its pinned release.
+// Ref: #/components/schemas/Declaration
+type Declaration struct {
+	// The release it was read from.
+	Version string `json:"version"`
+	// Its Applications.
+	Applications []DeclaredApplication `json:"applications"`
+	// Every grant its Processes hold.
+	Grants []Grant `json:"grants"`
+	// What a Rollback does first, in order.
+	Rollback []string `json:"rollback"`
+}
+
+// GetVersion returns the value of Version.
+func (s *Declaration) GetVersion() string {
+	return s.Version
+}
+
+// GetApplications returns the value of Applications.
+func (s *Declaration) GetApplications() []DeclaredApplication {
+	return s.Applications
+}
+
+// GetGrants returns the value of Grants.
+func (s *Declaration) GetGrants() []Grant {
+	return s.Grants
+}
+
+// GetRollback returns the value of Rollback.
+func (s *Declaration) GetRollback() []string {
+	return s.Rollback
+}
+
+// SetVersion sets the value of Version.
+func (s *Declaration) SetVersion(val string) {
+	s.Version = val
+}
+
+// SetApplications sets the value of Applications.
+func (s *Declaration) SetApplications(val []DeclaredApplication) {
+	s.Applications = val
+}
+
+// SetGrants sets the value of Grants.
+func (s *Declaration) SetGrants(val []Grant) {
+	s.Grants = val
+}
+
+// SetRollback sets the value of Rollback.
+func (s *Declaration) SetRollback(val []string) {
+	s.Rollback = val
+}
+
+func (*Declaration) getDeclarationRes() {}
+
+// One Application a Project declares.
+// Ref: #/components/schemas/DeclaredApplication
+type DeclaredApplication struct {
+	// The Application.
+	ID string `json:"id"`
+	// Its Processes.
+	Processes []DeclaredProcess    `json:"processes"`
+	Migration OptDeclaredMigration `json:"migration"`
+}
+
+// GetID returns the value of ID.
+func (s *DeclaredApplication) GetID() string {
+	return s.ID
+}
+
+// GetProcesses returns the value of Processes.
+func (s *DeclaredApplication) GetProcesses() []DeclaredProcess {
+	return s.Processes
+}
+
+// GetMigration returns the value of Migration.
+func (s *DeclaredApplication) GetMigration() OptDeclaredMigration {
+	return s.Migration
+}
+
+// SetID sets the value of ID.
+func (s *DeclaredApplication) SetID(val string) {
+	s.ID = val
+}
+
+// SetProcesses sets the value of Processes.
+func (s *DeclaredApplication) SetProcesses(val []DeclaredProcess) {
+	s.Processes = val
+}
+
+// SetMigration sets the value of Migration.
+func (s *DeclaredApplication) SetMigration(val OptDeclaredMigration) {
+	s.Migration = val
+}
+
+// How an Application moves its schema.
+// Ref: #/components/schemas/DeclaredMigration
+type DeclaredMigration struct {
+	// What runs it, liquibase or self.
+	Runner string `json:"runner"`
+	// The migration identity.
+	Identity OptString `json:"identity"`
+	// The release it was proven against.
+	ProvenAgainst OptString `json:"provenAgainst"`
+	// Whether a down migration may run.
+	Undo DeclaredMigrationUndo `json:"undo"`
+	// Why, where undo is blocked.
+	Reason OptString `json:"reason"`
+}
+
+// GetRunner returns the value of Runner.
+func (s *DeclaredMigration) GetRunner() string {
+	return s.Runner
+}
+
+// GetIdentity returns the value of Identity.
+func (s *DeclaredMigration) GetIdentity() OptString {
+	return s.Identity
+}
+
+// GetProvenAgainst returns the value of ProvenAgainst.
+func (s *DeclaredMigration) GetProvenAgainst() OptString {
+	return s.ProvenAgainst
+}
+
+// GetUndo returns the value of Undo.
+func (s *DeclaredMigration) GetUndo() DeclaredMigrationUndo {
+	return s.Undo
+}
+
+// GetReason returns the value of Reason.
+func (s *DeclaredMigration) GetReason() OptString {
+	return s.Reason
+}
+
+// SetRunner sets the value of Runner.
+func (s *DeclaredMigration) SetRunner(val string) {
+	s.Runner = val
+}
+
+// SetIdentity sets the value of Identity.
+func (s *DeclaredMigration) SetIdentity(val OptString) {
+	s.Identity = val
+}
+
+// SetProvenAgainst sets the value of ProvenAgainst.
+func (s *DeclaredMigration) SetProvenAgainst(val OptString) {
+	s.ProvenAgainst = val
+}
+
+// SetUndo sets the value of Undo.
+func (s *DeclaredMigration) SetUndo(val DeclaredMigrationUndo) {
+	s.Undo = val
+}
+
+// SetReason sets the value of Reason.
+func (s *DeclaredMigration) SetReason(val OptString) {
+	s.Reason = val
+}
+
+// Whether a down migration may run.
+type DeclaredMigrationUndo string
+
+const (
+	DeclaredMigrationUndoAllowed DeclaredMigrationUndo = "allowed"
+	DeclaredMigrationUndoBlocked DeclaredMigrationUndo = "blocked"
+)
+
+// AllValues returns all DeclaredMigrationUndo values.
+func (DeclaredMigrationUndo) AllValues() []DeclaredMigrationUndo {
+	return []DeclaredMigrationUndo{
+		DeclaredMigrationUndoAllowed,
+		DeclaredMigrationUndoBlocked,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeclaredMigrationUndo) MarshalText() ([]byte, error) {
+	switch s {
+	case DeclaredMigrationUndoAllowed:
+		return []byte(s), nil
+	case DeclaredMigrationUndoBlocked:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeclaredMigrationUndo) UnmarshalText(data []byte) error {
+	switch DeclaredMigrationUndo(data) {
+	case DeclaredMigrationUndoAllowed:
+		*s = DeclaredMigrationUndoAllowed
+		return nil
+	case DeclaredMigrationUndoBlocked:
+		*s = DeclaredMigrationUndoBlocked
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// One Process an Application declares.
+// Ref: #/components/schemas/DeclaredProcess
+type DeclaredProcess struct {
+	// The Process.
+	Name string `json:"name"`
+	// How a new release replaces it.
+	Switchover DeclaredProcessSwitchover `json:"switchover"`
+	// How many run.
+	Replicas int32 `json:"replicas"`
+}
+
+// GetName returns the value of Name.
+func (s *DeclaredProcess) GetName() string {
+	return s.Name
+}
+
+// GetSwitchover returns the value of Switchover.
+func (s *DeclaredProcess) GetSwitchover() DeclaredProcessSwitchover {
+	return s.Switchover
+}
+
+// GetReplicas returns the value of Replicas.
+func (s *DeclaredProcess) GetReplicas() int32 {
+	return s.Replicas
+}
+
+// SetName sets the value of Name.
+func (s *DeclaredProcess) SetName(val string) {
+	s.Name = val
+}
+
+// SetSwitchover sets the value of Switchover.
+func (s *DeclaredProcess) SetSwitchover(val DeclaredProcessSwitchover) {
+	s.Switchover = val
+}
+
+// SetReplicas sets the value of Replicas.
+func (s *DeclaredProcess) SetReplicas(val int32) {
+	s.Replicas = val
+}
+
+// How a new release replaces it.
+type DeclaredProcessSwitchover string
+
+const (
+	DeclaredProcessSwitchoverBlueGreen   DeclaredProcessSwitchover = "blue-green"
+	DeclaredProcessSwitchoverContinuous  DeclaredProcessSwitchover = "continuous"
+	DeclaredProcessSwitchoverInterrupted DeclaredProcessSwitchover = "interrupted"
+)
+
+// AllValues returns all DeclaredProcessSwitchover values.
+func (DeclaredProcessSwitchover) AllValues() []DeclaredProcessSwitchover {
+	return []DeclaredProcessSwitchover{
+		DeclaredProcessSwitchoverBlueGreen,
+		DeclaredProcessSwitchoverContinuous,
+		DeclaredProcessSwitchoverInterrupted,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeclaredProcessSwitchover) MarshalText() ([]byte, error) {
+	switch s {
+	case DeclaredProcessSwitchoverBlueGreen:
+		return []byte(s), nil
+	case DeclaredProcessSwitchoverContinuous:
+		return []byte(s), nil
+	case DeclaredProcessSwitchoverInterrupted:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeclaredProcessSwitchover) UnmarshalText(data []byte) error {
+	switch DeclaredProcessSwitchover(data) {
+	case DeclaredProcessSwitchoverBlueGreen:
+		*s = DeclaredProcessSwitchoverBlueGreen
+		return nil
+	case DeclaredProcessSwitchoverContinuous:
+		*s = DeclaredProcessSwitchoverContinuous
+		return nil
+	case DeclaredProcessSwitchoverInterrupted:
+		*s = DeclaredProcessSwitchoverInterrupted
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // One commit that moved a pin.
 // Ref: #/components/schemas/Deploy
 type Deploy struct {
@@ -394,6 +1007,14 @@ func (s *DeployList) SetItems(val []Deploy) {
 
 func (*DeployList) listDeploysRes() {}
 
+type GetDeclarationServiceUnavailable ProblemStatusCode
+
+func (*GetDeclarationServiceUnavailable) getDeclarationRes() {}
+
+type GetDeclarationUnauthorized ProblemStatusCode
+
+func (*GetDeclarationUnauthorized) getDeclarationRes() {}
+
 type GetHandoverServiceUnavailable ProblemStatusCode
 
 func (*GetHandoverServiceUnavailable) getHandoverRes() {}
@@ -413,6 +1034,47 @@ func (*GetReleaseNotesServiceUnavailable) getReleaseNotesRes() {}
 type GetReleaseNotesUnauthorized ProblemStatusCode
 
 func (*GetReleaseNotesUnauthorized) getReleaseNotesRes() {}
+
+// One secret a Process may read or use.
+// Ref: #/components/schemas/Grant
+type Grant struct {
+	// The Process.
+	Process string `json:"process"`
+	// The Vault path.
+	Path string `json:"path"`
+	// Read, or the transit operations.
+	Access string `json:"access"`
+}
+
+// GetProcess returns the value of Process.
+func (s *Grant) GetProcess() string {
+	return s.Process
+}
+
+// GetPath returns the value of Path.
+func (s *Grant) GetPath() string {
+	return s.Path
+}
+
+// GetAccess returns the value of Access.
+func (s *Grant) GetAccess() string {
+	return s.Access
+}
+
+// SetProcess sets the value of Process.
+func (s *Grant) SetProcess(val string) {
+	s.Process = val
+}
+
+// SetPath sets the value of Path.
+func (s *Grant) SetPath(val string) {
+	s.Path = val
+}
+
+// SetAccess sets the value of Access.
+func (s *Grant) SetAccess(val string) {
+	s.Access = val
+}
 
 // Each Project's delivery path.
 // Ref: #/components/schemas/Handover
@@ -561,6 +1223,14 @@ func (*ListAlertsServiceUnavailable) listAlertsRes() {}
 type ListAlertsUnauthorized ProblemStatusCode
 
 func (*ListAlertsUnauthorized) listAlertsRes() {}
+
+type ListCompositionRunsServiceUnavailable ProblemStatusCode
+
+func (*ListCompositionRunsServiceUnavailable) listCompositionRunsRes() {}
+
+type ListCompositionRunsUnauthorized ProblemStatusCode
+
+func (*ListCompositionRunsUnauthorized) listCompositionRunsRes() {}
 
 type ListDeploysServiceUnavailable ProblemStatusCode
 
@@ -821,6 +1491,52 @@ func (o OptDateTime) Get() (v time.Time, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDeclaredMigration returns new OptDeclaredMigration with value set to v.
+func NewOptDeclaredMigration(v DeclaredMigration) OptDeclaredMigration {
+	return OptDeclaredMigration{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDeclaredMigration is optional DeclaredMigration.
+type OptDeclaredMigration struct {
+	Value DeclaredMigration
+	Set   bool
+}
+
+// IsSet returns true if OptDeclaredMigration was set.
+func (o OptDeclaredMigration) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDeclaredMigration) Reset() {
+	var v DeclaredMigration
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDeclaredMigration) SetTo(v DeclaredMigration) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDeclaredMigration) Get() (v DeclaredMigration, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDeclaredMigration) Or(d DeclaredMigration) DeclaredMigration {
 	if v, ok := o.Get(); ok {
 		return v
 	}

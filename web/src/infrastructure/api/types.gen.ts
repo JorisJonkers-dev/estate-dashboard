@@ -217,6 +217,187 @@ export type ReleaseNotes = {
 };
 
 /**
+ * One fragment a run read.
+ */
+export type CompositionFragment = {
+    /**
+     * The Project.
+     */
+    project: string;
+    /**
+     * Its release.
+     */
+    version: string;
+    /**
+     * What the run did with it.
+     */
+    outcome: 'moved' | 'unchanged' | 'isolated' | 'stale' | 'held';
+    /**
+     * Why, where it was set aside or held.
+     */
+    reason?: string;
+    /**
+     * When it was published.
+     */
+    published: string;
+};
+
+/**
+ * One composition run.
+ */
+export type CompositionRun = {
+    /**
+     * The workflow run's id.
+     */
+    id: number;
+    /**
+     * When it ran.
+     */
+    at: string;
+    /**
+     * What started it.
+     */
+    trigger: string;
+    /**
+     * All composed, some set aside, or the run failed.
+     */
+    outcome: 'composed' | 'isolated' | 'failed';
+    /**
+     * The composition lock it published.
+     */
+    lock?: string;
+    /**
+     * The deploy-kit release it composed with.
+     */
+    toolkit?: string;
+    /**
+     * When the cluster snapshot it read was taken.
+     */
+    snapshotAt?: string;
+    /**
+     * The Projects whose pin it moved.
+     */
+    moved: Array<string>;
+    /**
+     * Every fragment it read.
+     */
+    fragments: Array<CompositionFragment>;
+    /**
+     * The workflow run.
+     */
+    url: string;
+};
+
+/**
+ * Composition runs, newest first.
+ */
+export type CompositionRunList = {
+    /**
+     * The runs.
+     */
+    items: Array<CompositionRun>;
+};
+
+/**
+ * One Process an Application declares.
+ */
+export type DeclaredProcess = {
+    /**
+     * The Process.
+     */
+    name: string;
+    /**
+     * How a new release replaces it.
+     */
+    switchover: 'blue-green' | 'continuous' | 'interrupted';
+    /**
+     * How many run.
+     */
+    replicas: number;
+};
+
+/**
+ * How an Application moves its schema.
+ */
+export type DeclaredMigration = {
+    /**
+     * What runs it, liquibase or self.
+     */
+    runner: string;
+    /**
+     * The migration identity.
+     */
+    identity?: string;
+    /**
+     * The release it was proven against.
+     */
+    provenAgainst?: string;
+    /**
+     * Whether a down migration may run.
+     */
+    undo: 'allowed' | 'blocked';
+    /**
+     * Why, where undo is blocked.
+     */
+    reason?: string;
+};
+
+/**
+ * One Application a Project declares.
+ */
+export type DeclaredApplication = {
+    /**
+     * The Application.
+     */
+    id: string;
+    /**
+     * Its Processes.
+     */
+    processes: Array<DeclaredProcess>;
+    migration?: DeclaredMigration;
+};
+
+/**
+ * One secret a Process may read or use.
+ */
+export type Grant = {
+    /**
+     * The Process.
+     */
+    process: string;
+    /**
+     * The Vault path.
+     */
+    path: string;
+    /**
+     * read, or the transit operations.
+     */
+    access: string;
+};
+
+/**
+ * What a Project declares at its pinned release.
+ */
+export type Declaration = {
+    /**
+     * The release it was read from.
+     */
+    version: string;
+    /**
+     * Its Applications.
+     */
+    applications: Array<DeclaredApplication>;
+    /**
+     * Every grant its Processes hold.
+     */
+    grants: Array<Grant>;
+    /**
+     * What a Rollback does first, in order.
+     */
+    rollback: Array<string>;
+};
+
+/**
  * One commit that moved a pin.
  */
 export type Deploy = {
@@ -1050,6 +1231,77 @@ export type GetReleaseNotesResponses = {
 };
 
 export type GetReleaseNotesResponse = GetReleaseNotesResponses[keyof GetReleaseNotesResponses];
+
+export type ListCompositionRunsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/estate/composition/runs';
+};
+
+export type ListCompositionRunsErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListCompositionRunsError = ListCompositionRunsErrors[keyof ListCompositionRunsErrors];
+
+export type ListCompositionRunsResponses = {
+    /**
+     * The runs.
+     */
+    200: CompositionRunList;
+};
+
+export type ListCompositionRunsResponse = ListCompositionRunsResponses[keyof ListCompositionRunsResponses];
+
+export type GetDeclarationData = {
+    body?: never;
+    path: {
+        /**
+         * The Project.
+         */
+        project: string;
+    };
+    query?: never;
+    url: '/api/v1/estate/projects/{project}/declaration';
+};
+
+export type GetDeclarationErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type GetDeclarationError = GetDeclarationErrors[keyof GetDeclarationErrors];
+
+export type GetDeclarationResponses = {
+    /**
+     * The declaration.
+     */
+    200: Declaration;
+};
+
+export type GetDeclarationResponse = GetDeclarationResponses[keyof GetDeclarationResponses];
 
 export type ListIssuesData = {
     body?: never;

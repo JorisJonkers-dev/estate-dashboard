@@ -428,6 +428,18 @@ func TestTheEstateRepositoryIsServedInTheContractsShape(t *testing.T) {
 	}
 }
 
+func TestTheReadsNotMadeYetSaySo(t *testing.T) {
+	srv := serve(t, &memory{})
+	for path, want := range map[string]string{
+		"/api/v1/estate/composition/runs":          "Composition runs are not read yet.",
+		"/api/v1/estate/projects/auth/declaration": "Declarations are not read yet.",
+	} {
+		if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
+			t.Fatalf("%s = %d %v", path, got.code, got.body)
+		}
+	}
+}
+
 func TestAnEstateRepositoryThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 	for want, uc := range map[string]estateweb.UseCases{
 		"GitHub did not answer.":                                    estateapp.New(&repository{err: errors.New("rate limited")}),

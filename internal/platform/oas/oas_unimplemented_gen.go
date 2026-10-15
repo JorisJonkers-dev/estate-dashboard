@@ -13,6 +13,17 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// GetDeclaration implements getDeclaration operation.
+//
+// The Applications, Processes, migration, rollback and grants the Project's Intent Fragment declares,
+// at the version its pin was composed from (#31). A 503 means fragments are not read yet, or the
+// registry did not answer.
+//
+// GET /api/v1/estate/projects/{project}/declaration
+func (UnimplementedHandler) GetDeclaration(ctx context.Context, params GetDeclarationParams) (r GetDeclarationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetHandover implements getHandover operation.
 //
 // The handover ledger from platform.intent.yml on the Estate repository's default branch. It lists the
@@ -64,6 +75,16 @@ func (UnimplementedHandler) ListAlertHistory(ctx context.Context, params ListAle
 //
 // GET /api/v1/alerts
 func (UnimplementedHandler) ListAlerts(ctx context.Context) (r ListAlertsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListCompositionRuns implements listCompositionRuns operation.
+//
+// Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed. Read
+// from each run's artifact (#30). A 503 means the runs are not read yet, or GitHub did not answer.
+//
+// GET /api/v1/estate/composition/runs
+func (UnimplementedHandler) ListCompositionRuns(ctx context.Context) (r ListCompositionRunsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

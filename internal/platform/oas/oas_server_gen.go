@@ -8,6 +8,14 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// GetDeclaration implements getDeclaration operation.
+	//
+	// The Applications, Processes, migration, rollback and grants the Project's Intent Fragment declares,
+	// at the version its pin was composed from (#31). A 503 means fragments are not read yet, or the
+	// registry did not answer.
+	//
+	// GET /api/v1/estate/projects/{project}/declaration
+	GetDeclaration(ctx context.Context, params GetDeclarationParams) (GetDeclarationRes, error)
 	// GetHandover implements getHandover operation.
 	//
 	// The handover ledger from platform.intent.yml on the Estate repository's default branch. It lists the
@@ -47,6 +55,13 @@ type Handler interface {
 	//
 	// GET /api/v1/alerts
 	ListAlerts(ctx context.Context) (ListAlertsRes, error)
+	// ListCompositionRuns implements listCompositionRuns operation.
+	//
+	// Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed. Read
+	// from each run's artifact (#30). A 503 means the runs are not read yet, or GitHub did not answer.
+	//
+	// GET /api/v1/estate/composition/runs
+	ListCompositionRuns(ctx context.Context) (ListCompositionRunsRes, error)
 	// ListDeploys implements listDeploys operation.
 	//
 	// The Estate repository's history of projects//source.yaml: its deploy log. A Project with no pin has

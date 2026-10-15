@@ -408,6 +408,60 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/estate/composition/runs:
+    get:
+      operationId: listCompositionRuns
+      summary: List the estate's composition runs, newest first
+      description: >-
+        Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed.
+        Read from each run's artifact (#30). A 503 means the runs are not read yet, or GitHub did not
+        answer.
+      tags: [estate]
+      responses:
+        "200":
+          description: The runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompositionRunList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/estate/projects/{project}/declaration:
+    get:
+      operationId: getDeclaration
+      summary: Read what a Project declares at its pinned release
+      description: >-
+        The Applications, Processes, migration, rollback and grants the Project's Intent Fragment
+        declares, at the version its pin was composed from (#31). A 503 means fragments are not read
+        yet, or the registry did not answer.
+      tags: [estate]
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: The Project.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+            pattern: "^[a-z0-9_][a-z0-9_-]{0,62}$"
+      responses:
+        "200":
+          description: The declaration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Declaration"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/estate/issues:
     get:
       operationId: listIssues
@@ -777,6 +831,211 @@ components:
           format: date-time
           maxLength: 64
           description: When it was published.
+    CompositionFragment:
+      description: One fragment a run read.
+      type: object
+      additionalProperties: false
+      required: [project, version, outcome, published]
+      properties:
+        project:
+          type: string
+          maxLength: 63
+          description: The Project.
+        version:
+          type: string
+          maxLength: 64
+          description: Its release.
+        outcome:
+          type: string
+          enum: [moved, unchanged, isolated, stale, held]
+          description: What the run did with it.
+        reason:
+          type: string
+          maxLength: 512
+          description: Why, where it was set aside or held.
+        published:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was published.
+    CompositionRun:
+      description: One composition run.
+      type: object
+      additionalProperties: false
+      required: [id, at, trigger, outcome, moved, fragments, url]
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: The workflow run's id.
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it ran.
+        trigger:
+          type: string
+          maxLength: 256
+          description: What started it.
+        outcome:
+          type: string
+          enum: [composed, isolated, failed]
+          description: All composed, some set aside, or the run failed.
+        lock:
+          type: string
+          maxLength: 128
+          description: The composition lock it published.
+        toolkit:
+          type: string
+          maxLength: 64
+          description: The deploy-kit release it composed with.
+        snapshotAt:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When the cluster snapshot it read was taken.
+        moved:
+          type: array
+          maxItems: 1000
+          description: The Projects whose pin it moved.
+          items:
+            type: string
+            maxLength: 63
+        fragments:
+          type: array
+          maxItems: 1000
+          description: Every fragment it read.
+          items:
+            $ref: "#/components/schemas/CompositionFragment"
+        url:
+          type: string
+          maxLength: 2048
+          description: The workflow run.
+    CompositionRunList:
+      description: Composition runs, newest first.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          description: The runs.
+          items:
+            $ref: "#/components/schemas/CompositionRun"
+    DeclaredProcess:
+      description: One Process an Application declares.
+      type: object
+      additionalProperties: false
+      required: [name, switchover, replicas]
+      properties:
+        name:
+          type: string
+          maxLength: 63
+          description: The Process.
+        switchover:
+          type: string
+          enum: [blue-green, continuous, interrupted]
+          description: How a new release replaces it.
+        replicas:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+          description: How many run.
+    DeclaredMigration:
+      description: How an Application moves its schema.
+      type: object
+      additionalProperties: false
+      required: [runner, undo]
+      properties:
+        runner:
+          type: string
+          maxLength: 64
+          description: What runs it, liquibase or self.
+        identity:
+          type: string
+          maxLength: 128
+          description: The migration identity.
+        provenAgainst:
+          type: string
+          maxLength: 64
+          description: The release it was proven against.
+        undo:
+          type: string
+          enum: [allowed, blocked]
+          description: Whether a down migration may run.
+        reason:
+          type: string
+          maxLength: 256
+          description: Why, where undo is blocked.
+    DeclaredApplication:
+      description: One Application a Project declares.
+      type: object
+      additionalProperties: false
+      required: [id, processes]
+      properties:
+        id:
+          type: string
+          maxLength: 63
+          description: The Application.
+        processes:
+          type: array
+          maxItems: 64
+          description: Its Processes.
+          items:
+            $ref: "#/components/schemas/DeclaredProcess"
+        migration:
+          $ref: "#/components/schemas/DeclaredMigration"
+    Grant:
+      description: One secret a Process may read or use.
+      type: object
+      additionalProperties: false
+      required: [process, path, access]
+      properties:
+        process:
+          type: string
+          maxLength: 63
+          description: The Process.
+        path:
+          type: string
+          maxLength: 512
+          description: The Vault path.
+        access:
+          type: string
+          maxLength: 32
+          description: read, or the transit operations.
+    Declaration:
+      description: What a Project declares at its pinned release.
+      type: object
+      additionalProperties: false
+      required: [version, applications, grants, rollback]
+      properties:
+        version:
+          type: string
+          maxLength: 64
+          description: The release it was read from.
+        applications:
+          type: array
+          maxItems: 64
+          description: Its Applications.
+          items:
+            $ref: "#/components/schemas/DeclaredApplication"
+        grants:
+          type: array
+          maxItems: 512
+          description: Every grant its Processes hold.
+          items:
+            $ref: "#/components/schemas/Grant"
+        rollback:
+          type: array
+          maxItems: 16
+          description: What a Rollback does first, in order.
+          items:
+            type: string
+            maxLength: 256
     Deploy:
       description: One commit that moved a pin.
       type: object

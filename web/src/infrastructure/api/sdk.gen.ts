@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetReleaseNotesData, GetReleaseNotesErrors, GetReleaseNotesResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListLogLinesData, ListLogLinesErrors, ListLogLinesResponses, ListLogStreamsData, ListLogStreamsErrors, ListLogStreamsResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
-import { zGetHandoverResponse, zGetReleaseNotesQuery, zGetReleaseNotesResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListLogLinesPath, zListLogLinesQuery, zListLogLinesResponse, zListLogStreamsPath, zListLogStreamsQuery, zListLogStreamsResponse, zListPinsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
+import type { GetDeclarationData, GetDeclarationErrors, GetDeclarationResponses, GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetReleaseNotesData, GetReleaseNotesErrors, GetReleaseNotesResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListCompositionRunsData, ListCompositionRunsErrors, ListCompositionRunsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListLogLinesData, ListLogLinesErrors, ListLogLinesResponses, ListLogStreamsData, ListLogStreamsErrors, ListLogStreamsResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
+import { zGetDeclarationPath, zGetDeclarationResponse, zGetHandoverResponse, zGetReleaseNotesQuery, zGetReleaseNotesResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListCompositionRunsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListLogLinesPath, zListLogLinesQuery, zListLogLinesResponse, zListLogStreamsPath, zListLogStreamsQuery, zListLogStreamsResponse, zListPinsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -232,6 +232,48 @@ export const getReleaseNotes = <ThrowOnError extends boolean = false>(options: O
             type: 'apiKey'
         }],
     url: '/api/v1/estate/releases/notes',
+    ...options
+});
+
+/**
+ * List the estate's composition runs, newest first
+ *
+ * Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed. Read from each run's artifact (#30). A 503 means the runs are not read yet, or GitHub did not answer.
+ */
+export const listCompositionRuns = <ThrowOnError extends boolean = false>(options?: Options<ListCompositionRunsData, ThrowOnError>): RequestResult<ListCompositionRunsResponses, ListCompositionRunsErrors, ThrowOnError> => (options?.client ?? client).get<ListCompositionRunsResponses, ListCompositionRunsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListCompositionRunsResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/estate/composition/runs',
+    ...options
+});
+
+/**
+ * Read what a Project declares at its pinned release
+ *
+ * The Applications, Processes, migration, rollback and grants the Project's Intent Fragment declares, at the version its pin was composed from (#31). A 503 means fragments are not read yet, or the registry did not answer.
+ */
+export const getDeclaration = <ThrowOnError extends boolean = false>(options: Options<GetDeclarationData, ThrowOnError>): RequestResult<GetDeclarationResponses, GetDeclarationErrors, ThrowOnError> => (options.client ?? client).get<GetDeclarationResponses, GetDeclarationErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetDeclarationPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zGetDeclarationResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/estate/projects/{project}/declaration',
     ...options
 });
 

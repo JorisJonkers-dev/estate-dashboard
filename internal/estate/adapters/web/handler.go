@@ -131,6 +131,25 @@ func (h *Estate) GetReleaseNotes(ctx context.Context, params oas.GetReleaseNotes
 	return &oas.ReleaseNotes{Version: notes.Version, Body: notes.Body, URL: opt(notes.URL), PublishedAt: oas.NewOptDateTime(notes.PublishedAt)}, nil
 }
 
+// notYet is the 503 for a read the dashboard does not make yet.
+func notYet(what string) oas.ProblemStatusCode {
+	return oas.ProblemStatusCode{StatusCode: http.StatusServiceUnavailable, Response: httpx.Problem(http.StatusServiceUnavailable, what+" are not read yet.")}
+}
+
+// ListCompositionRuns implements listCompositionRuns. The runs are read from each run's artifact,
+// which compose.yml does not upload yet (JorisJonkers-dev/estate-dashboard#30).
+func (h *Estate) ListCompositionRuns(context.Context) (oas.ListCompositionRunsRes, error) {
+	down := oas.ListCompositionRunsServiceUnavailable(notYet("Composition runs"))
+	return &down, nil
+}
+
+// GetDeclaration implements getDeclaration. A declaration is read from the Project's fragment,
+// which the dashboard does not read yet (JorisJonkers-dev/estate-dashboard#31).
+func (h *Estate) GetDeclaration(context.Context, oas.GetDeclarationParams) (oas.GetDeclarationRes, error) {
+	down := oas.GetDeclarationServiceUnavailable(notYet("Declarations"))
+	return &down, nil
+}
+
 // ListIssues implements listIssues.
 func (h *Estate) ListIssues(ctx context.Context) (oas.ListIssuesRes, error) {
 	issues, err := h.uc.Issues(ctx)

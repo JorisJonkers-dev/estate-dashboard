@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/vue-query';
 
 import { client } from '../client.gen';
-import { getHandover, getReleaseNotes, getSession, listAlertHistory, listAlerts, listDeploys, listIssues, listLogLines, listLogStreams, listPins, listReleases, listRollouts, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
-import type { GetHandoverData, GetHandoverError, GetHandoverResponse, GetReleaseNotesData, GetReleaseNotesError, GetReleaseNotesResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListLogLinesData, ListLogLinesError, ListLogLinesResponse, ListLogStreamsData, ListLogStreamsError, ListLogStreamsResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
+import { getDeclaration, getHandover, getReleaseNotes, getSession, listAlertHistory, listAlerts, listCompositionRuns, listDeploys, listIssues, listLogLines, listLogStreams, listPins, listReleases, listRollouts, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
+import type { GetDeclarationData, GetDeclarationError, GetDeclarationResponse, GetHandoverData, GetHandoverError, GetHandoverResponse, GetReleaseNotesData, GetReleaseNotesError, GetReleaseNotesResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListCompositionRunsData, ListCompositionRunsError, ListCompositionRunsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListLogLinesData, ListLogLinesError, ListLogLinesResponse, ListLogStreamsData, ListLogStreamsError, ListLogStreamsResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -236,6 +236,46 @@ export const getReleaseNotesOptions = (options: Options<GetReleaseNotesData>) =>
         return data;
     },
     queryKey: getReleaseNotesQueryKey(options)
+});
+
+export const listCompositionRunsQueryKey = (options?: Options<ListCompositionRunsData>) => createQueryKey('listCompositionRuns', options);
+
+/**
+ * List the estate's composition runs, newest first
+ *
+ * Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed. Read from each run's artifact (#30). A 503 means the runs are not read yet, or GitHub did not answer.
+ */
+export const listCompositionRunsOptions = (options?: Options<ListCompositionRunsData>) => queryOptions<ListCompositionRunsResponse, ListCompositionRunsError, ListCompositionRunsResponse, ReturnType<typeof listCompositionRunsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listCompositionRuns({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listCompositionRunsQueryKey(options)
+});
+
+export const getDeclarationQueryKey = (options: Options<GetDeclarationData>) => createQueryKey('getDeclaration', options);
+
+/**
+ * Read what a Project declares at its pinned release
+ *
+ * The Applications, Processes, migration, rollback and grants the Project's Intent Fragment declares, at the version its pin was composed from (#31). A 503 means fragments are not read yet, or the registry did not answer.
+ */
+export const getDeclarationOptions = (options: Options<GetDeclarationData>) => queryOptions<GetDeclarationResponse, GetDeclarationError, GetDeclarationResponse, ReturnType<typeof getDeclarationQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getDeclaration({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getDeclarationQueryKey(options)
 });
 
 export const listIssuesQueryKey = (options?: Options<ListIssuesData>) => createQueryKey('listIssues', options);

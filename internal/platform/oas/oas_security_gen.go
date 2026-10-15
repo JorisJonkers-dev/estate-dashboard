@@ -37,21 +37,23 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // operationRolesSessionCookie is a private map storing roles per operation.
 var operationRolesSessionCookie = map[string][]string{
-	GetHandoverOperation:      []string{},
-	GetReleaseNotesOperation:  []string{},
-	GetSessionOperation:       []string{},
-	ListAlertHistoryOperation: []string{},
-	ListAlertsOperation:       []string{},
-	ListDeploysOperation:      []string{},
-	ListIssuesOperation:       []string{},
-	ListLogLinesOperation:     []string{},
-	ListLogStreamsOperation:   []string{},
-	ListPinsOperation:         []string{},
-	ListReleasesOperation:     []string{},
-	ListRolloutsOperation:     []string{},
-	ListSourcesOperation:      []string{},
-	ListUnitsOperation:        []string{},
-	SilenceAlertOperation:     []string{},
+	GetDeclarationOperation:      []string{},
+	GetHandoverOperation:         []string{},
+	GetReleaseNotesOperation:     []string{},
+	GetSessionOperation:          []string{},
+	ListAlertHistoryOperation:    []string{},
+	ListAlertsOperation:          []string{},
+	ListCompositionRunsOperation: []string{},
+	ListDeploysOperation:         []string{},
+	ListIssuesOperation:          []string{},
+	ListLogLinesOperation:        []string{},
+	ListLogStreamsOperation:      []string{},
+	ListPinsOperation:            []string{},
+	ListReleasesOperation:        []string{},
+	ListRolloutsOperation:        []string{},
+	ListSourcesOperation:         []string{},
+	ListUnitsOperation:           []string{},
+	SilenceAlertOperation:        []string{},
 }
 
 // GetRolesForSessionCookie returns the required roles for the given operation.
