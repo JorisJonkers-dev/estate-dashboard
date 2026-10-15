@@ -77,7 +77,8 @@ function stateOf(
   releasing: boolean,
 ): { state: string; tone: Tone } {
   if (conditions.includes('isolated')) return { state: 'Refused, isolated', tone: 'crit' }
-  if (conditions.length > 0) return { state: describeCondition(conditions[0] ?? ''), tone: 'warn' }
+  const [first] = conditions
+  if (first !== undefined) return { state: describeCondition(first), tone: 'warn' }
   if (path === 'legacy') return { state: 'Old path', tone: 'idle' }
   if (pin?.rolledBack) return { state: `Rolled back to ${pin.rolledBack.version}, paused`, tone: 'back' }
   if (pin?.paused) return { state: 'Paused', tone: 'back' }

@@ -96,6 +96,31 @@ describe('the Projects table', () => {
     expect(projectRows(reads).map((r) => r.name)).toEqual(['delivery', 'estate-dashboard', 'notes'])
   })
 
+  it('reads a pause, a missing pin and missing units, and skips what names no Project', () => {
+    const rows = projectRows({
+      handover: { estate: ['held', 'fresh', 'empty'], legacy: [] },
+      pins: [
+        { project: 'held', digest: 'sha256:1', paused: { by: 'joris', at: '2026-10-15T07:00:00Z', reason: 'held' } },
+        { project: 'empty', digest: 'sha256:2' },
+      ],
+      units: [{ ...unit('x'), source: 'estate' }],
+      releases: [
+        { namespace: 'odd', application: 'odd', members: [{ process: 'o', phase: 'Progressing', iterations: 0 }] },
+      ],
+      issues: [
+        { number: 1, title: 'no project', url: 'u', labels: [], updatedAt: '2026-10-15T08:00:00Z', condition: 'stale' },
+        { number: 2, title: 'no condition', url: 'u', labels: [], updatedAt: '2026-10-15T08:00:00Z', project: 'held' },
+      ],
+      deploys: {},
+    })
+    expect(rows.map((r) => [r.name, r.state])).toEqual([
+      ['empty', 'Not ready'],
+      ['fresh', 'Not pinned yet'],
+      ['held', 'Paused'],
+    ])
+    expect(projectRows({ deploys: {} })).toEqual([])
+  })
+
   it('filters by state, and a pause or a release needs attention', () => {
     const rows = projectRows(base())
     expect(rows.filter((r) => passes(r, 'Needs attention')).map((r) => r.name)).toEqual(['notes'])
@@ -127,6 +152,40 @@ describe('the health strip', () => {
     expect(health(reads)[0]).toMatchObject({ status: '1 condition', tone: 'warn', detail: 'nothing isolated' })
     reads.issues = [condition(74, 'notes', 'paused')]
     expect(health(reads)[0]).toMatchObject({ status: 'All composed', tone: 'ok' })
+  })
+
+  it('pages on a page alert, and is calm with nothing in flight', () => {
+    const reads = base()
+    reads.alerts = [alert('Down', 'page', '2026-10-15T07:00:00Z')]
+    reads.releases = [release('a', 'Succeeded'), release('b', 'Failed')]
+    expect(
+      health(reads)
+        .slice(2)
+        .map((h) => [h.status, h.tone]),
+    ).toEqual([
+      ['None in flight', 'warn'],
+      ['1 alert', 'crit'],
+    ])
+    reads.releases = [release('a', 'Succeeded')]
+    expect(health(reads)[2]).toMatchObject({ tone: 'ok', detail: 'none failed' })
+  })
+
+  it('ranks each alert class by severity', () => {
+    const reads = base()
+    reads.alerts = [
+      alert('Page', 'page', '2026-10-15T07:00:00Z'),
+      alert('Urgent', 'urgent', '2026-10-15T07:01:00Z'),
+      alert('Later', 'business-hours', '2026-10-15T07:02:00Z'),
+    ]
+    expect(
+      needs(reads)
+        .filter((n) => n.class === 'Platform')
+        .map((n) => [n.severity, n.tone]),
+    ).toEqual([
+      ['Info', 'info'],
+      ['Warning', 'warn'],
+      ['Critical', 'crit'],
+    ])
   })
 
   it('says what it could not read rather than calling it healthy', () => {

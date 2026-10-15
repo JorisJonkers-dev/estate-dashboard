@@ -15,4 +15,10 @@ describe('release notes', () => {
     ])
     expect(notes[0]?.spans[0]?.text).toBe('0.2.0')
   })
+
+  it('ends a line at a link that closes it', () => {
+    expect(readNotes('* see [#97](https://x/97)')).toEqual([
+      { kind: 'item', spans: [{ text: 'see ' }, { text: '#97', href: 'https://x/97' }] },
+    ])
+  })
 })
