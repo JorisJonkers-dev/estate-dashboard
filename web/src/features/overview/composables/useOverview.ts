@@ -29,7 +29,9 @@ export function useOverview() {
   // The newest deploy of each pinned Project.
   const pinned = computed(() => (pins.data.value?.items ?? []).map((p) => p.project).filter((p) => !p.startsWith('_')))
   const deploys = useQueries({
-    queries: computed(() => pinned.value.map((project) => ({ ...listDeploysOptions({ path: { project }, query: { limit: 1 } }), ...live }))),
+    queries: computed(() =>
+      pinned.value.map((project) => ({ ...listDeploysOptions({ path: { project }, query: { limit: 1 } }), ...live })),
+    ),
   })
 
   const reads = computed<Reads>(() => {

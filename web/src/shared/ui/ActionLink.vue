@@ -16,6 +16,8 @@ const look = computed(() => [
 <template>
   <TermHint :text="hint">
     <RouterLink v-if="inside" :to="to" :class="look"><slot /></RouterLink>
-    <a v-else :href="to" target="_blank" rel="noopener" :class="look"><slot /><span class="sr-only"> (opens in a new tab)</span></a>
+    <a v-else :href="to" target="_blank" rel="noopener" :class="look"
+      ><slot /><span class="sr-only"> (opens in a new tab)</span></a
+    >
   </TermHint>
 </template>

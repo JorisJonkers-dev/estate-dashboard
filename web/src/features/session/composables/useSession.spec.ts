@@ -5,7 +5,8 @@ import { whoIsSignedIn } from './useSession'
 function answering(body: unknown, status: number, contentType = 'application/json') {
   configureApi({
     baseUrl: 'http://app.test',
-    fetch: () => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': contentType } })),
+    fetch: () =>
+      Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': contentType } })),
   })
 }
 

@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
+import {
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogRoot,
+  DialogTitle,
+} from 'reka-ui'
 
 /** Side panel for logs and notes. Escape closes it. */
 const open = defineModel<boolean>('open', { required: true })
@@ -18,8 +26,22 @@ defineProps<{ title: string; subtitle: string }>()
             <DialogTitle class="m-0 truncate text-xl font-semibold">{{ title }}</DialogTitle>
             <DialogDescription class="m-0 mt-0.5 truncate text-sm text-text-muted">{{ subtitle }}</DialogDescription>
           </div>
-          <DialogClose aria-label="Close" class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-control bg-transparent text-nav transition-colors hover:border-accent hover:text-accent">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          <DialogClose
+            aria-label="Close"
+            class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-control bg-transparent text-nav transition-colors hover:border-accent hover:text-accent"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
           </DialogClose>
         </header>
         <div class="min-h-0 grow overflow-auto"><slot /></div>

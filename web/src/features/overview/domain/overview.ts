@@ -163,11 +163,19 @@ const plural = (n: number, one: string, many = `${one}s`) => `${String(n)} ${n =
 /** One cell per area, from what was read. */
 export function health(reads: Reads): Health[] {
   const composition: Health = (() => {
-    if (!reads.issues) return { name: 'Composition', status: 'Unknown', tone: 'idle', detail: "couldn't read the estate repository" }
+    if (!reads.issues)
+      return { name: 'Composition', status: 'Unknown', tone: 'idle', detail: "couldn't read the estate repository" }
     const isolated = new Set(reads.issues.filter((i) => i.condition === 'isolated').map((i) => i.project))
     const open = reads.issues.filter((i) => i.condition && i.condition !== pausedCondition).length
-    if (isolated.size > 0) return { name: 'Composition', status: `${String(isolated.size)} isolated`, tone: 'crit', detail: plural(open, 'open condition') }
-    if (open > 0) return { name: 'Composition', status: plural(open, 'condition'), tone: 'warn', detail: 'nothing isolated' }
+    if (isolated.size > 0)
+      return {
+        name: 'Composition',
+        status: `${String(isolated.size)} isolated`,
+        tone: 'crit',
+        detail: plural(open, 'open condition'),
+      }
+    if (open > 0)
+      return { name: 'Composition', status: plural(open, 'condition'), tone: 'warn', detail: 'nothing isolated' }
     return { name: 'Composition', status: 'All composed', tone: 'ok', detail: 'no open condition' }
   })()
   const delivery: Health = (() => {
@@ -175,10 +183,13 @@ export function health(reads: Reads): Health[] {
     const ready = reads.units.filter((u) => u.ready).length
     const total = reads.units.length
     const detail = `${String(ready)} of ${plural(total, 'unit')} ready`
-    return ready === total ? { name: 'Delivery', status: 'Healthy', tone: 'ok', detail } : { name: 'Delivery', status: `${String(total - ready)} not ready`, tone: 'crit', detail }
+    return ready === total
+      ? { name: 'Delivery', status: 'Healthy', tone: 'ok', detail }
+      : { name: 'Delivery', status: `${String(total - ready)} not ready`, tone: 'crit', detail }
   })()
   const releases: Health = (() => {
-    if (!reads.releases) return { name: 'Releases', status: 'Unknown', tone: 'idle', detail: "couldn't read the Release Gate" }
+    if (!reads.releases)
+      return { name: 'Releases', status: 'Unknown', tone: 'idle', detail: "couldn't read the Release Gate" }
     const flying = reads.releases.filter(inFlight).length
     const failed = reads.releases.filter((r) => r.members.some((m) => m.phase === 'Failed')).length
     const detail = failed === 0 ? 'none failed' : `${plural(failed, 'release')} failed`
@@ -186,7 +197,8 @@ export function health(reads: Reads): Health[] {
     return { name: 'Releases', status: 'None in flight', tone: failed > 0 ? 'warn' : 'ok', detail }
   })()
   const platform: Health = (() => {
-    if (!reads.alerts) return { name: 'Platform', status: 'Not read', tone: 'idle', detail: 'Alertmanager did not answer' }
+    if (!reads.alerts)
+      return { name: 'Platform', status: 'Not read', tone: 'idle', detail: 'Alertmanager did not answer' }
     const firing = reads.alerts.filter((a) => a.silencedBy.length === 0)
     const silenced = reads.alerts.length - firing.length
     const detail = silenced === 0 ? 'none silenced' : `${String(silenced)} silenced`

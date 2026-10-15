@@ -14,7 +14,10 @@ const stream = computed(() => props.streams.find((s) => s.pod === pod.value) ?? 
 
 const lines = useQuery(
   computed(() => ({
-    ...listLogLinesOptions({ path: { project: props.project }, query: { pod: stream.value?.pod ?? '', container: stream.value?.container ?? '', hours: window, limit: 1000 } }),
+    ...listLogLinesOptions({
+      path: { project: props.project },
+      query: { pod: stream.value?.pod ?? '', container: stream.value?.container ?? '', hours: window, limit: 1000 },
+    }),
     enabled: stream.value !== undefined,
     refetchInterval: 10_000,
   })),
@@ -24,8 +27,19 @@ const failure = computed(() => (lines.error.value ? describeError(lines.error.va
 
 const now = useNow()
 const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-const started = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-const level: Record<string, string> = { error: 'text-crit', warn: 'text-warn', warning: 'text-warn', info: 'text-dim', debug: 'text-dim' }
+const started = new Intl.DateTimeFormat(undefined, {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+const level: Record<string, string> = {
+  error: 'text-crit',
+  warn: 'text-warn',
+  warning: 'text-warn',
+  info: 'text-dim',
+  debug: 'text-dim',
+}
 
 // Scroll to the newest line.
 const view = useTemplateRef<HTMLElement>('view')
@@ -38,7 +52,12 @@ watch(read, async () => {
 <template>
   <div class="flex h-full flex-col">
     <!-- Each pod by when it started; its name is on hover. -->
-    <div v-if="streams.length > 1" role="group" aria-label="Pod" class="flex flex-wrap gap-2 border-b border-line px-6 py-3">
+    <div
+      v-if="streams.length > 1"
+      role="group"
+      aria-label="Pod"
+      class="flex flex-wrap gap-2 border-b border-line px-6 py-3"
+    >
       <button
         v-for="s in streams"
         :key="s.pod"
@@ -48,12 +67,21 @@ watch(read, async () => {
         class="inline-flex cursor-pointer items-center gap-2 rounded-full border border-control bg-transparent px-3 py-1 font-sans text-[13px] text-nav transition-colors hover:text-white aria-pressed:border-accent aria-pressed:text-white"
         @click="pod = s.pod"
       >
-        <span class="size-1.5 rounded-full" :class="isRunning(s, now) ? 'bg-accent' : 'border border-dim'" aria-hidden="true" />
+        <span
+          class="size-1.5 rounded-full"
+          :class="isRunning(s, now) ? 'bg-accent' : 'border border-dim'"
+          aria-hidden="true"
+        />
         {{ s.first ? `started ${started.format(new Date(s.first))}` : s.pod }}
         <span class="sr-only">{{ isRunning(s, now) ? ', running' : ', finished' }}</span>
       </button>
     </div>
-    <div ref="view" tabindex="0" aria-label="Log lines" class="min-h-0 grow overflow-auto bg-[#181818] px-6 py-4 font-mono text-[13px] leading-relaxed">
+    <div
+      ref="view"
+      tabindex="0"
+      aria-label="Log lines"
+      class="min-h-0 grow overflow-auto bg-[#181818] px-6 py-4 font-mono text-[13px] leading-relaxed"
+    >
       <p v-if="failure" class="m-0 text-warn">{{ failure }}</p>
       <p v-else-if="lines.isPending.value" class="m-0 text-text-muted">Loading…</p>
       <p v-else-if="read.length === 0" class="m-0 text-text-muted">Nothing in the last 7 days.</p>
@@ -61,7 +89,10 @@ watch(read, async () => {
         <time class="text-dim" :datetime="l.at">{{ time.format(new Date(l.at)) }}</time>
         <span class="uppercase" :class="level[l.level ?? ''] ?? 'text-dim'">{{ l.level ?? '' }}</span>
         <span class="break-words whitespace-pre-wrap">
-          {{ l.message }}<template v-for="[k, v] in l.fields" :key="k"><span class="ml-2 text-dim">{{ k }}=</span><span class="text-text-muted">{{ v }}</span></template>
+          {{ l.message
+          }}<template v-for="[k, v] in l.fields" :key="k"
+            ><span class="ml-2 text-dim">{{ k }}=</span><span class="text-text-muted">{{ v }}</span></template
+          >
         </span>
       </div>
     </div>

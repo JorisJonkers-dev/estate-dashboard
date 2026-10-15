@@ -58,10 +58,21 @@ test('the sign-in page is the canvas page', async ({ page }) => {
   await page.goto('/sign-in')
 
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
-  await expect(page.getByText("The estate's delivery dashboard, for admins. You sign in with your jorisjonkers.dev account.")).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Continue with jorisjonkers.dev' })).toHaveAttribute('href', '/auth/login')
-  await expect(page.getByRole('link', { name: 'Forgot your password?' })).toHaveAttribute('href', 'https://auth.jorisjonkers.dev/forgot-password')
-  await expect(page.getByRole('link', { name: 'jorisjonkers.dev', exact: true })).toHaveAttribute('href', 'https://jorisjonkers.dev')
+  await expect(
+    page.getByText("The estate's delivery dashboard, for admins. You sign in with your jorisjonkers.dev account."),
+  ).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Continue with jorisjonkers.dev' })).toHaveAttribute(
+    'href',
+    '/auth/login',
+  )
+  await expect(page.getByRole('link', { name: 'Forgot your password?' })).toHaveAttribute(
+    'href',
+    'https://auth.jorisjonkers.dev/forgot-password',
+  )
+  await expect(page.getByRole('link', { name: 'jorisjonkers.dev', exact: true })).toHaveAttribute(
+    'href',
+    'https://jorisjonkers.dev',
+  )
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expectTheCanvasPanel(page, '440px')
   await expectAccessible(page)
@@ -71,7 +82,10 @@ test('the sign-in page is the canvas page', async ({ page }) => {
 
 test('the sign-in page returns to the page that was asked for, and says when a sign-in failed', async ({ page }) => {
   await page.goto('/sign-in?next=%2F%3Fsince%3Dyesterday&failed=1')
-  await expect(page.getByRole('link', { name: 'Continue with jorisjonkers.dev' })).toHaveAttribute('href', '/auth/login?next=%2F%3Fsince%3Dyesterday')
+  await expect(page.getByRole('link', { name: 'Continue with jorisjonkers.dev' })).toHaveAttribute(
+    'href',
+    '/auth/login?next=%2F%3Fsince%3Dyesterday',
+  )
   await expect(page.getByRole('alert')).toHaveText('Signing in did not complete. Try again.')
   await expectAccessible(page)
 })
@@ -82,10 +96,15 @@ test('the not-an-admin page is the canvas page', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: 'This dashboard is for admins' })).toBeVisible()
   await expect(
-    page.getByText('You are signed in, but your account does not hold the admin role. Ask an admin to grant it in auth, then sign in again.'),
+    page.getByText(
+      'You are signed in, but your account does not hold the admin role. Ask an admin to grant it in auth, then sign in again.',
+    ),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign in as someone else' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Back to jorisjonkers.dev' })).toHaveAttribute('href', 'https://jorisjonkers.dev')
+  await expect(page.getByRole('link', { name: 'Back to jorisjonkers.dev' })).toHaveAttribute(
+    'href',
+    'https://jorisjonkers.dev',
+  )
   await expectTheCanvasPanel(page, '480px')
   await expectAccessible(page)
   expect(errors).toEqual([])

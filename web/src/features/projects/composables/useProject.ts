@@ -29,19 +29,31 @@ export function useProject(name: Ref<string>) {
   const releases = useQuery({ ...listReleasesOptions(), ...live })
   const issues = useQuery({ ...listIssuesOptions(), ...live })
   const alerts = useQuery({ ...listAlertsOptions(), ...live })
-  const deploys = useQuery(computed(() => ({ ...listDeploysOptions({ path: { project: name.value }, query: { limit: 20 } }), ...live })))
+  const deploys = useQuery(
+    computed(() => ({ ...listDeploysOptions({ path: { project: name.value }, query: { limit: 20 } }), ...live })),
+  )
 
   /** The repository the Project publishes from. */
-  const repository = computed(() => (units.data.value?.items ?? []).find((u) => u.source === `project-${name.value}` && u.repository)?.repository)
+  const repository = computed(
+    () => (units.data.value?.items ?? []).find((u) => u.source === `project-${name.value}` && u.repository)?.repository,
+  )
   const rollouts = useQuery(
     computed(() => ({
-      ...listRolloutsOptions({ path: { project: name.value }, query: { repository: repository.value ?? '', limit: 10 } }),
+      ...listRolloutsOptions({
+        path: { project: name.value },
+        query: { repository: repository.value ?? '', limit: 10 },
+      }),
       enabled: repository.value !== undefined,
       ...live,
     })),
   )
 
-  const streams = useQuery(computed(() => ({ ...listLogStreamsOptions({ path: { project: name.value }, query: { hours: window } }), refetchInterval: 60_000 })))
+  const streams = useQuery(
+    computed(() => ({
+      ...listLogStreamsOptions({ path: { project: name.value }, query: { hours: window } }),
+      refetchInterval: 60_000,
+    })),
+  )
   const unitOf = computed(() => (units.data.value?.items ?? []).find((u) => u.source === `project-${name.value}`))
 
   const row = computed(() =>
@@ -61,8 +73,19 @@ export function useProject(name: Ref<string>) {
     repository,
     pin: computed(() => pins.data.value?.items.find((p) => p.project === name.value)),
     unit: unitOf,
-    cluster: computed(() => clusterRows(name.value, sources.data.value?.items ?? [], units.data.value?.items ?? [], releases.data.value?.items ?? [])),
-    alerts: computed(() => inbox(alerts.data.value?.items ?? [], issues.data.value?.items ?? [], releases.data.value?.items ?? []).filter((i) => i.project === name.value)),
+    cluster: computed(() =>
+      clusterRows(
+        name.value,
+        sources.data.value?.items ?? [],
+        units.data.value?.items ?? [],
+        releases.data.value?.items ?? [],
+      ),
+    ),
+    alerts: computed(() =>
+      inbox(alerts.data.value?.items ?? [], issues.data.value?.items ?? [], releases.data.value?.items ?? []).filter(
+        (i) => i.project === name.value,
+      ),
+    ),
     deploys: computed(() => deploys.data.value?.items ?? []),
     releases: computed(() => releaseViews(rollouts.data.value?.items ?? [], unitOf.value)),
     streams: computed(() => streams.data.value?.items ?? []),

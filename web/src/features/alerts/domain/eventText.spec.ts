@@ -24,9 +24,9 @@ describe('describeEvent', () => {
   })
 
   it('says after how long an alert resolved, across offsets', () => {
-    expect(describeEvent({ status: 'resolved', startsAt: '2026-10-03T07:00:00Z', endsAt: '2026-10-03T09:30:00+02:00' })).toBe(
-      'Resolved after 30 min',
-    )
+    expect(
+      describeEvent({ status: 'resolved', startsAt: '2026-10-03T07:00:00Z', endsAt: '2026-10-03T09:30:00+02:00' }),
+    ).toBe('Resolved after 30 min')
   })
 
   it('reads a resolved event with no end as fired, which the contract never sends', () => {

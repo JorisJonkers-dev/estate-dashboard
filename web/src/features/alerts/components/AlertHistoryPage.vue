@@ -35,8 +35,17 @@ const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', tim
       >
         <span class="size-2 rounded-full" :class="event.status === 'firing' ? 'bg-warn' : 'bg-ok'" aria-hidden="true" />
         <span class="name font-medium">{{ event.name }}</span>
-        <span class="state whitespace-nowrap" :class="event.status === 'firing' ? 'text-warn' : 'text-ok'" :data-status="event.status">{{ describeEvent(event) }}</span>
-        <time class="col-span-3 pl-5 text-sm whitespace-nowrap text-text-muted md:col-span-1 md:pl-0" :datetime="event.observedAt">{{ dateFormat.format(new Date(event.observedAt)) }}</time>
+        <span
+          class="state whitespace-nowrap"
+          :class="event.status === 'firing' ? 'text-warn' : 'text-ok'"
+          :data-status="event.status"
+          >{{ describeEvent(event) }}</span
+        >
+        <time
+          class="col-span-3 pl-5 text-sm whitespace-nowrap text-text-muted md:col-span-1 md:pl-0"
+          :datetime="event.observedAt"
+          >{{ dateFormat.format(new Date(event.observedAt)) }}</time
+        >
       </li>
     </ul>
   </div>

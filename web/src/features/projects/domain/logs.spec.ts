@@ -3,7 +3,13 @@ import { byProcess, isMigration, isRunning, ofRelease, readLine } from './logs'
 
 const now = Date.parse('2026-10-15T12:00:00Z')
 const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000).toISOString()
-const s = (pod: string, container: string, version?: string, first = 60, last = 1) => ({ pod, container, ...(version ? { version } : {}), first: at(first), last: at(last) })
+const s = (pod: string, container: string, version?: string, first = 60, last = 1) => ({
+  pod,
+  container,
+  ...(version ? { version } : {}),
+  first: at(first),
+  last: at(last),
+})
 
 describe('the containers of a release', () => {
   it('takes the ones labelled with its version', () => {
@@ -12,14 +18,26 @@ describe('the containers of a release', () => {
   })
 
   it('takes unlabelled ones that started between this release and the next, until pods carry a version', () => {
-    const streams = [s('before', 'api', undefined, 300), s('during', 'api', undefined, 150), s('after', 'api', undefined, 50), { pod: 'unknown', container: 'api' }]
+    const streams = [
+      s('before', 'api', undefined, 300),
+      s('during', 'api', undefined, 150),
+      s('after', 'api', undefined, 50),
+      { pod: 'unknown', container: 'api' },
+    ]
     expect(ofRelease(streams, { version: '1.0.0', at: at(200) }, at(100)).map((x) => x.pod)).toEqual(['during'])
     expect(ofRelease(streams, { version: '1.1.0', at: at(100) }).map((x) => x.pod)).toEqual(['after'])
   })
 
   it('groups by Process, migrations first, and counts only the running ones', () => {
-    const streams = [s('api-1', 'api', '1.0.0', 60, 1), s('api-2', 'api', '1.0.0', 30, 2), s('api-old', 'api', '1.0.0', 90, 45), s('api-migration-up', 'liquibase', '1.0.0', 95, 94)]
-    expect(byProcess(streams, now).map((p) => [p.process, p.migration, p.running, p.streams.map((x) => x.pod)])).toEqual([
+    const streams = [
+      s('api-1', 'api', '1.0.0', 60, 1),
+      s('api-2', 'api', '1.0.0', 30, 2),
+      s('api-old', 'api', '1.0.0', 90, 45),
+      s('api-migration-up', 'liquibase', '1.0.0', 95, 94),
+    ]
+    expect(
+      byProcess(streams, now).map((p) => [p.process, p.migration, p.running, p.streams.map((x) => x.pod)]),
+    ).toEqual([
       ['liquibase', true, 0, ['api-migration-up']],
       ['api', false, 2, ['api-2', 'api-1', 'api-old']],
     ])
@@ -50,7 +68,11 @@ describe('a log line', () => {
   })
 
   it('takes the level a plain line starts with', () => {
-    expect(readLine('ERROR: relation "pages" already exists')).toEqual({ level: 'error', message: 'ERROR: relation "pages" already exists', fields: [] })
+    expect(readLine('ERROR: relation "pages" already exists')).toEqual({
+      level: 'error',
+      message: 'ERROR: relation "pages" already exists',
+      fields: [],
+    })
     expect(readLine('Warning low disk').level).toBe('warning')
   })
 

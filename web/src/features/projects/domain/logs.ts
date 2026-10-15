@@ -48,7 +48,9 @@ export function byProcess(streams: Stream[], now: number): ProcessLogs[] {
     out.set(s.container, p)
   }
   for (const p of out.values()) p.streams.sort((a, b) => (b.first ?? '').localeCompare(a.first ?? ''))
-  return [...out.values()].sort((a, b) => Number(b.migration) - Number(a.migration) || a.process.localeCompare(b.process))
+  return [...out.values()].sort(
+    (a, b) => Number(b.migration) - Number(a.migration) || a.process.localeCompare(b.process),
+  )
 }
 
 /** A log line: JSON lines split into level, message and fields. */

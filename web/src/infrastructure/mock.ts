@@ -6,7 +6,14 @@ const run = (id: number) => `https://github.com/JorisJonkers-dev/estate/actions/
 const estate = ['auth', 'delivery', 'estate-dashboard', 'knowledge', 'notes']
 const legacy = ['agents', 'data', 'grimoire', 'mail', 'media', 'tribelt']
 
-const unit = (project: string, version: string, repository: string, ready = true, reason?: string, message?: string) => ({
+const unit = (
+  project: string,
+  version: string,
+  repository: string,
+  ready = true,
+  reason?: string,
+  message?: string,
+) => ({
   name: `apps-${project}`,
   source: `project-${project}`,
   path: `./apps/${project}`,
@@ -53,13 +60,27 @@ const answers: Record<string, unknown> = {
       unit('auth', '3.4.2', 'JorisJonkers-dev/auth-api'),
       unit('delivery', '0.6.0', 'JorisJonkers-dev/delivery'),
       unit('estate-dashboard', '0.2.0', 'JorisJonkers-dev/estate-dashboard'),
-      unit('knowledge', '1.12.0', 'JorisJonkers-dev/knowledge', false, 'HealthCheckFailed', 'Deployment knowledge-system/knowledge-api is not ready: 0 of 2 replicas'),
+      unit(
+        'knowledge',
+        '1.12.0',
+        'JorisJonkers-dev/knowledge',
+        false,
+        'HealthCheckFailed',
+        'Deployment knowledge-system/knowledge-api is not ready: 0 of 2 replicas',
+      ),
       unit('notes', '0.9.1', 'JorisJonkers-dev/notes'),
     ],
   },
   '/api/v1/delivery/sources': {
     truncated: false,
-    items: estate.map((p) => ({ name: `project-${p}`, url: `oci://ghcr.io/jorisjonkers-dev/render/${p}`, digest: 'sha256:1', revision: 'sha256:1', ready: true, reason: 'Succeeded' })),
+    items: estate.map((p) => ({
+      name: `project-${p}`,
+      url: `oci://ghcr.io/jorisjonkers-dev/render/${p}`,
+      digest: 'sha256:1',
+      revision: 'sha256:1',
+      ready: true,
+      reason: 'Succeeded',
+    })),
   },
   '/api/v1/delivery/releases': {
     truncated: false,
@@ -76,7 +97,12 @@ const answers: Record<string, unknown> = {
         pinned: '3.5.0',
         since: minutesAgo(4),
       },
-      { namespace: 'estate-dashboard-system', application: 'estate-dashboard', members: [{ process: 'estate-dashboard', phase: 'Succeeded', iterations: 4 }], serving: '0.2.0' },
+      {
+        namespace: 'estate-dashboard-system',
+        application: 'estate-dashboard',
+        members: [{ process: 'estate-dashboard', phase: 'Succeeded', iterations: 4 }],
+        serving: '0.2.0',
+      },
     ],
   },
   '/api/v1/estate/issues': {
@@ -99,7 +125,13 @@ const answers: Record<string, unknown> = {
         project: 'grimoire',
         condition: 'stale',
       },
-      { number: 5, title: 'Dependency Dashboard', url: 'https://github.com/JorisJonkers-dev/estate/issues/5', labels: [], updatedAt: minutesAgo(30) },
+      {
+        number: 5,
+        title: 'Dependency Dashboard',
+        url: 'https://github.com/JorisJonkers-dev/estate/issues/5',
+        labels: [],
+        updatedAt: minutesAgo(30),
+      },
     ],
   },
   '/api/v1/alerts': {
@@ -122,21 +154,57 @@ const answers: Record<string, unknown> = {
         labels: { alertname: 'CertificateExpiring', namespace: 'edge-system' },
         silencedBy: [],
       },
-      { fingerprint: 'a3', name: 'NodeDiskPressure', class: 'page', startsAt: minutesAgo(30), labels: { alertname: 'NodeDiskPressure' }, silencedBy: ['s-1'] },
+      {
+        fingerprint: 'a3',
+        name: 'NodeDiskPressure',
+        class: 'page',
+        startsAt: minutesAgo(30),
+        labels: { alertname: 'NodeDiskPressure' },
+        silencedBy: ['s-1'],
+      },
     ],
   },
   '/api/v1/alerts/history': {
     items: [
-      { id: 4, fingerprint: 'a1', name: 'BackupFailed', status: 'firing', startsAt: minutesAgo(360), observedAt: minutesAgo(359) },
-      { id: 3, fingerprint: 'a9', name: 'ReleaseHeld', status: 'resolved', startsAt: minutesAgo(900), endsAt: minutesAgo(860), observedAt: minutesAgo(860) },
-      { id: 2, fingerprint: 'a9', name: 'ReleaseHeld', status: 'firing', startsAt: minutesAgo(900), observedAt: minutesAgo(899) },
-      { id: 1, fingerprint: 'a2', name: 'CertificateExpiring', status: 'firing', startsAt: minutesAgo(1500), observedAt: minutesAgo(1499) },
+      {
+        id: 4,
+        fingerprint: 'a1',
+        name: 'BackupFailed',
+        status: 'firing',
+        startsAt: minutesAgo(360),
+        observedAt: minutesAgo(359),
+      },
+      {
+        id: 3,
+        fingerprint: 'a9',
+        name: 'ReleaseHeld',
+        status: 'resolved',
+        startsAt: minutesAgo(900),
+        endsAt: minutesAgo(860),
+        observedAt: minutesAgo(860),
+      },
+      {
+        id: 2,
+        fingerprint: 'a9',
+        name: 'ReleaseHeld',
+        status: 'firing',
+        startsAt: minutesAgo(900),
+        observedAt: minutesAgo(899),
+      },
+      {
+        id: 1,
+        fingerprint: 'a2',
+        name: 'CertificateExpiring',
+        status: 'firing',
+        startsAt: minutesAgo(1500),
+        observedAt: minutesAgo(1499),
+      },
     ],
   },
 }
 
 const rollouts: Record<string, unknown[]> = {
-  auth: [
+  'auth': [
     rollout(3807, '3.5.0', 5, [
       ['in_progress', 'auth 3.5.0: both members in analysis, 2 of 4', 2],
       ['in_progress', 'applied by Flux; auth waits for Flagger', 4],
@@ -151,7 +219,7 @@ const rollouts: Record<string, unknown[]> = {
       ['success', 'auth 3.4.1 promoted', 13990],
     ]),
   ],
-  delivery: [
+  'delivery': [
     rollout(3686, '0.6.0', 820, [
       ['success', 'delivery 0.6.0 applied by Flux and ready', 819],
       ['in_progress', 'delivery 0.6.0 pinned', 820],
@@ -164,13 +232,13 @@ const rollouts: Record<string, unknown[]> = {
       ['in_progress', 'estate-dashboard 0.2.0 pinned', 120],
     ]),
   ],
-  knowledge: [
+  'knowledge': [
     rollout(3601, '1.12.0', 2900, [
       ['failure', 'knowledge 1.12.0 did not become ready in 10m', 2880],
       ['in_progress', 'knowledge 1.12.0 pinned', 2900],
     ]),
   ],
-  notes: [
+  'notes': [
     rollout(3812, '0.9.1', 62, [
       ['success', 'notes rolled back to 0.9.1 and paused', 61],
       ['in_progress', 'pre-rollback backup taken', 64],
@@ -180,7 +248,13 @@ const rollouts: Record<string, unknown[]> = {
 }
 
 // Each container with when it wrote its first and latest line, in minutes ago.
-const stream = (pod: string, container: string, version: string, first: number, last: number) => ({ pod, container, version, first: minutesAgo(first), last: minutesAgo(last) })
+const stream = (pod: string, container: string, version: string, first: number, last: number) => ({
+  pod,
+  container,
+  version,
+  first: minutesAgo(first),
+  last: minutesAgo(last),
+})
 const streams: Record<string, ReturnType<typeof stream>[]> = {
   notes: [
     stream('notes-migration-up-0-10-0-x7k2p', 'liquibase', '0.10.0', 302, 301),
@@ -225,56 +299,151 @@ function lines(pod: string, container: string) {
   }))
 }
 
-
 const runs = {
   items: [
-    { id: 38707081285, at: minutesAgo(5), trigger: 'auth 3.5.0 published', outcome: 'isolated', lock: '9c41e07b2a1d', toolkit: '0.14.0', snapshotAt: minutesAgo(125), moved: ['auth'], url: run(38707081285),
+    {
+      id: 38707081285,
+      at: minutesAgo(5),
+      trigger: 'auth 3.5.0 published',
+      outcome: 'isolated',
+      lock: '9c41e07b2a1d',
+      toolkit: '0.14.0',
+      snapshotAt: minutesAgo(125),
+      moved: ['auth'],
+      url: run(38707081285),
       fragments: [
         { project: 'auth', version: '3.5.0', outcome: 'moved', published: minutesAgo(6) },
-        { project: 'knowledge', version: '1.13.1', outcome: 'isolated', reason: 'E_DUPLICATE_HOST: knowledge.jorisjonkers.dev is also declared by app', published: minutesAgo(2880) },
-        { project: 'notes', version: '0.9.1', outcome: 'held', reason: 'paused after a rollback', published: minutesAgo(62) },
+        {
+          project: 'knowledge',
+          version: '1.13.1',
+          outcome: 'isolated',
+          reason: 'E_DUPLICATE_HOST: knowledge.jorisjonkers.dev is also declared by app',
+          published: minutesAgo(2880),
+        },
+        {
+          project: 'notes',
+          version: '0.9.1',
+          outcome: 'held',
+          reason: 'paused after a rollback',
+          published: minutesAgo(62),
+        },
         { project: 'delivery', version: '0.6.0', outcome: 'unchanged', published: minutesAgo(820) },
         { project: 'estate-dashboard', version: '0.2.0', outcome: 'unchanged', published: minutesAgo(120) },
-        { project: 'grimoire', version: '0.21.0', outcome: 'stale', reason: 'no fragment for 9 days', published: minutesAgo(12960) },
-      ] },
-    { id: 38706000001, at: minutesAgo(62), trigger: 'rollback of notes to 0.9.1', outcome: 'isolated', lock: '4b7d0e1f93c2', toolkit: '0.14.0', snapshotAt: minutesAgo(180), moved: ['notes'], url: run(38706000001),
-      fragments: [{ project: 'notes', version: '0.9.1', outcome: 'moved', published: minutesAgo(400) }] },
-    { id: 38700000002, at: minutesAgo(420), trigger: 'nightly', outcome: 'composed', lock: 'e2a85c4d10f7', toolkit: '0.14.0', snapshotAt: minutesAgo(500), moved: [], url: run(38700000002),
-      fragments: [{ project: 'delivery', version: '0.6.0', outcome: 'unchanged', published: minutesAgo(820) }] },
+        {
+          project: 'grimoire',
+          version: '0.21.0',
+          outcome: 'stale',
+          reason: 'no fragment for 9 days',
+          published: minutesAgo(12960),
+        },
+      ],
+    },
+    {
+      id: 38706000001,
+      at: minutesAgo(62),
+      trigger: 'rollback of notes to 0.9.1',
+      outcome: 'isolated',
+      lock: '4b7d0e1f93c2',
+      toolkit: '0.14.0',
+      snapshotAt: minutesAgo(180),
+      moved: ['notes'],
+      url: run(38706000001),
+      fragments: [{ project: 'notes', version: '0.9.1', outcome: 'moved', published: minutesAgo(400) }],
+    },
+    {
+      id: 38700000002,
+      at: minutesAgo(420),
+      trigger: 'nightly',
+      outcome: 'composed',
+      lock: 'e2a85c4d10f7',
+      toolkit: '0.14.0',
+      snapshotAt: minutesAgo(500),
+      moved: [],
+      url: run(38700000002),
+      fragments: [{ project: 'delivery', version: '0.6.0', outcome: 'unchanged', published: minutesAgo(820) }],
+    },
   ],
 }
 
 const declarations: Record<string, unknown> = {
   auth: {
     version: '3.4.2',
-    applications: [{ id: 'auth', processes: [
-      { name: 'auth-api', description: 'Signs users in and issues their tokens.', switchover: 'blue-green', replicas: 2 },
-      { name: 'auth-ui', description: 'The sign-in pages.', switchover: 'blue-green', replicas: 1 },
+    applications: [
+      {
+        id: 'auth',
+        processes: [
+          {
+            name: 'auth-api',
+            description: 'Signs users in and issues their tokens.',
+            switchover: 'blue-green',
+            replicas: 2,
+          },
+          { name: 'auth-ui', description: 'The sign-in pages.', switchover: 'blue-green', replicas: 1 },
+        ],
+        migration: { runner: 'liquibase', identity: 'auth-migration', provenAgainst: '3.4.2', undo: 'allowed' },
+      },
     ],
-      migration: { runner: 'liquibase', identity: 'auth-migration', provenAgainst: '3.4.2', undo: 'allowed' } }],
     grants: [
       { process: 'auth-api', path: 'secret/data/platform/postgres/auth', access: 'read' },
       { process: 'auth-api', path: 'secret/data/auth-api', access: 'read' },
       { process: 'auth-api', path: 'transit/sign/auth-api-jwt', access: 'sign' },
     ],
-    rollback: ['Back up auth_db on platform-postgres. Keep it 7 days.', 'Wait for that backup to succeed, or stop', 'Compose auth at 3.4.2, then pause it'],
+    rollback: [
+      'Back up auth_db on platform-postgres. Keep it 7 days.',
+      'Wait for that backup to succeed, or stop',
+      'Compose auth at 3.4.2, then pause it',
+    ],
   },
   notes: {
     version: '0.9.1',
-    applications: [{ id: 'notes', processes: [{ name: 'notes', description: 'The notes wiki.', switchover: 'interrupted', replicas: 1 }],
-      migration: { runner: 'liquibase', identity: 'notes-migration', provenAgainst: '0.9.1', undo: 'blocked', reason: '0.10.0 has a non-transactional changeset' } }],
+    applications: [
+      {
+        id: 'notes',
+        processes: [{ name: 'notes', description: 'The notes wiki.', switchover: 'interrupted', replicas: 1 }],
+        migration: {
+          runner: 'liquibase',
+          identity: 'notes-migration',
+          provenAgainst: '0.9.1',
+          undo: 'blocked',
+          reason: '0.10.0 has a non-transactional changeset',
+        },
+      },
+    ],
     grants: [{ process: 'notes', path: 'secret/data/platform/outline', access: 'read' }],
     rollback: ['Back up notes_db. Keep it 7 days.', 'Compose notes at 0.9.1, then pause it'],
   },
   delivery: {
     version: '0.6.0',
     applications: [
-      { id: 'delivery', processes: [
-        { name: 'collector', description: 'Saves the state of the cluster to the estate repository every 10 minutes.', switchover: 'continuous', replicas: 1 },
-        { name: 'reporter', description: 'Turns Flux and Flagger events into GitHub deployment statuses.', switchover: 'continuous', replicas: 1 },
-        { name: 'release-gate', description: 'Holds a new release until its checks pass, and runs the down migration when one is held.', switchover: 'continuous', replicas: 2 },
-        { name: 'flagger', description: 'Switches traffic from the old version to the new one.', switchover: 'continuous', replicas: 1 },
-      ] },
+      {
+        id: 'delivery',
+        processes: [
+          {
+            name: 'collector',
+            description: 'Saves the state of the cluster to the estate repository every 10 minutes.',
+            switchover: 'continuous',
+            replicas: 1,
+          },
+          {
+            name: 'reporter',
+            description: 'Turns Flux and Flagger events into GitHub deployment statuses.',
+            switchover: 'continuous',
+            replicas: 1,
+          },
+          {
+            name: 'release-gate',
+            description: 'Holds a new release until its checks pass, and runs the down migration when one is held.',
+            switchover: 'continuous',
+            replicas: 2,
+          },
+          {
+            name: 'flagger',
+            description: 'Switches traffic from the old version to the new one.',
+            switchover: 'continuous',
+            replicas: 1,
+          },
+        ],
+      },
     ],
     grants: [{ process: 'collector', path: 'secret/data/delivery/github-app', access: 'read' }],
     rollback: [],
@@ -300,14 +469,31 @@ export function mockFetch(input: RequestInfo | URL, init?: RequestInit): Promise
   if (deploys) {
     const project = deploys[1] ?? ''
     const history = (rollouts[project] ?? []) as { version: string; at: string; commit: string }[]
-    return Promise.resolve(json({ items: history.map((r) => ({ commit: r.commit, at: r.at, message: `chore(deploy): ${project} ${r.version}` })) }))
+    return Promise.resolve(
+      json({
+        items: history.map((r) => ({ commit: r.commit, at: r.at, message: `chore(deploy): ${project} ${r.version}` })),
+      }),
+    )
   }
   if (pathname === '/api/v1/estate/composition/runs') return Promise.resolve(json(runs))
-  if (pathname === '/api/v1/estate/releases/notes') return Promise.resolve(json(notes(new URL(request.url).searchParams.get('version') ?? '')))
+  if (pathname === '/api/v1/estate/releases/notes')
+    return Promise.resolve(json(notes(new URL(request.url).searchParams.get('version') ?? '')))
   const declared = /^\/api\/v1\/estate\/projects\/([^/]+)\/declaration$/.exec(pathname)
   if (declared) {
     const d = declarations[declared[1] ?? '']
-    return Promise.resolve(d ? json(d) : json({ type: 'about:blank', title: 'Service Unavailable', status: 503, detail: 'Declarations are not read yet.' }, 503))
+    return Promise.resolve(
+      d
+        ? json(d)
+        : json(
+            {
+              type: 'about:blank',
+              title: 'Service Unavailable',
+              status: 503,
+              detail: 'Declarations are not read yet.',
+            },
+            503,
+          ),
+    )
   }
   const logStreams = /^\/api\/v1\/projects\/([^/]+)\/logs\/streams$/.exec(pathname)
   if (logStreams) return Promise.resolve(json({ items: streams[logStreams[1] ?? ''] ?? [] }))

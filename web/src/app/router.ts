@@ -15,18 +15,46 @@ async function askTheApi(): Promise<SignedIn> {
 }
 
 /** The app's routes. Every page but the two public ones needs a signed-in admin. */
-export function createAppRouter(history: RouterHistory = createWebHistory(), signedIn: () => Promise<SignedIn> = askTheApi): Router {
+export function createAppRouter(
+  history: RouterHistory = createWebHistory(),
+  signedIn: () => Promise<SignedIn> = askTheApi,
+): Router {
   const router = createRouter({
     history,
     routes: [
       { path: '/', name: 'overview', component: () => import('../features/overview/components/OverviewPage.vue') },
-      { path: '/projects', name: 'projects', component: () => import('../features/projects/components/ProjectsPage.vue') },
-      { path: '/projects/:name', name: 'project', component: () => import('../features/projects/components/ProjectPage.vue') },
-      { path: '/projects/:name/release', name: 'release', component: () => import('../features/projects/components/ReleasePage.vue') },
+      {
+        path: '/projects',
+        name: 'projects',
+        component: () => import('../features/projects/components/ProjectsPage.vue'),
+      },
+      {
+        path: '/projects/:name',
+        name: 'project',
+        component: () => import('../features/projects/components/ProjectPage.vue'),
+      },
+      {
+        path: '/projects/:name/release',
+        name: 'release',
+        component: () => import('../features/projects/components/ReleasePage.vue'),
+      },
       { path: '/alerts', name: 'alerts', component: () => import('../features/alerts/components/AlertsPage.vue') },
-      { path: '/alerts/history', name: 'alert-history', component: () => import('../features/alerts/components/AlertHistoryPage.vue') },
-      { path: '/composition', name: 'composition', component: () => import('../features/composition/components/CompositionPage.vue') },
-      { path: '/sign-in', name: 'sign-in', meta: { public: true }, component: () => import('../features/session/components/SignInPage.vue') },
+      {
+        path: '/alerts/history',
+        name: 'alert-history',
+        component: () => import('../features/alerts/components/AlertHistoryPage.vue'),
+      },
+      {
+        path: '/composition',
+        name: 'composition',
+        component: () => import('../features/composition/components/CompositionPage.vue'),
+      },
+      {
+        path: '/sign-in',
+        name: 'sign-in',
+        meta: { public: true },
+        component: () => import('../features/session/components/SignInPage.vue'),
+      },
       {
         path: '/not-an-admin',
         name: 'not-an-admin',

@@ -27,7 +27,16 @@ export function releases(rollouts: Rollout[], unit: Unit | undefined): ReleaseVi
       previous.pins += 1
       continue
     }
-    out.push({ key: r.id, version: r.version, at: r.at, state: 'past', pins: 1, commit: r.commit, ...(r.run ? { run: r.run } : {}), stages: r.stages })
+    out.push({
+      key: r.id,
+      version: r.version,
+      at: r.at,
+      state: 'past',
+      pins: 1,
+      commit: r.commit,
+      ...(r.run ? { run: r.run } : {}),
+      stages: r.stages,
+    })
   }
   out.forEach((v, i) => {
     if (v.stages.some(failed)) v.state = 'failed'

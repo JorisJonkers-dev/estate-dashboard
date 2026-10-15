@@ -25,9 +25,11 @@ const admin: Handler = () => json({ subject: 'user-1', name: 'joris' })
 
 /** Answers the history path with history, and every other read the shell makes with nothing. */
 function history(answer: Handler): Handler {
-  return (request) => (new URL(request.url).pathname === '/api/v1/alerts/history' ? answer(request) : json({ items: [] }))
+  return (request) =>
+    new URL(request.url).pathname === '/api/v1/alerts/history' ? answer(request) : json({ items: [] })
 }
-const nobody: Handler = () => json({ type: 'about:blank', title: 'Unauthorized', status: 401 }, 401, 'application/problem+json')
+const nobody: Handler = () =>
+  json({ type: 'about:blank', title: 'Unauthorized', status: 401 }, 401, 'application/problem+json')
 
 /** The paths the app asked the API for, in order. */
 function asked(fetch: { mock: { calls: unknown[][] } }): string[] {
@@ -58,37 +60,59 @@ afterEach(() => {
 
 describe('the alert history page', () => {
   it('lists the events the API returns, newest first as sent', async () => {
-    const resolved = { ...fired('CollectorStopped', 2), status: 'resolved', endsAt: '2026-10-03T07:30:00Z', observedAt: '2026-10-03T07:30:20Z' }
-    const { wrapper } = await mountApp(history(() => json({ items: [resolved, fired('CollectorStopped')] })), '/alerts/history')
+    const resolved = {
+      ...fired('CollectorStopped', 2),
+      status: 'resolved',
+      endsAt: '2026-10-03T07:30:00Z',
+      observedAt: '2026-10-03T07:30:20Z',
+    }
+    const { wrapper } = await mountApp(
+      history(() => json({ items: [resolved, fired('CollectorStopped')] })),
+      '/alerts/history',
+    )
     expect(wrapper.findAll('li').map((li) => li.find('.state').text())).toEqual(['Resolved after 30 min', 'Fired'])
     expect(wrapper.findAll('li .name').map((name) => name.text())).toEqual(['CollectorStopped', 'CollectorStopped'])
   })
 
   it('accepts a time with any offset, as RFC 3339 does', async () => {
-    const { wrapper } = await mountApp(history(() => json({ items: [{ ...fired('ReleaseHeld'), observedAt: '2026-10-03T09:00:20+02:00' }] })), '/alerts/history')
+    const { wrapper } = await mountApp(
+      history(() => json({ items: [{ ...fired('ReleaseHeld'), observedAt: '2026-10-03T09:00:20+02:00' }] })),
+      '/alerts/history',
+    )
     expect(wrapper.get('li time').attributes('datetime')).toBe('2026-10-03T09:00:20+02:00')
   })
 
   it('says so when nothing has been recorded', async () => {
-    const { wrapper } = await mountApp(history(() => json({ items: [] })), '/alerts/history')
+    const { wrapper } = await mountApp(
+      history(() => json({ items: [] })),
+      '/alerts/history',
+    )
     expect(wrapper.text()).toContain('No alerts yet')
   })
 
   it('shows the problem when the history cannot load', async () => {
     const { wrapper } = await mountApp(
-      history(() => json({ type: 'about:blank', title: 'Internal Server Error', status: 500 }, 500, 'application/problem+json')),
+      history(() =>
+        json({ type: 'about:blank', title: 'Internal Server Error', status: 500 }, 500, 'application/problem+json'),
+      ),
       '/alerts/history',
     )
     expect(wrapper.get('[role="alert"]').text()).toBe('Internal Server Error')
   })
 
   it('refuses a response the contract does not allow', async () => {
-    const { wrapper } = await mountApp(history(() => json({ items: [{ ...fired('X'), status: 'pending', startsAt: 'yesterday' }] })), '/alerts/history')
+    const { wrapper } = await mountApp(
+      history(() => json({ items: [{ ...fired('X'), status: 'pending', startsAt: 'yesterday' }] })),
+      '/alerts/history',
+    )
     expect(wrapper.get('[role="alert"]').text()).toBe('Something went wrong. Try again.')
   })
 
   it('asks who is signed in, then for the history and what the shell shows, and only reads', async () => {
-    const { fetch } = await mountApp(history(() => json({ items: [] })), '/alerts/history')
+    const { fetch } = await mountApp(
+      history(() => json({ items: [] })),
+      '/alerts/history',
+    )
     expect(asked(fetch)[0]).toBe('/api/v1/session')
     expect(new Set(asked(fetch))).toEqual(new Set(['/api/v1/session', '/api/v1/alerts', '/api/v1/alerts/history']))
     for (const [request] of fetch.mock.calls) expect(request instanceof Request ? request.method : 'GET').toBe('GET')
@@ -115,7 +139,8 @@ describe('a browser nobody is signed in on', () => {
   })
 
   it('still sees the page when the API cannot say who is there, and the page reports it', async () => {
-    const away: Handler = () => json({ type: 'about:blank', title: 'Service Unavailable', status: 503 }, 503, 'application/problem+json')
+    const away: Handler = () =>
+      json({ type: 'about:blank', title: 'Service Unavailable', status: 503 }, 503, 'application/problem+json')
     const { wrapper, router } = await mountApp(away, '/alerts/history', away)
     expect(router.currentRoute.value.fullPath).toBe('/alerts/history')
     expect(wrapper.get('[role="alert"]').text()).toBe('Service Unavailable')
@@ -129,8 +154,12 @@ describe('the sign-in page', () => {
     expect(wrapper.findAll('main')).toHaveLength(1)
     expect(wrapper.get('.name').text()).toBe('estate')
     expect(wrapper.get('h1').text()).toBe('Sign in')
-    expect(wrapper.text()).toContain("The estate's delivery dashboard, for admins. Sign in with your jorisjonkers.dev account.")
-    expect(wrapper.text()).toContain('You come back here after you sign in. If your account has two-factor, auth asks for it there.')
+    expect(wrapper.text()).toContain(
+      "The estate's delivery dashboard, for admins. Sign in with your jorisjonkers.dev account.",
+    )
+    expect(wrapper.text()).toContain(
+      'You come back here after you sign in. If your account has two-factor, auth asks for it there.',
+    )
     expect(wrapper.findAll('.links a').map((a) => [a.text(), a.attributes('href')])).toEqual([
       ['Forgot your password?', 'https://auth.jorisjonkers.dev/forgot-password'],
       ['jorisjonkers.dev', 'https://jorisjonkers.dev'],
@@ -168,7 +197,9 @@ describe('the not-an-admin page', () => {
     expect(wrapper.text()).toContain(
       "You're signed in, but your account doesn't have the admin role. Ask an admin to grant it in auth, then sign in again.",
     )
-    expect(wrapper.findAll('.links a').map((a) => [a.text(), a.attributes('href')])).toEqual([['Back to jorisjonkers.dev', 'https://jorisjonkers.dev']])
+    expect(wrapper.findAll('.links a').map((a) => [a.text(), a.attributes('href')])).toEqual([
+      ['Back to jorisjonkers.dev', 'https://jorisjonkers.dev'],
+    ])
     expect(fetch).not.toHaveBeenCalled()
   })
 
@@ -197,9 +228,30 @@ function estate(overrides: Record<string, Handler> = {}): Handler {
       json({
         truncated: false,
         items: [
-          { name: 'apps-delivery', source: 'project-delivery', path: './apps/delivery', dependsOn: [], ready: true, version: '0.6.0' },
-          { name: 'apps-estate-dashboard', source: 'project-estate-dashboard', path: './apps/estate-dashboard', dependsOn: [], ready: true, version: '0.2.0' },
-          { name: 'apps-notes', source: 'project-notes', path: './apps/notes', dependsOn: [], ready: true, version: '0.9.1' },
+          {
+            name: 'apps-delivery',
+            source: 'project-delivery',
+            path: './apps/delivery',
+            dependsOn: [],
+            ready: true,
+            version: '0.6.0',
+          },
+          {
+            name: 'apps-estate-dashboard',
+            source: 'project-estate-dashboard',
+            path: './apps/estate-dashboard',
+            dependsOn: [],
+            ready: true,
+            version: '0.2.0',
+          },
+          {
+            name: 'apps-notes',
+            source: 'project-notes',
+            path: './apps/notes',
+            dependsOn: [],
+            ready: true,
+            version: '0.9.1',
+          },
         ],
       }),
     '/api/v1/delivery/releases': () => json({ truncated: false, items: [] }),
@@ -217,8 +269,19 @@ function estate(overrides: Record<string, Handler> = {}): Handler {
           },
         ],
       }),
-    '/api/v1/alerts': () => json({ type: 'about:blank', title: 'Service Unavailable', status: 503, detail: 'The dashboard runs without an Alertmanager.' }, 503, 'application/problem+json'),
-    '/api/v1/estate/projects/delivery/deploys': () => json({ items: [{ commit: 'a', at: '2026-10-15T06:00:00Z', message: 'chore(deploy): delivery 0.6.0' }] }),
+    '/api/v1/alerts': () =>
+      json(
+        {
+          type: 'about:blank',
+          title: 'Service Unavailable',
+          status: 503,
+          detail: 'The dashboard runs without an Alertmanager.',
+        },
+        503,
+        'application/problem+json',
+      ),
+    '/api/v1/estate/projects/delivery/deploys': () =>
+      json({ items: [{ commit: 'a', at: '2026-10-15T06:00:00Z', message: 'chore(deploy): delivery 0.6.0' }] }),
     ...overrides,
   }
   return (request) => (answers[new URL(request.url).pathname] ?? (() => json({ items: [] })))(request)
@@ -234,7 +297,13 @@ describe('the overview', () => {
       ['estate-dashboard', 'Live'],
       ['notes', 'Refused, isolated'],
     ])
-    expect(wrapper.findAll('tbody tr')[1]?.findAll('td')[1]?.findAll('span').map((span) => span.text())).toEqual(['0.6.0', '8a77a093432a'])
+    expect(
+      wrapper
+        .findAll('tbody tr')[1]
+        ?.findAll('td')[1]
+        ?.findAll('span')
+        .map((span) => span.text()),
+    ).toEqual(['0.6.0', '8a77a093432a'])
     expect(rows[0]?.[2]).toBe('fleet-infra')
   })
 
@@ -246,7 +315,9 @@ describe('the overview', () => {
       ['Releases', 'None in flight'],
       ['Platform', 'Not read'],
     ])
-    expect(wrapper.get('[role="status"]').text()).toBe("Couldn't read Alertmanager. The dashboard runs without an Alertmanager.")
+    expect(wrapper.get('[role="status"]').text()).toBe(
+      "Couldn't read Alertmanager. The dashboard runs without an Alertmanager.",
+    )
   })
 
   it('puts the isolated Project under Needs you, linking its issue', async () => {
@@ -268,12 +339,23 @@ describe('the overview', () => {
   })
 
   it('says nothing needs you when nothing is refused or firing', async () => {
-    const firing = { fingerprint: 'f', name: 'BackupFailed', class: 'urgent', startsAt: '2026-10-15T07:00:00Z', labels: { alertname: 'BackupFailed' }, silencedBy: [] }
-    const quiet = await mountApp(estate({ '/api/v1/estate/issues': () => json({ items: [] }), '/api/v1/alerts': () => json({ items: [] }) }))
+    const firing = {
+      fingerprint: 'f',
+      name: 'BackupFailed',
+      class: 'urgent',
+      startsAt: '2026-10-15T07:00:00Z',
+      labels: { alertname: 'BackupFailed' },
+      silencedBy: [],
+    }
+    const quiet = await mountApp(
+      estate({ '/api/v1/estate/issues': () => json({ items: [] }), '/api/v1/alerts': () => json({ items: [] }) }),
+    )
     expect(quiet.wrapper.text()).toContain('Nothing is firing or stuck.')
     const loud = await mountApp(estate({ '/api/v1/alerts': () => json({ items: [firing] }) }))
     expect(loud.wrapper.get('nav[aria-label="Pages"]').text()).toContain('Alerts1')
-    expect(loud.wrapper.findAll('[aria-labelledby="needs-h"] li a').map((a) => a.attributes('href'))).toContain('/alerts')
+    expect(loud.wrapper.findAll('[aria-labelledby="needs-h"] li a').map((a) => a.attributes('href'))).toContain(
+      '/alerts',
+    )
   })
 })
 

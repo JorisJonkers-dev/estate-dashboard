@@ -14,11 +14,16 @@ defineProps<{ text?: string | undefined; term?: boolean }>()
   <TooltipProvider v-else :delay-duration="250">
     <TooltipRoot>
       <TooltipTrigger as-child>
-        <span v-if="term" tabindex="0" class="cursor-help underline decoration-dim decoration-dotted underline-offset-4"><slot /></span>
+        <span v-if="term" tabindex="0" class="cursor-help underline decoration-dim decoration-dotted underline-offset-4"
+          ><slot
+        /></span>
         <slot v-else />
       </TooltipTrigger>
       <TooltipPortal>
-        <TooltipContent :side-offset="6" class="z-40 max-w-72 rounded-md border border-line bg-[#2a2a2a] px-3 py-2 font-sans text-sm leading-snug font-normal tracking-normal text-text-primary normal-case shadow-lg">
+        <TooltipContent
+          :side-offset="6"
+          class="z-40 max-w-72 rounded-md border border-line bg-[#2a2a2a] px-3 py-2 font-sans text-sm leading-snug font-normal tracking-normal text-text-primary normal-case shadow-lg"
+        >
           {{ text }}
           <TooltipArrow class="fill-[#2a2a2a]" />
         </TooltipContent>

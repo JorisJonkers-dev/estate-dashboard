@@ -6,10 +6,18 @@ const stage = (state: string) => ({ state, description: '', at: '2026-10-15T08:0
 describe('a Project on GitHub', () => {
   it('links its repository, deployments, commits, pin, workflows and issues', () => {
     expect(links.repository('JorisJonkers-dev/delivery')).toBe('https://github.com/JorisJonkers-dev/delivery')
-    expect(links.deployments('JorisJonkers-dev/delivery')).toBe('https://github.com/JorisJonkers-dev/delivery/deployments/production')
-    expect(links.commit('JorisJonkers-dev/delivery', 'abc')).toBe('https://github.com/JorisJonkers-dev/delivery/commit/abc')
-    expect(links.pin('delivery')).toBe('https://github.com/JorisJonkers-dev/estate/blob/main/projects/delivery/source.yaml')
-    expect(links.pinHistory('delivery')).toBe('https://github.com/JorisJonkers-dev/estate/commits/main/projects/delivery/source.yaml')
+    expect(links.deployments('JorisJonkers-dev/delivery')).toBe(
+      'https://github.com/JorisJonkers-dev/delivery/deployments/production',
+    )
+    expect(links.commit('JorisJonkers-dev/delivery', 'abc')).toBe(
+      'https://github.com/JorisJonkers-dev/delivery/commit/abc',
+    )
+    expect(links.pin('delivery')).toBe(
+      'https://github.com/JorisJonkers-dev/estate/blob/main/projects/delivery/source.yaml',
+    )
+    expect(links.pinHistory('delivery')).toBe(
+      'https://github.com/JorisJonkers-dev/estate/commits/main/projects/delivery/source.yaml',
+    )
     expect(links.workflow('rollback')).toBe('https://github.com/JorisJonkers-dev/estate/actions/workflows/rollback.yml')
     expect(links.issue(72)).toBe('https://github.com/JorisJonkers-dev/estate/issues/72')
   })
@@ -17,7 +25,12 @@ describe('a Project on GitHub', () => {
 
 describe('a rollout stage', () => {
   it('reads as a tone and a word', () => {
-    expect(['success', 'failure', 'error', 'inactive', 'in_progress', 'odd'].map((s) => [stageTone(stage(s)), stageWord(stage(s))])).toEqual([
+    expect(
+      ['success', 'failure', 'error', 'inactive', 'in_progress', 'odd'].map((s) => [
+        stageTone(stage(s)),
+        stageWord(stage(s)),
+      ]),
+    ).toEqual([
       ['ok', 'Done'],
       ['crit', 'Failed'],
       ['crit', 'Failed'],
@@ -37,7 +50,15 @@ describe('what the cluster holds for a Project', () => {
         { name: 'project-other', url: 'oci://r', digest: 'sha256:2', ready: true },
       ],
       [
-        { name: 'apps-auth', source: 'project-auth', path: './', dependsOn: [], ready: false, reason: 'HealthCheckFailed', message: 'timed out' },
+        {
+          name: 'apps-auth',
+          source: 'project-auth',
+          path: './',
+          dependsOn: [],
+          ready: false,
+          reason: 'HealthCheckFailed',
+          message: 'timed out',
+        },
         { name: 'apps-quiet', source: 'project-auth', path: './', dependsOn: [], ready: false },
       ],
       [
@@ -51,7 +72,11 @@ describe('what the cluster holds for a Project', () => {
             { process: 'auth-done', phase: 'Succeeded', iterations: 4 },
           ],
         },
-        { namespace: 'other-system', application: 'other', members: [{ process: 'x', phase: 'Failed', iterations: 0 }] },
+        {
+          namespace: 'other-system',
+          application: 'other',
+          members: [{ process: 'x', phase: 'Failed', iterations: 0 }],
+        },
       ],
     )
     expect(rows.map((r) => [r.kind, r.name, r.word, r.tone, r.detail])).toEqual([
@@ -66,7 +91,21 @@ describe('what the cluster holds for a Project', () => {
   })
 
   it('names a source that is not ready, and why', () => {
-    const [row] = clusterRows('a', [{ name: 'project-a', url: 'oci://r', digest: 'x', ready: false, reason: 'VerificationError', message: 'no signature' }], [], [])
+    const [row] = clusterRows(
+      'a',
+      [
+        {
+          name: 'project-a',
+          url: 'oci://r',
+          digest: 'x',
+          ready: false,
+          reason: 'VerificationError',
+          message: 'no signature',
+        },
+      ],
+      [],
+      [],
+    )
     expect(row).toMatchObject({ word: 'VerificationError', tone: 'crit', detail: 'no signature' })
     const [quiet] = clusterRows('a', [{ name: 'project-a', url: 'oci://r', digest: 'x', ready: false }], [], [])
     expect(quiet).toMatchObject({ word: 'Not ready' })

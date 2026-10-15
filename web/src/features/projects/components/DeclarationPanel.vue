@@ -20,16 +20,21 @@ const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase
         <thead>
           <tr class="border-b border-line">
             <th scope="col" class="py-2 pr-4 text-left" :class="label">Process</th>
-            <th scope="col" class="py-2 pr-4 text-left" :class="label"><TermHint :text="glossary.switchover" term>Switchover</TermHint></th>
+            <th scope="col" class="py-2 pr-4 text-left" :class="label">
+              <TermHint :text="glossary.switchover" term>Switchover</TermHint>
+            </th>
             <th scope="col" class="py-2 pr-4 text-left" :class="label">Replicas</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="p in a.processes" :key="p.name" class="border-b border-line-soft">
             <th scope="row" class="py-2.5 pr-4 text-left font-medium">
-              {{ p.name }}<span v-if="p.description" class="block text-sm font-normal text-text-muted">{{ p.description }}</span>
+              {{ p.name
+              }}<span v-if="p.description" class="block text-sm font-normal text-text-muted">{{ p.description }}</span>
             </th>
-            <td class="py-2.5 pr-4 text-text-muted"><TermHint :text="explain(p.switchover)" term>{{ p.switchover }}</TermHint></td>
+            <td class="py-2.5 pr-4 text-text-muted">
+              <TermHint :text="explain(p.switchover)" term>{{ p.switchover }}</TermHint>
+            </td>
             <td class="py-2.5 text-text-muted">{{ p.replicas }}</td>
           </tr>
         </tbody>
@@ -37,7 +42,10 @@ const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase
       <dl v-if="a.migration" class="m-0 mt-4 grid grid-cols-3 gap-4 text-[15px]">
         <div>
           <dt :class="label"><TermHint :text="glossary.migration" term>Migration</TermHint></dt>
-          <dd class="m-0">{{ a.migration.runner }}<span v-if="a.migration.identity" class="text-text-muted">, {{ a.migration.identity }}</span></dd>
+          <dd class="m-0">
+            {{ a.migration.runner
+            }}<span v-if="a.migration.identity" class="text-text-muted">, {{ a.migration.identity }}</span>
+          </dd>
         </div>
         <div>
           <dt :class="label"><TermHint :text="glossary.provenAgainst" term>Proven against</TermHint></dt>
@@ -45,7 +53,10 @@ const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase
         </div>
         <div>
           <dt :class="label"><TermHint :text="glossary.undo" term>Undo</TermHint></dt>
-          <dd class="m-0" :class="a.migration.undo === 'allowed' ? 'text-ok' : 'text-warn'">{{ a.migration.undo }}<span v-if="a.migration.reason" class="block text-sm text-text-muted">{{ a.migration.reason }}</span></dd>
+          <dd class="m-0" :class="a.migration.undo === 'allowed' ? 'text-ok' : 'text-warn'">
+            {{ a.migration.undo
+            }}<span v-if="a.migration.reason" class="block text-sm text-text-muted">{{ a.migration.reason }}</span>
+          </dd>
         </div>
       </dl>
     </section>
@@ -59,9 +70,13 @@ const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase
     </section>
 
     <section v-if="d.grants.length" aria-labelledby="grants-h">
-      <h2 id="grants-h" class="m-0 mb-3 text-xl font-semibold"><TermHint :text="glossary.grants" term>Grants</TermHint></h2>
+      <h2 id="grants-h" class="m-0 mb-3 text-xl font-semibold">
+        <TermHint :text="glossary.grants" term>Grants</TermHint>
+      </h2>
       <ul class="m-0 flex list-none flex-col gap-1 p-0 font-mono text-[13px]">
-        <li v-for="g in d.grants" :key="g.process + g.path"><span class="text-text-muted">{{ g.process }}</span> {{ g.path }} <span class="text-dim">{{ g.access }}</span></li>
+        <li v-for="g in d.grants" :key="g.process + g.path">
+          <span class="text-text-muted">{{ g.process }}</span> {{ g.path }} <span class="text-dim">{{ g.access }}</span>
+        </li>
       </ul>
     </section>
   </div>

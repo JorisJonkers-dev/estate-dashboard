@@ -13,7 +13,9 @@ test('the history is read from the migrated database through the real API', asyn
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
   })
-  const answered = page.waitForResponse((response) => response.url().endsWith('/api/v1/alerts/history') && response.status() === 200)
+  const answered = page.waitForResponse(
+    (response) => response.url().endsWith('/api/v1/alerts/history') && response.status() === 200,
+  )
   await page.goto('/')
   await answered
   await expect(page.getByRole('heading', { name: 'Alert history' })).toBeVisible()

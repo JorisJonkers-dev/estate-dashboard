@@ -38,13 +38,19 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
 <template>
   <div class="flex flex-col gap-10">
     <HeadBand eyebrow="Production" title="Composition">
-      Each composition run reads the published fragments, builds the estate and moves the pins that changed. A refused fragment is set aside. The rest still compose.
+      Each composition run reads the published fragments, builds the estate and moves the pins that changed. A refused
+      fragment is set aside. The rest still compose.
     </HeadBand>
 
     <EmptyPlate v-if="failure" title="Runs aren't shown yet" mark="quiet">{{ failure }}</EmptyPlate>
     <p v-else-if="runs.isPending.value" class="m-0 text-text-muted">Loading…</p>
-    <EmptyPlate v-else-if="items.length === 0" title="No runs yet" mark="quiet">The next composition run shows up here.</EmptyPlate>
-    <div v-else class="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)] lg:items-start lg:gap-12">
+    <EmptyPlate v-else-if="items.length === 0" title="No runs yet" mark="quiet"
+      >The next composition run shows up here.</EmptyPlate
+    >
+    <div
+      v-else
+      class="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)] lg:items-start lg:gap-12"
+    >
       <ul aria-label="Runs" class="m-0 list-none border-t border-line p-0">
         <li v-for="r in items" :key="r.id">
           <button
@@ -57,7 +63,10 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
               <span class="block font-medium">{{ age(r.at, now) }} ago</span>
               <span class="block truncate text-sm text-text-muted">{{ r.trigger }}</span>
             </span>
-            <span class="flex items-center gap-2 text-sm font-medium whitespace-nowrap" :class="toneText[outcome[r.outcome].tone]">
+            <span
+              class="flex items-center gap-2 text-sm font-medium whitespace-nowrap"
+              :class="toneText[outcome[r.outcome].tone]"
+            >
               <span class="size-2 rounded-full bg-current" aria-hidden="true" />{{ outcome[r.outcome].word }}
             </span>
           </button>
@@ -67,7 +76,13 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
       <section v-if="picked" aria-labelledby="run-h" class="flex flex-col gap-5 lg:border-l lg:border-line lg:pl-8">
         <div class="flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="run-h" class="m-0 text-xl font-semibold">{{ when.format(new Date(picked.at)) }}</h2>
-          <a :href="picked.url" target="_blank" rel="noopener" class="inline-flex min-h-9 items-center rounded-md border border-control px-3 text-sm font-medium no-underline hover:border-accent">Workflow run<span class="sr-only"> (opens in a new tab)</span></a>
+          <a
+            :href="picked.url"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex min-h-9 items-center rounded-md border border-control px-3 text-sm font-medium no-underline hover:border-accent"
+            >Workflow run<span class="sr-only"> (opens in a new tab)</span></a
+          >
         </div>
         <dl class="m-0 grid grid-cols-2 gap-4 md:grid-cols-4">
           <div>
@@ -90,15 +105,28 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
         <table aria-label="Fragments in this run" class="w-full border-collapse">
           <thead>
             <tr class="border-b border-line">
-              <th v-for="h in ['Project', 'Version', 'Outcome', 'Published']" :key="h" scope="col" class="py-2 pr-4 text-left" :class="label">{{ h }}</th>
+              <th
+                v-for="h in ['Project', 'Version', 'Outcome', 'Published']"
+                :key="h"
+                scope="col"
+                class="py-2 pr-4 text-left"
+                :class="label"
+              >
+                {{ h }}
+              </th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="f in picked.fragments" :key="f.project" class="border-b border-line-soft">
-              <th scope="row" class="py-2.5 pr-4 text-left font-medium"><RouterLink :to="`/projects/${f.project}`" class="no-underline hover:underline">{{ f.project }}</RouterLink></th>
+              <th scope="row" class="py-2.5 pr-4 text-left font-medium">
+                <RouterLink :to="`/projects/${f.project}`" class="no-underline hover:underline">{{
+                  f.project
+                }}</RouterLink>
+              </th>
               <td class="py-2.5 pr-4">{{ f.version }}</td>
               <td class="py-2.5 pr-4" :class="toneText[fragment[f.outcome].tone]">
-                {{ fragment[f.outcome].word }}<span v-if="f.reason" class="block text-sm text-text-muted">{{ f.reason }}</span>
+                {{ fragment[f.outcome].word
+                }}<span v-if="f.reason" class="block text-sm text-text-muted">{{ f.reason }}</span>
               </td>
               <td class="py-2.5 text-text-muted">{{ age(f.published, now) }}</td>
             </tr>

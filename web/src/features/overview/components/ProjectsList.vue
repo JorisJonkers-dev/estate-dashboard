@@ -28,11 +28,19 @@ const head = 'py-2.5 pr-4 text-left text-xs font-semibold tracking-[0.12em] text
 
 <template>
   <section aria-labelledby="projects-h">
-    <h2 id="projects-h" class="m-0 mb-3 text-xl font-semibold">Projects <span class="font-normal text-text-muted">{{ shown.length }}</span></h2>
+    <h2 id="projects-h" class="m-0 mb-3 text-xl font-semibold">
+      Projects <span class="font-normal text-text-muted">{{ shown.length }}</span>
+    </h2>
 
     <!-- Filters and search share one line; on a phone the search wraps below. -->
     <div class="flex flex-wrap items-end gap-x-6 md:flex-nowrap md:border-b md:border-line">
-      <ToggleGroupRoot type="single" :model-value="filter" aria-label="Filter by state" class="flex w-full min-w-0 gap-6 overflow-x-auto border-b border-line md:w-auto md:grow md:border-0" @update:model-value="pick">
+      <ToggleGroupRoot
+        type="single"
+        :model-value="filter"
+        aria-label="Filter by state"
+        class="flex w-full min-w-0 gap-6 overflow-x-auto border-b border-line md:w-auto md:grow md:border-0"
+        @update:model-value="pick"
+      >
         <ToggleGroupItem
           v-for="f in filters"
           :key="f"
@@ -42,13 +50,29 @@ const head = 'py-2.5 pr-4 text-left text-xs font-semibold tracking-[0.12em] text
           {{ f }} <span class="text-dim">{{ counts[f] }}</span>
         </ToggleGroupItem>
       </ToggleGroupRoot>
-      <label class="mt-3 flex min-h-9 w-full md:my-1.5 md:shrink-0 items-center gap-2 rounded-md border border-control px-2.5 text-text-muted focus-within:border-accent md:w-56">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <label
+        class="mt-3 flex min-h-9 w-full md:my-1.5 md:shrink-0 items-center gap-2 rounded-md border border-control px-2.5 text-text-muted focus-within:border-accent md:w-56"
+      >
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          aria-hidden="true"
+        >
           <circle cx="11" cy="11" r="7" />
           <path d="M20 20l-4-4" />
         </svg>
         <span class="sr-only">Search projects</span>
-        <input v-model="query" type="search" placeholder="Search" class="min-h-9 min-w-0 grow border-0 bg-transparent font-sans text-[15px] text-text-primary outline-none" />
+        <input
+          v-model="query"
+          type="search"
+          placeholder="Search"
+          class="min-h-9 min-w-0 grow border-0 bg-transparent font-sans text-[15px] text-text-primary outline-none"
+        />
       </label>
     </div>
 
@@ -72,10 +96,18 @@ const head = 'py-2.5 pr-4 text-left text-xs font-semibold tracking-[0.12em] text
         >
           <th scope="row" class="text-left font-medium md:py-3 md:pr-4">
             <!-- The link covers the row. -->
-            <RouterLink :to="`/projects/${p.name}`" class="text-text-primary no-underline after:absolute after:inset-0 hover:text-text-primary">{{ p.name }}</RouterLink>
+            <RouterLink
+              :to="`/projects/${p.name}`"
+              class="text-text-primary no-underline after:absolute after:inset-0 hover:text-text-primary"
+              >{{ p.name }}</RouterLink
+            >
           </th>
-          <td class="md:py-3 md:pr-4"><StateTag :tone="p.tone" :hint="explain(p.state)">{{ p.state }}</StateTag></td>
-          <td class="col-span-2 text-sm text-text-muted md:col-span-1 md:py-3 md:pr-4 md:text-base md:text-text-primary">
+          <td class="md:py-3 md:pr-4">
+            <StateTag :tone="p.tone" :hint="explain(p.state)">{{ p.state }}</StateTag>
+          </td>
+          <td
+            class="col-span-2 text-sm text-text-muted md:col-span-1 md:py-3 md:pr-4 md:text-base md:text-text-primary"
+          >
             <span v-if="p.version" class="mr-2 font-medium">{{ p.version }}</span>
             <span class="font-mono text-xs text-dim">{{ p.path === 'legacy' ? 'fleet-infra' : (p.pin ?? '') }}</span>
           </td>
@@ -83,7 +115,9 @@ const head = 'py-2.5 pr-4 text-left text-xs font-semibold tracking-[0.12em] text
             <time v-if="p.deployedAt" :datetime="p.deployedAt">{{ age(p.deployedAt, now) }} ago</time>
           </td>
           <td class="hidden text-text-muted md:table-cell md:py-3">
-            <TermHint :text="p.path === 'legacy' ? glossary.oldPath : glossary.estatePath" term>{{ p.path === 'legacy' ? 'old path' : 'estate path' }}</TermHint>
+            <TermHint :text="p.path === 'legacy' ? glossary.oldPath : glossary.estatePath" term>{{
+              p.path === 'legacy' ? 'old path' : 'estate path'
+            }}</TermHint>
           </td>
         </tr>
       </tbody>

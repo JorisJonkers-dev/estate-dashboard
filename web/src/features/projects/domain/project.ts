@@ -34,7 +34,15 @@ export function stageTone(stage: Stage): Tone {
 
 /** A stage's state in words. */
 export function stageWord(stage: Stage): string {
-  const words: Record<string, string> = { success: 'Done', failure: 'Failed', error: 'Failed', inactive: 'Replaced', in_progress: 'Started', queued: 'Queued', pending: 'Pending' }
+  const words: Record<string, string> = {
+    success: 'Done',
+    failure: 'Failed',
+    error: 'Failed',
+    inactive: 'Replaced',
+    in_progress: 'Started',
+    queued: 'Queued',
+    pending: 'Pending',
+  }
   return words[stage.state] ?? stage.state
 }
 
@@ -51,15 +59,34 @@ export interface ClusterRow {
 export function clusterRows(project: string, sources: Source[], units: Unit[], releases: Release[]): ClusterRow[] {
   const rows: ClusterRow[] = []
   for (const s of sources.filter((s) => s.name === `project-${project}`)) {
-    rows.push({ kind: 'Source', name: s.name, word: s.ready ? 'Ready' : (s.reason ?? 'Not ready'), tone: s.ready ? 'ok' : 'crit', ...(s.ready || !s.message ? {} : { detail: s.message }) })
+    rows.push({
+      kind: 'Source',
+      name: s.name,
+      word: s.ready ? 'Ready' : (s.reason ?? 'Not ready'),
+      tone: s.ready ? 'ok' : 'crit',
+      ...(s.ready || !s.message ? {} : { detail: s.message }),
+    })
   }
   for (const u of units.filter((u) => u.source === `project-${project}`)) {
-    rows.push({ kind: 'Unit', name: u.name, word: u.ready ? 'Ready' : (u.reason ?? 'Not ready'), tone: u.ready ? 'ok' : 'crit', ...(u.ready || !u.message ? {} : { detail: u.message }) })
+    rows.push({
+      kind: 'Unit',
+      name: u.name,
+      word: u.ready ? 'Ready' : (u.reason ?? 'Not ready'),
+      tone: u.ready ? 'ok' : 'crit',
+      ...(u.ready || !u.message ? {} : { detail: u.message }),
+    })
   }
   for (const r of releases.filter((r) => r.namespace === `${project}-system`)) {
     for (const m of r.members) {
       const phase = m.phase ?? 'Not seen yet'
-      const tone: Tone = phase === 'Failed' ? 'crit' : phase === 'Succeeded' || phase === 'Initialized' ? 'ok' : m.phase ? 'info' : 'idle'
+      const tone: Tone =
+        phase === 'Failed'
+          ? 'crit'
+          : phase === 'Succeeded' || phase === 'Initialized'
+            ? 'ok'
+            : m.phase
+              ? 'info'
+              : 'idle'
       rows.push({ kind: 'Canary', name: `${r.namespace}/${m.process}`, word: phase, tone })
     }
   }

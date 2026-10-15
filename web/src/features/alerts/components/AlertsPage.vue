@@ -2,7 +2,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { listAlertHistoryOptions, listAlertsOptions, listAlertsQueryKey, listIssuesOptions, listReleasesOptions, silenceAlertMutation } from '../../../infrastructure/api/@tanstack/vue-query.gen'
+import {
+  listAlertHistoryOptions,
+  listAlertsOptions,
+  listAlertsQueryKey,
+  listIssuesOptions,
+  listReleasesOptions,
+  silenceAlertMutation,
+} from '../../../infrastructure/api/@tanstack/vue-query.gen'
 import { useNow } from '../../../infrastructure/useNow'
 import { toneText } from '../../../shared/tone'
 import EmptyPlate from '../../../shared/ui/EmptyPlate.vue'
@@ -21,7 +28,9 @@ const releases = useQuery({ ...listReleasesOptions(), ...live })
 const history = useQuery({ ...listAlertHistoryOptions(), ...live })
 const now = useNow()
 
-const items = computed(() => inbox(alerts.data.value?.items ?? [], issues.data.value?.items ?? [], releases.data.value?.items ?? []))
+const items = computed(() =>
+  inbox(alerts.data.value?.items ?? [], issues.data.value?.items ?? [], releases.data.value?.items ?? []),
+)
 const alertmanager = computed(() => (alerts.error.value ? describeError(alerts.error.value) : null))
 
 const tab = ref<'All' | AlertClass>('All')
@@ -32,7 +41,11 @@ const count = (c: 'All' | AlertClass) => items.value.filter((i) => c === 'All' |
 const query = useRoute().query.alert
 const pickedKey = ref<string | null>(typeof query === 'string' ? query : null)
 const picked = computed(() => shown.value.find((i) => i.key === pickedKey.value) ?? shown.value[0])
-const pickedHistory = computed(() => (history.data.value?.items ?? []).filter((e) => picked.value?.fingerprint !== undefined && e.fingerprint === picked.value.fingerprint))
+const pickedHistory = computed(() =>
+  (history.data.value?.items ?? []).filter(
+    (e) => picked.value?.fingerprint !== undefined && e.fingerprint === picked.value.fingerprint,
+  ),
+)
 
 // The one write here. It goes to Alertmanager, which also silences Discord.
 const queryClient = useQueryClient()
@@ -52,7 +65,9 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
 
 <template>
   <div class="flex flex-col gap-10">
-    <HeadBand eyebrow="Production" title="Alerts">From Alertmanager, open estate issues and the Release Gate. A silence here also silences Discord.</HeadBand>
+    <HeadBand eyebrow="Production" title="Alerts"
+      >From Alertmanager, open estate issues and the Release Gate. A silence here also silences Discord.</HeadBand
+    >
 
     <p v-if="alertmanager" role="status" class="-mt-4 mb-0 text-[15px] text-warn">{{ alertmanager }}</p>
 
@@ -71,7 +86,10 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
     </div>
 
     <EmptyPlate v-if="shown.length === 0" title="All clear">Nothing here needs you.</EmptyPlate>
-    <div v-else class="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start lg:gap-12">
+    <div
+      v-else
+      class="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start lg:gap-12"
+    >
       <ul aria-label="Alerts" class="m-0 list-none border-t border-line p-0">
         <li v-for="i in shown" :key="i.key">
           <button
@@ -80,10 +98,16 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
             class="grid w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 border-0 border-b border-l-2 border-line-soft border-l-transparent bg-transparent px-3 py-3 text-left font-sans text-text-primary transition-colors hover:bg-panel aria-pressed:border-l-accent aria-pressed:bg-panel"
             @click="pickedKey = i.key"
           >
-            <span class="size-2 rounded-full" :class="i.silenced ? 'bg-dim' : ['bg-current', toneText[i.tone]]" aria-hidden="true" />
+            <span
+              class="size-2 rounded-full"
+              :class="i.silenced ? 'bg-dim' : ['bg-current', toneText[i.tone]]"
+              aria-hidden="true"
+            />
             <span class="min-w-0">
               <span class="block truncate font-medium">{{ i.title }}</span>
-              <span class="block text-sm text-text-muted">{{ i.severity }} · {{ i.class }}<template v-if="i.project"> · {{ i.project }}</template></span>
+              <span class="block text-sm text-text-muted"
+                >{{ i.severity }} · {{ i.class }}<template v-if="i.project"> · {{ i.project }}</template></span
+              >
             </span>
             <span class="text-right text-sm text-text-muted">
               <span class="block">{{ age(i.since, now) }}</span>
@@ -94,12 +118,16 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
       </ul>
 
       <section v-if="picked" aria-labelledby="detail-h" class="flex flex-col gap-4 lg:border-l lg:border-line lg:pl-8">
-        <p class="m-0 text-xs font-semibold tracking-[0.12em] uppercase" :class="toneText[picked.tone]">{{ picked.severity }} · {{ picked.class }}</p>
+        <p class="m-0 text-xs font-semibold tracking-[0.12em] uppercase" :class="toneText[picked.tone]">
+          {{ picked.severity }} · {{ picked.class }}
+        </p>
         <h2 id="detail-h" class="m-0 text-2xl font-semibold">{{ picked.title }}</h2>
         <dl class="m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-5 gap-y-1.5 text-[15px]">
           <template v-if="picked.project">
             <dt class="text-text-muted">Project</dt>
-            <dd class="m-0"><RouterLink :to="`/projects/${picked.project}`">{{ picked.project }}</RouterLink></dd>
+            <dd class="m-0">
+              <RouterLink :to="`/projects/${picked.project}`">{{ picked.project }}</RouterLink>
+            </dd>
           </template>
           <dt class="text-text-muted">Source</dt>
           <dd class="m-0">{{ picked.source }}</dd>
@@ -116,7 +144,10 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
           <template v-if="picked.fingerprint && !picked.silenced">
             <label class="flex items-center gap-2 text-[15px] text-text-muted">
               Silence for
-              <select v-model="length" class="min-h-10 rounded-md border border-control bg-surface-dark px-2 font-sans text-text-primary">
+              <select
+                v-model="length"
+                class="min-h-10 rounded-md border border-control bg-surface-dark px-2 font-sans text-text-primary"
+              >
                 <option value="1h">1 hour</option>
                 <option value="4h">4 hours</option>
                 <option value="1d">1 day</option>
@@ -124,13 +155,30 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
               </select>
             </label>
             <TermHint :text="glossary.silence">
-              <button type="button" :disabled="silence.isPending.value" class="min-h-10 cursor-pointer rounded-md border border-accent bg-accent px-4 font-sans text-[15px] font-medium text-[#1c1c1c] transition-colors hover:bg-transparent hover:text-accent disabled:opacity-50" @click="silencePicked">
+              <button
+                type="button"
+                :disabled="silence.isPending.value"
+                class="min-h-10 cursor-pointer rounded-md border border-accent bg-accent px-4 font-sans text-[15px] font-medium text-[#1c1c1c] transition-colors hover:bg-transparent hover:text-accent disabled:opacity-50"
+                @click="silencePicked"
+              >
                 Silence
               </button>
             </TermHint>
           </template>
-          <RouterLink v-if="picked.link && picked.link.href.startsWith('/')" :to="picked.link.href" class="inline-flex min-h-10 items-center rounded-md border border-control px-4 text-[15px] font-medium no-underline hover:border-accent">{{ picked.link.label }}</RouterLink>
-          <a v-else-if="picked.link" :href="picked.link.href" target="_blank" rel="noopener" class="inline-flex min-h-10 items-center rounded-md border border-control px-4 text-[15px] font-medium no-underline hover:border-accent">{{ picked.link.label }}<span class="sr-only"> (opens in a new tab)</span></a>
+          <RouterLink
+            v-if="picked.link && picked.link.href.startsWith('/')"
+            :to="picked.link.href"
+            class="inline-flex min-h-10 items-center rounded-md border border-control px-4 text-[15px] font-medium no-underline hover:border-accent"
+            >{{ picked.link.label }}</RouterLink
+          >
+          <a
+            v-else-if="picked.link"
+            :href="picked.link.href"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex min-h-10 items-center rounded-md border border-control px-4 text-[15px] font-medium no-underline hover:border-accent"
+            >{{ picked.link.label }}<span class="sr-only"> (opens in a new tab)</span></a
+          >
         </div>
         <p v-if="silence.isError.value" role="alert" class="m-0 text-crit">{{ describeError(silence.error.value) }}</p>
         <div v-if="picked.fingerprint" class="border-t border-line pt-4">
@@ -138,7 +186,9 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
           <p v-if="pickedHistory.length === 0" class="m-0 text-sm text-text-muted">Nothing recorded yet.</p>
           <ol v-else class="m-0 flex list-none flex-col gap-1 p-0 text-[15px]">
             <li v-for="e in pickedHistory" :key="e.id" class="flex gap-4">
-              <time class="min-w-36 text-text-muted" :datetime="e.observedAt">{{ when.format(new Date(e.observedAt)) }}</time>
+              <time class="min-w-36 text-text-muted" :datetime="e.observedAt">{{
+                when.format(new Date(e.observedAt))
+              }}</time>
               <span>{{ describeEvent(e) }}</span>
             </li>
           </ol>
