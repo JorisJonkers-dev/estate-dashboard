@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.3.0...v0.3.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* find containers that just started, date Deployed by release, and read Alertmanager ([#42](https://github.com/JorisJonkers-dev/estate-dashboard/issues/42)) ([33e2e8f](https://github.com/JorisJonkers-dev/estate-dashboard/commit/33e2e8f9f796bc94014938470f6ac5647b38051b))
+
 ## [0.3.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.2.0...v0.3.0) (2026-10-15)
 
 
