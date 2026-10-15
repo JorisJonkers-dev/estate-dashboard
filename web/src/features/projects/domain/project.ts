@@ -34,7 +34,7 @@ export function stageTone(stage: Stage): Tone {
 
 /** A stage's state in words. */
 export function stageWord(stage: Stage): string {
-  const words: Record<string, string> = { success: 'Done', failure: 'Failed', error: 'Failed', inactive: 'Superseded', in_progress: 'Running', queued: 'Queued', pending: 'Pending' }
+  const words: Record<string, string> = { success: 'Done', failure: 'Failed', error: 'Failed', inactive: 'Superseded', in_progress: 'Started', queued: 'Queued', pending: 'Pending' }
   return words[stage.state] ?? stage.state
 }
 

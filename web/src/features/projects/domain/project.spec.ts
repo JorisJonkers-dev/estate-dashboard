@@ -22,7 +22,7 @@ describe('a rollout stage', () => {
       ['crit', 'Failed'],
       ['crit', 'Failed'],
       ['idle', 'Superseded'],
-      ['info', 'Running'],
+      ['info', 'Started'],
       ['info', 'odd'],
     ])
   })

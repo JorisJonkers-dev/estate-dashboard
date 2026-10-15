@@ -10,7 +10,7 @@ const { eyebrow, title, tone = 'none' } = defineProps<{ eyebrow: string; title: 
 
 <template>
   <header class="band -mx-6 border-b border-line lg:-mx-10" :class="tone === 'none' ? 'text-text-muted' : toneText[tone]">
-    <div class="px-6 pt-8 pb-7 lg:px-10 lg:pt-10 lg:pb-8">
+    <div class="px-6 pt-8 pb-7 text-text-primary lg:px-10 lg:pt-10 lg:pb-8">
       <div class="flex flex-wrap items-end justify-between gap-6">
         <div class="min-w-0">
           <p class="m-0 text-xs font-semibold tracking-[0.2em] text-text-muted uppercase">{{ eyebrow }}</p>

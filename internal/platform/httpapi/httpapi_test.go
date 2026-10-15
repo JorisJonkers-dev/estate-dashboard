@@ -25,7 +25,9 @@ import (
 	estateapp "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/app"
 	estatedomain "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/logs/adapters/loki"
+	logsweb "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/adapters/web"
 	logsapp "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/app"
+	logsdomain "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpapi"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oidc"
 )
@@ -89,7 +91,12 @@ func serveAll(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases
 
 func serveEstate(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases, estate estateweb.UseCases) *httptest.Server {
 	t.Helper()
-	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l, delivery, estate, logsapp.New(loki.Absent{}, time.Now))
+	return serveLogs(t, repo, l, delivery, estate, logsapp.New(loki.Absent{}, time.Now))
+}
+
+func serveLogs(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases, estate estateweb.UseCases, logs logsweb.UseCases) *httptest.Server {
+	t.Helper()
+	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l, delivery, estate, logs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -484,5 +491,54 @@ func TestFailureIsAnOpaque500(t *testing.T) {
 	got := call(t, srv, http.MethodGet, "/api/v1/alerts/history", "", true)
 	if got.code != http.StatusInternalServerError || got.body["detail"] != nil {
 		t.Fatalf("GET = %d %v, want a 500 without detail", got.code, got.body)
+	}
+}
+
+// logStore is a log store in memory.
+type logStore struct {
+	streams []logsdomain.Stream
+	lines   []logsdomain.Line
+	err     error
+}
+
+func (s *logStore) Streams(context.Context, string, time.Time) ([]logsdomain.Stream, error) {
+	return s.streams, s.err
+}
+
+func (s *logStore) Lines(context.Context, string, logsdomain.Stream, time.Time, int) ([]logsdomain.Line, error) {
+	return s.lines, s.err
+}
+
+func TestAProjectsLogsAreServedInTheContractsShape(t *testing.T) {
+	at := time.Date(2026, 10, 15, 8, 0, 0, 0, time.UTC)
+	store := &logStore{
+		streams: []logsdomain.Stream{{Pod: "auth-migration-up", Container: "liquibase"}},
+		lines:   []logsdomain.Line{{At: at, Text: "ChangeSet applied"}},
+	}
+	srv := serveLogs(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(github.Absent{}), logsapp.New(store, time.Now))
+	streams := call(t, srv, http.MethodGet, "/api/v1/projects/auth/logs/streams?hours=6", "", true)
+	if streams.code != http.StatusOK || streams.body["items"].([]any)[0].(map[string]any)["container"] != "liquibase" {
+		t.Fatalf("streams = %d %v", streams.code, streams.body)
+	}
+	lines := call(t, srv, http.MethodGet, "/api/v1/projects/auth/logs?pod=auth-migration-up&container=liquibase&limit=10", "", true)
+	if line := lines.body["items"].([]any)[0].(map[string]any); lines.code != http.StatusOK || line["text"] != "ChangeSet applied" || line["at"] != "2026-10-15T08:00:00Z" {
+		t.Fatalf("lines = %d %v", lines.code, lines.body)
+	}
+	if got := call(t, srv, http.MethodGet, "/api/v1/projects/auth/logs?pod=x&container=y.", "", true); got.code != http.StatusBadRequest {
+		t.Fatalf("a container that is no name = %d", got.code)
+	}
+}
+
+func TestALokiThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
+	for want, uc := range map[string]logsweb.UseCases{
+		"Loki did not answer.":             logsapp.New(&logStore{err: errors.New("timeout")}, time.Now),
+		"The dashboard runs without Loki.": logsapp.New(loki.Absent{}, time.Now),
+	} {
+		srv := serveLogs(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(github.Absent{}), uc)
+		for _, path := range []string{"/api/v1/projects/auth/logs/streams", "/api/v1/projects/auth/logs?pod=p&container=c"} {
+			if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
+				t.Fatalf("%s = %d %v", path, got.code, got.body)
+			}
+		}
 	}
 }
