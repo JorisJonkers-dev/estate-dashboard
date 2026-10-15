@@ -4,6 +4,7 @@ import {
   getHandoverOptions,
   listDeploysOptions,
   listIssuesOptions,
+  listLogStreamsOptions,
   listPinsOptions,
   listReleasesOptions,
   listRolloutsOptions,
@@ -11,7 +12,9 @@ import {
   listUnitsOptions,
 } from '../../../infrastructure/api/@tanstack/vue-query.gen'
 import { projectRows } from '../../overview/domain/overview'
+import { window } from '../domain/logs'
 import { clusterRows, conditionsOf } from '../domain/project'
+import { releases as releaseViews } from '../domain/releases'
 
 const live = { refetchInterval: 30_000 }
 
@@ -35,6 +38,9 @@ export function useProject(name: Ref<string>) {
     })),
   )
 
+  const streams = useQuery(computed(() => ({ ...listLogStreamsOptions({ path: { project: name.value }, query: { hours: window } }), refetchInterval: 60_000 })))
+  const unitOf = computed(() => (units.data.value?.items ?? []).find((u) => u.source === `project-${name.value}`))
+
   const row = computed(() =>
     projectRows({
       ...(handover.data.value ? { handover: handover.data.value } : {}),
@@ -51,11 +57,12 @@ export function useProject(name: Ref<string>) {
     row,
     repository,
     pin: computed(() => pins.data.value?.items.find((p) => p.project === name.value)),
-    unit: computed(() => (units.data.value?.items ?? []).find((u) => u.source === `project-${name.value}`)),
+    unit: unitOf,
     cluster: computed(() => clusterRows(name.value, sources.data.value?.items ?? [], units.data.value?.items ?? [], releases.data.value?.items ?? [])),
     conditions: computed(() => conditionsOf(name.value, issues.data.value?.items ?? [])),
     deploys: computed(() => deploys.data.value?.items ?? []),
-    rollouts: computed(() => rollouts.data.value?.items ?? []),
+    releases: computed(() => releaseViews(rollouts.data.value?.items ?? [], unitOf.value)),
+    streams: computed(() => streams.data.value?.items ?? []),
     rolloutsLoading: computed(() => repository.value !== undefined && rollouts.isPending.value),
   }
 }

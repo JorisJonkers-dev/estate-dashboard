@@ -1,32 +1,60 @@
 import type { Stream } from '../../../infrastructure/api/types.gen'
 
-/** A group of containers on the logs panel. */
-export interface StreamGroup {
-  name: 'Migrations' | 'Containers'
+/** A Process's containers that wrote logs: one per pod. */
+export interface ProcessLogs {
+  /** The container's name, which is the Process's. */
+  process: string
+  migration: boolean
   streams: Stream[]
 }
 
-/** Whether a container is part of a migration Job, by pod or container name. */
+/** Whether a container belongs to a migration Job, up or down, by its pod's or its own name. */
 export function isMigration(s: Stream): boolean {
   return /migrat/.test(s.pod) || /migrat/.test(s.container)
 }
 
-/** Migrations first, then the other containers. Empty groups are left out. */
-export function groupStreams(streams: Stream[]): StreamGroup[] {
-  const groups: StreamGroup[] = [
-    { name: 'Migrations', streams: streams.filter(isMigration) },
-    { name: 'Containers', streams: streams.filter((s) => !isMigration(s)) },
-  ]
-  return groups.filter((g) => g.streams.length > 0)
+/** The containers of one release, or those with no version when `version` is undefined, by Process. */
+export function byProcess(streams: Stream[], version: string | undefined): ProcessLogs[] {
+  const out = new Map<string, ProcessLogs>()
+  for (const s of streams.filter((s) => s.version === version)) {
+    const p = out.get(s.container) ?? { process: s.container, migration: isMigration(s), streams: [] }
+    p.streams.push(s)
+    out.set(s.container, p)
+  }
+  return [...out.values()].sort((a, b) => Number(b.migration) - Number(a.migration) || a.process.localeCompare(b.process))
 }
 
-/** A stream's key: its pod and container. */
-export const streamKey = (s: Stream) => `${s.pod}/${s.container}`
+/** A log line, read: JSON lines show their level and message, with every other field after. */
+export interface ReadLine {
+  level?: string
+  message: string
+  fields: [string, string][]
+}
 
-/** How far back the logs panel can look. */
-export const windows = [
-  { hours: 1, label: '1 hour' },
-  { hours: 6, label: '6 hours' },
-  { hours: 24, label: '1 day' },
-  { hours: 168, label: '7 days' },
-] as const
+const quiet = new Set(['time', 'ts', 'timestamp', 'level', 'lvl', 'msg', 'message'])
+
+/** Reads one line: a JSON object's level, message and fields, or the text as it is. */
+export function readLine(text: string): ReadLine {
+  if (!text.startsWith('{')) return { message: text, fields: [] }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return { message: text, fields: [] }
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return { message: text, fields: [] }
+  const o = parsed as Record<string, unknown>
+  const word = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v))
+  const level = o.level ?? o.lvl
+  const message = o.msg ?? o.message
+  return {
+    ...(level === undefined ? {} : { level: word(level).toLowerCase() }),
+    message: message === undefined ? '' : word(message),
+    fields: Object.entries(o)
+      .filter(([k]) => !quiet.has(k))
+      .map(([k, v]) => [k, word(v)]),
+  }
+}
+
+/** How far back to look for logs, in hours. */
+export const window = 168
