@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.2.0...v0.3.0) (2026-10-15)
+
+
+### Features
+
+* the estate screens, logs by release, and the house theme ([#39](https://github.com/JorisJonkers-dev/estate-dashboard/issues/39)) ([2164716](https://github.com/JorisJonkers-dev/estate-dashboard/commit/21647163cdf8ff58ab48b39a56cb7a075a6a9dd1))
+
 ## [0.2.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.1.0...v0.2.0) (2026-10-15)
 
 
