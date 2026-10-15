@@ -16,11 +16,16 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/logs/domain"
 )
 
 // maxBody is the most of a reply the adapter reads.
 const maxBody = 16 << 20
+
+// spans is how many containers' first and latest lines are read at once.
+const spans = 8
 
 // Loki reads one Loki.
 type Loki struct {
@@ -96,12 +101,21 @@ func (l *Loki) Streams(ctx context.Context, namespace string, since time.Time) (
 		seen[s] = true
 		streams = append(streams, s)
 	}
+	// Two reads per container add up over a week of pods, so a few run at once.
+	group, ctx := errgroup.WithContext(ctx)
+	group.SetLimit(spans)
 	for i := range streams {
-		first, last, err := l.span(ctx, namespace, streams[i], since)
-		if err != nil {
-			return nil, fmt.Errorf("loki: read when %s/%s wrote: %w", streams[i].Pod, streams[i].Container, err)
-		}
-		streams[i].First, streams[i].Last = first, last
+		group.Go(func() error {
+			first, last, err := l.span(ctx, namespace, streams[i], since)
+			if err != nil {
+				return fmt.Errorf("loki: read when %s/%s wrote: %w", streams[i].Pod, streams[i].Container, err)
+			}
+			streams[i].First, streams[i].Last = first, last
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 	slices.SortFunc(streams, func(a, b domain.Stream) int {
 		if c := strings.Compare(a.Pod, b.Pod); c != 0 {
