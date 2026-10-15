@@ -122,7 +122,7 @@ describe('a project', () => {
     await settle()
     expect(body()).toContain('auth · 3.4.2')
     const pods = [...document.querySelectorAll<HTMLButtonElement>('[aria-label="Pod"] button')]
-    expect(pods.map((p) => p.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('started')]))
+    expect(pods.map((p) => p.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('primary')]))
     pods.at(-1)?.click()
     await settle()
     expect(pods.at(-1)?.getAttribute('aria-pressed')).toBe('true')
