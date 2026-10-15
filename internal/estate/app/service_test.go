@@ -34,6 +34,19 @@ func (r *repository) Rollouts(_ context.Context, _, _ string, limit int) ([]doma
 	return nil, r.err
 }
 
+func (r *repository) Notes(context.Context, string, string) (domain.Notes, error) {
+	return domain.Notes{Version: "1.0.0"}, r.err
+}
+
+func TestNotesAreTheRepositorysOrItsFailure(t *testing.T) {
+	if n, err := app.New(&repository{}).Notes(t.Context(), "a/b", "1.0.0"); err != nil || n.Version != "1.0.0" {
+		t.Fatalf("notes = %+v, %v", n, err)
+	}
+	if _, err := app.New(&repository{err: domain.ErrNoRelease}).Notes(t.Context(), "a/b", "1.0.0"); !errors.Is(err, domain.ErrNoRelease) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestRolloutsClampsTheLimit(t *testing.T) {
 	for asked, want := range map[int]int{0: app.DefaultRollouts, 3: 3, 101: app.MaxDeploys} {
 		repo := &repository{}

@@ -20,6 +20,7 @@ type UseCases interface {
 	Deploys(ctx context.Context, project string, limit int) ([]domain.Deploy, error)
 	Issues(ctx context.Context) ([]domain.Issue, error)
 	Rollouts(ctx context.Context, repository, project string, limit int) ([]domain.Rollout, error)
+	Notes(ctx context.Context, repository, version string) (domain.Notes, error)
 }
 
 // Estate implements the estate operations.
@@ -113,6 +114,21 @@ func (h *Estate) ListRollouts(ctx context.Context, params oas.ListRolloutsParams
 		items = append(items, oas.Rollout{ID: r.ID, Version: r.Version, Commit: r.Commit, Run: opt(r.Run), Artifact: opt(r.Artifact), At: r.At, Stages: stages})
 	}
 	return &oas.RolloutList{Items: items}, nil
+}
+
+// GetReleaseNotes implements getReleaseNotes. A release with no GitHub Release, or one outside the
+// estate's repositories, is a 404.
+func (h *Estate) GetReleaseNotes(ctx context.Context, params oas.GetReleaseNotesParams) (oas.GetReleaseNotesRes, error) {
+	notes, err := h.uc.Notes(ctx, params.Repository, params.Version)
+	switch {
+	case errors.Is(err, domain.ErrNoRelease), errors.Is(err, domain.ErrForeignRepository):
+		missing := oas.GetReleaseNotesNotFound{StatusCode: http.StatusNotFound, Response: httpx.Problem(http.StatusNotFound, "This release has no notes.")}
+		return &missing, nil
+	case err != nil:
+		down := oas.GetReleaseNotesServiceUnavailable(h.unavailable(ctx, "notes", err))
+		return &down, nil
+	}
+	return &oas.ReleaseNotes{Version: notes.Version, Body: notes.Body, URL: opt(notes.URL), PublishedAt: oas.NewOptDateTime(notes.PublishedAt)}, nil
 }
 
 // ListIssues implements listIssues.

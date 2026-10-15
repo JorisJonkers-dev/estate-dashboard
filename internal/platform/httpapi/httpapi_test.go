@@ -364,6 +364,13 @@ func (r *repository) Deploys(_ context.Context, project string, limit int) ([]es
 
 func (r *repository) Issues(context.Context) ([]estatedomain.Issue, error) { return r.issues, r.err }
 
+func (r *repository) Notes(_ context.Context, _, version string) (estatedomain.Notes, error) {
+	if version == "9.9.9" {
+		return estatedomain.Notes{}, estatedomain.ErrNoRelease
+	}
+	return estatedomain.Notes{Version: version, Body: "## Features\n\n* a thing"}, r.err
+}
+
 func (r *repository) Rollouts(_ context.Context, repository, project string, limit int) ([]estatedomain.Rollout, error) {
 	r.asked = append(r.asked, repository+" "+project+" "+strconv.Itoa(limit))
 	return r.rollouts, r.err
@@ -404,6 +411,13 @@ func TestTheEstateRepositoryIsServedInTheContractsShape(t *testing.T) {
 	stage := rollouts.body["items"].([]any)[0].(map[string]any)["stages"].([]any)[0].(map[string]any)
 	if rollouts.code != http.StatusOK || stage["log"] != "https://github.com/x/runs/1" || repo.asked[len(repo.asked)-1] != "JorisJonkers-dev/auth-api auth 3" {
 		t.Fatalf("rollouts = %d %v, asked %v", rollouts.code, rollouts.body, repo.asked)
+	}
+	notes := call(t, srv, http.MethodGet, "/api/v1/estate/releases/notes?repository=JorisJonkers-dev/auth-api&version=1.3.0", "", true)
+	if notes.code != http.StatusOK || notes.body["body"] != "## Features\n\n* a thing" {
+		t.Fatalf("notes = %d %v", notes.code, notes.body)
+	}
+	if got := call(t, srv, http.MethodGet, "/api/v1/estate/releases/notes?repository=JorisJonkers-dev/auth-api&version=9.9.9", "", true); got.code != http.StatusNotFound {
+		t.Fatalf("a release without notes = %d", got.code)
 	}
 	issues := call(t, srv, http.MethodGet, "/api/v1/estate/issues", "", true)
 	if issues.code != http.StatusOK || issues.body["items"].([]any)[0].(map[string]any)["number"] != float64(7) {

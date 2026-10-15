@@ -106,6 +106,16 @@ export const zLogLines = z.object({
 });
 
 /**
+ * A release's notes.
+ */
+export const zReleaseNotes = z.object({
+    version: z.string().max(64),
+    body: z.string().max(125000),
+    url: z.string().max(2048).optional(),
+    publishedAt: z.iso.datetime({ offset: true }).max(64).optional()
+});
+
+/**
  * One commit that moved a pin.
  */
 export const zDeploy = z.object({
@@ -398,6 +408,16 @@ export const zListLogLinesQuery = z.object({
  * What Loki holds.
  */
 export const zListLogLinesResponse = zLogLines;
+
+export const zGetReleaseNotesQuery = z.object({
+    repository: z.string().min(3).max(140).regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/),
+    version: z.string().min(5).max(64).regex(/^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$/)
+});
+
+/**
+ * The notes.
+ */
+export const zGetReleaseNotesResponse = zReleaseNotes;
 
 /**
  * What the Estate repository holds.

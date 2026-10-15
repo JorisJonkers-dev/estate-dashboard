@@ -365,6 +365,49 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/estate/releases/notes:
+    get:
+      operationId: getReleaseNotes
+      summary: Read a release's notes
+      description: >-
+        The body of the GitHub Release a repository of the estate published for a version, as
+        Markdown. A 404 means there is none. A 503 means GitHub did not answer, or the dashboard
+        runs without the Estate repository.
+      tags: [estate]
+      parameters:
+        - name: repository
+          in: query
+          required: true
+          description: The repository, owner/name.
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 140
+            pattern: "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+        - name: version
+          in: query
+          required: true
+          description: The release.
+          schema:
+            type: string
+            minLength: 5
+            maxLength: 64
+            pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$"
+      responses:
+        "200":
+          description: The notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseNotes"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/estate/issues:
     get:
       operationId: listIssues
@@ -711,6 +754,29 @@ components:
           description: The lines.
           items:
             $ref: "#/components/schemas/LogLine"
+    ReleaseNotes:
+      description: A release's notes.
+      type: object
+      additionalProperties: false
+      required: [version, body]
+      properties:
+        version:
+          type: string
+          maxLength: 64
+          description: The release.
+        body:
+          type: string
+          maxLength: 125000
+          description: The notes, as Markdown.
+        url:
+          type: string
+          maxLength: 2048
+          description: The GitHub Release.
+        publishedAt:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was published.
     Deploy:
       description: One commit that moved a pin.
       type: object

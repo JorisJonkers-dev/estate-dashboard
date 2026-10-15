@@ -14,6 +14,149 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
+// GetReleaseNotesParams is parameters of getReleaseNotes operation.
+type GetReleaseNotesParams struct {
+	// The repository, owner/name.
+	Repository string
+	// The release.
+	Version string
+}
+
+func unpackGetReleaseNotesParams(packed middleware.Parameters) (params GetReleaseNotesParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "repository",
+			In:   "query",
+		}
+		params.Repository = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "version",
+			In:   "query",
+		}
+		params.Version = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetReleaseNotesParams(args [0]string, argsEscaped bool, r *http.Request) (params GetReleaseNotesParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: repository.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "repository",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.Repository = c
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     3,
+					MinLengthSet:  true,
+					MaxLength:     140,
+					MaxLengthSet:  true,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(params.Repository)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "repository",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: version.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "version",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.Version = c
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     5,
+					MinLengthSet:  true,
+					MaxLength:     64,
+					MaxLengthSet:  true,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(params.Version)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "version",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // ListAlertHistoryParams is parameters of listAlertHistory operation.
 type ListAlertHistoryParams struct {
 	// How many events to return.

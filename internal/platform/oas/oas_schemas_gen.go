@@ -402,6 +402,18 @@ type GetHandoverUnauthorized ProblemStatusCode
 
 func (*GetHandoverUnauthorized) getHandoverRes() {}
 
+type GetReleaseNotesNotFound ProblemStatusCode
+
+func (*GetReleaseNotesNotFound) getReleaseNotesRes() {}
+
+type GetReleaseNotesServiceUnavailable ProblemStatusCode
+
+func (*GetReleaseNotesServiceUnavailable) getReleaseNotesRes() {}
+
+type GetReleaseNotesUnauthorized ProblemStatusCode
+
+func (*GetReleaseNotesUnauthorized) getReleaseNotesRes() {}
+
 // Each Project's delivery path.
 // Ref: #/components/schemas/Handover
 type Handover struct {
@@ -1411,6 +1423,61 @@ func (s *ReleaseMigration) SetTestedAgainst(val OptString) {
 func (s *ReleaseMigration) SetNonTransactional(val bool) {
 	s.NonTransactional = val
 }
+
+// A release's notes.
+// Ref: #/components/schemas/ReleaseNotes
+type ReleaseNotes struct {
+	// The release.
+	Version string `json:"version"`
+	// The notes, as Markdown.
+	Body string `json:"body"`
+	// The GitHub Release.
+	URL OptString `json:"url"`
+	// When it was published.
+	PublishedAt OptDateTime `json:"publishedAt"`
+}
+
+// GetVersion returns the value of Version.
+func (s *ReleaseNotes) GetVersion() string {
+	return s.Version
+}
+
+// GetBody returns the value of Body.
+func (s *ReleaseNotes) GetBody() string {
+	return s.Body
+}
+
+// GetURL returns the value of URL.
+func (s *ReleaseNotes) GetURL() OptString {
+	return s.URL
+}
+
+// GetPublishedAt returns the value of PublishedAt.
+func (s *ReleaseNotes) GetPublishedAt() OptDateTime {
+	return s.PublishedAt
+}
+
+// SetVersion sets the value of Version.
+func (s *ReleaseNotes) SetVersion(val string) {
+	s.Version = val
+}
+
+// SetBody sets the value of Body.
+func (s *ReleaseNotes) SetBody(val string) {
+	s.Body = val
+}
+
+// SetURL sets the value of URL.
+func (s *ReleaseNotes) SetURL(val OptString) {
+	s.URL = val
+}
+
+// SetPublishedAt sets the value of PublishedAt.
+func (s *ReleaseNotes) SetPublishedAt(val OptDateTime) {
+	s.PublishedAt = val
+}
+
+func (*ReleaseNotes) getReleaseNotesRes() {}
 
 // The release a Rollback took the Project back to.
 // Ref: #/components/schemas/Rollback

@@ -227,6 +227,29 @@ func TestARolloutIsADeploymentCompositionOpenedForTheProject(t *testing.T) {
 	}
 }
 
+func TestNotesAreTheGitHubReleaseOfTheVersion(t *testing.T) {
+	f := &fake{status: http.StatusOK, rest: `{"body":"## Features","html_url":"https://github.com/x/releases/tag/v1.2.0","published_at":"2026-10-15T08:00:00Z"}`}
+	e := f.serve(t)
+	got, err := e.Notes(t.Context(), "JorisJonkers-dev/auth-api", "1.2.0")
+	if err != nil || got.Body != "## Features" || got.Version != "1.2.0" || f.seen[0] != "GET /api/repos/JorisJonkers-dev/auth-api/releases/tags/v1.2.0?" {
+		t.Fatalf("notes = %+v, %v, asked %v", got, err, f.seen)
+	}
+	if _, err := e.Notes(t.Context(), "someone/else", "1.2.0"); !errors.Is(err, domain.ErrForeignRepository) {
+		t.Errorf("a foreign repository = %v", err)
+	}
+	if _, err := e.Notes(t.Context(), "JorisJonkers-dev/x", "latest"); !errors.Is(err, domain.ErrNoRelease) {
+		t.Errorf("a version that is none = %v", err)
+	}
+	f.status = http.StatusNotFound
+	if _, err := e.Notes(t.Context(), "JorisJonkers-dev/x", "1.2.0"); !errors.Is(err, domain.ErrNoRelease) {
+		t.Errorf("no release = %v", err)
+	}
+	f.status = http.StatusBadGateway
+	if _, err := e.Notes(t.Context(), "JorisJonkers-dev/x", "1.2.0"); err == nil || errors.Is(err, domain.ErrNoRelease) {
+		t.Errorf("a failure = %v", err)
+	}
+}
+
 func TestTheIssuesAreTheOpenOnesWithoutPullRequests(t *testing.T) {
 	f := &fake{status: http.StatusOK, rest: `[
 		{"number":7,"title":"auth is held","html_url":"https://github.com/x/7","updated_at":"2026-10-03T09:00:00+02:00","labels":[{"name":"held"}],"body":"auth is held.\n\n<!-- estate-condition: auth/held -->"},
@@ -267,7 +290,8 @@ func TestWithoutARepositoryEveryReadSaysSo(t *testing.T) {
 	_, e3 := a.Issues(t.Context())
 	_, e4 := a.Handover(t.Context())
 	_, e5 := a.Rollouts(t.Context(), "a/b", "x", 1)
-	for _, err := range []error{e1, e2, e3, e4, e5} {
+	_, e6 := a.Notes(t.Context(), "a/b", "1.0.0")
+	for _, err := range []error{e1, e2, e3, e4, e5, e6} {
 		if !errors.Is(err, domain.ErrNoRepository) {
 			t.Fatalf("error = %v", err)
 		}

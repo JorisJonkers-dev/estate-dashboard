@@ -5,6 +5,10 @@ type GetHandoverRes interface {
 	getHandoverRes()
 }
 
+type GetReleaseNotesRes interface {
+	getReleaseNotesRes()
+}
+
 type GetSessionRes interface {
 	getSessionRes()
 }

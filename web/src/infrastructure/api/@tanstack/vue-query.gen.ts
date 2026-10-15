@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/vue-query';
 
 import { client } from '../client.gen';
-import { getHandover, getSession, listAlertHistory, listAlerts, listDeploys, listIssues, listLogLines, listLogStreams, listPins, listReleases, listRollouts, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
-import type { GetHandoverData, GetHandoverError, GetHandoverResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListLogLinesData, ListLogLinesError, ListLogLinesResponse, ListLogStreamsData, ListLogStreamsError, ListLogStreamsResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
+import { getHandover, getReleaseNotes, getSession, listAlertHistory, listAlerts, listDeploys, listIssues, listLogLines, listLogStreams, listPins, listReleases, listRollouts, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
+import type { GetHandoverData, GetHandoverError, GetHandoverResponse, GetReleaseNotesData, GetReleaseNotesError, GetReleaseNotesResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListLogLinesData, ListLogLinesError, ListLogLinesResponse, ListLogStreamsData, ListLogStreamsError, ListLogStreamsResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -216,6 +216,26 @@ export const listLogLinesOptions = (options: Options<ListLogLinesData>) => query
         return data;
     },
     queryKey: listLogLinesQueryKey(options)
+});
+
+export const getReleaseNotesQueryKey = (options: Options<GetReleaseNotesData>) => createQueryKey('getReleaseNotes', options);
+
+/**
+ * Read a release's notes
+ *
+ * The body of the GitHub Release a repository of the estate published for a version, as Markdown. A 404 means there is none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const getReleaseNotesOptions = (options: Options<GetReleaseNotesData>) => queryOptions<GetReleaseNotesResponse, GetReleaseNotesError, GetReleaseNotesResponse, ReturnType<typeof getReleaseNotesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getReleaseNotes({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getReleaseNotesQueryKey(options)
 });
 
 export const listIssuesQueryKey = (options?: Options<ListIssuesData>) => createQueryKey('listIssues', options);

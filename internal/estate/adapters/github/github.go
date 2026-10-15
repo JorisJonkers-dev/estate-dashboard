@@ -394,6 +394,36 @@ func (e *Estate) Rollouts(ctx context.Context, repository, name string, limit in
 	return rollouts, nil
 }
 
+// version is what a release may be called: what its tag is built from.
+var version = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$`)
+
+// Notes implements domain.Repository: the body of the GitHub Release tagged vX.Y.Z, or X.Y.Z.
+func (e *Estate) Notes(ctx context.Context, repository, release string) (domain.Notes, error) {
+	owner, _, _ := strings.Cut(repository, "/")
+	estateOwner, _, _ := strings.Cut(e.repository, "/")
+	if !repositoryName.MatchString(repository) || !strings.EqualFold(owner, estateOwner) {
+		return domain.Notes{}, fmt.Errorf("%w: %q", domain.ErrForeignRepository, repository)
+	}
+	if !version.MatchString(release) {
+		return domain.Notes{}, fmt.Errorf("%w: %q", domain.ErrNoRelease, release)
+	}
+	var reply struct {
+		Body        string    `json:"body"`
+		HTMLURL     string    `json:"html_url"`
+		PublishedAt time.Time `json:"published_at"`
+	}
+	for _, tag := range []string{"v" + release, release} {
+		err := e.do(ctx, http.MethodGet, "/repos/"+repository+"/releases/tags/"+tag, nil, nil, &reply)
+		if err == nil {
+			return domain.Notes{Version: release, Body: reply.Body, URL: reply.HTMLURL, PublishedAt: reply.PublishedAt.UTC()}, nil
+		}
+		if !strings.Contains(err.Error(), "answered 404") {
+			return domain.Notes{}, fmt.Errorf("github: read the notes of %s %s: %w", repository, release, err)
+		}
+	}
+	return domain.Notes{}, fmt.Errorf("%w: %s %s", domain.ErrNoRelease, repository, release)
+}
+
 // Absent is the repository of a dashboard that runs without one: every read is ErrNoRepository.
 type Absent struct{}
 
@@ -415,6 +445,11 @@ func (Absent) Handover(context.Context) (domain.Handover, error) {
 // Rollouts implements domain.Repository.
 func (Absent) Rollouts(context.Context, string, string, int) ([]domain.Rollout, error) {
 	return nil, domain.ErrNoRepository
+}
+
+// Notes implements domain.Repository.
+func (Absent) Notes(context.Context, string, string) (domain.Notes, error) {
+	return domain.Notes{}, domain.ErrNoRepository
 }
 
 // Issues implements domain.Repository.

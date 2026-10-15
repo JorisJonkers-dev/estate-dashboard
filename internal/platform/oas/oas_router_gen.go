@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	rn25AllowedHeaders = map[string]string{
+	rn26AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
 )
@@ -161,7 +161,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn25AllowedHeaders,
+									allowedHeaders: rn26AllowedHeaders,
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -453,6 +453,31 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 						}
 
+					}
+
+				case 'r': // Prefix: "releases/notes"
+
+					if l := len("releases/notes"); len(elem) >= l && elem[0:l] == "releases/notes" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "GET":
+							s.handleGetReleaseNotesRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: nil,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
 					}
 
 				}
@@ -1040,6 +1065,31 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 
 						}
 
+					}
+
+				case 'r': // Prefix: "releases/notes"
+
+					if l := len("releases/notes"); len(elem) >= l && elem[0:l] == "releases/notes" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "GET":
+							r.name = GetReleaseNotesOperation
+							r.summary = "Read a release's notes"
+							r.operationID = "getReleaseNotes"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/estate/releases/notes"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
+						}
 					}
 
 				}

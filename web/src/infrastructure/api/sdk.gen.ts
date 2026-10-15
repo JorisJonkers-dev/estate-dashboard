@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListLogLinesData, ListLogLinesErrors, ListLogLinesResponses, ListLogStreamsData, ListLogStreamsErrors, ListLogStreamsResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
-import { zGetHandoverResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListLogLinesPath, zListLogLinesQuery, zListLogLinesResponse, zListLogStreamsPath, zListLogStreamsQuery, zListLogStreamsResponse, zListPinsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
+import type { GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetReleaseNotesData, GetReleaseNotesErrors, GetReleaseNotesResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListLogLinesData, ListLogLinesErrors, ListLogLinesResponses, ListLogStreamsData, ListLogStreamsErrors, ListLogStreamsResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
+import { zGetHandoverResponse, zGetReleaseNotesQuery, zGetReleaseNotesResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListLogLinesPath, zListLogLinesQuery, zListLogLinesResponse, zListLogStreamsPath, zListLogStreamsQuery, zListLogStreamsResponse, zListPinsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -211,6 +211,27 @@ export const listLogLines = <ThrowOnError extends boolean = false>(options: Opti
             type: 'apiKey'
         }],
     url: '/api/v1/projects/{project}/logs',
+    ...options
+});
+
+/**
+ * Read a release's notes
+ *
+ * The body of the GitHub Release a repository of the estate published for a version, as Markdown. A 404 means there is none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const getReleaseNotes = <ThrowOnError extends boolean = false>(options: Options<GetReleaseNotesData, ThrowOnError>): RequestResult<GetReleaseNotesResponses, GetReleaseNotesErrors, ThrowOnError> => (options.client ?? client).get<GetReleaseNotesResponses, GetReleaseNotesErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zGetReleaseNotesQuery
+    }).parseAsync(data),
+    responseValidator: async (data) => await zGetReleaseNotesResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/estate/releases/notes',
     ...options
 });
 

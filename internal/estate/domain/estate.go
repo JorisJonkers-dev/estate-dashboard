@@ -82,6 +82,17 @@ type Rollout struct {
 	Stages   []Stage
 }
 
+// Notes are a release's notes, as its GitHub Release holds them: Markdown.
+type Notes struct {
+	Version     string
+	Body        string
+	URL         string
+	PublishedAt time.Time
+}
+
+// ErrNoRelease is returned for a version its repository published no GitHub Release for.
+var ErrNoRelease = errors.New("no such release")
+
 // ErrForeignRepository is returned for a repository outside the estate's owner. The dashboard
 // reads only the estate's own repositories.
 var ErrForeignRepository = errors.New("not one of the estate's repositories")
@@ -102,4 +113,6 @@ type Repository interface {
 	Issues(ctx context.Context) ([]Issue, error)
 	// Rollouts returns up to limit rollouts of the Project in repository, newest first.
 	Rollouts(ctx context.Context, repository, project string, limit int) ([]Rollout, error)
+	// Notes returns the notes of version's GitHub Release in repository.
+	Notes(ctx context.Context, repository, version string) (Notes, error)
 }

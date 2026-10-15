@@ -83,6 +83,15 @@ func (s *Service) Rollouts(ctx context.Context, repository, project string, limi
 	return rollouts, nil
 }
 
+// Notes returns the notes of a release published from repository.
+func (s *Service) Notes(ctx context.Context, repository, version string) (domain.Notes, error) {
+	notes, err := s.repo.Notes(ctx, repository, version)
+	if err != nil {
+		return domain.Notes{}, fmt.Errorf("read the notes of %s: %w", version, err)
+	}
+	return notes, nil
+}
+
 // Issues returns the open issues, the most recently updated first.
 func (s *Service) Issues(ctx context.Context) ([]domain.Issue, error) {
 	issues, err := s.repo.Issues(ctx)

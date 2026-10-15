@@ -195,6 +195,28 @@ export type LogLines = {
 };
 
 /**
+ * A release's notes.
+ */
+export type ReleaseNotes = {
+    /**
+     * The release.
+     */
+    version: string;
+    /**
+     * The notes, as Markdown.
+     */
+    body: string;
+    /**
+     * The GitHub Release.
+     */
+    url?: string;
+    /**
+     * When it was published.
+     */
+    publishedAt?: string;
+};
+
+/**
  * One commit that moved a pin.
  */
 export type Deploy = {
@@ -982,6 +1004,52 @@ export type ListLogLinesResponses = {
 };
 
 export type ListLogLinesResponse = ListLogLinesResponses[keyof ListLogLinesResponses];
+
+export type GetReleaseNotesData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The repository, owner/name.
+         */
+        repository: string;
+        /**
+         * The release.
+         */
+        version: string;
+    };
+    url: '/api/v1/estate/releases/notes';
+};
+
+export type GetReleaseNotesErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    404: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type GetReleaseNotesError = GetReleaseNotesErrors[keyof GetReleaseNotesErrors];
+
+export type GetReleaseNotesResponses = {
+    /**
+     * The notes.
+     */
+    200: ReleaseNotes;
+};
+
+export type GetReleaseNotesResponse = GetReleaseNotesResponses[keyof GetReleaseNotesResponses];
 
 export type ListIssuesData = {
     body?: never;

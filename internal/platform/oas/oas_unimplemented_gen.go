@@ -25,6 +25,17 @@ func (UnimplementedHandler) GetHandover(ctx context.Context) (r GetHandoverRes, 
 	return r, ht.ErrNotImplemented
 }
 
+// GetReleaseNotes implements getReleaseNotes operation.
+//
+// The body of the GitHub Release a repository of the estate published for a version, as Markdown. A
+// 404 means there is none. A 503 means GitHub did not answer, or the dashboard runs without the Estate
+// repository.
+//
+// GET /api/v1/estate/releases/notes
+func (UnimplementedHandler) GetReleaseNotes(ctx context.Context, params GetReleaseNotesParams) (r GetReleaseNotesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetSession implements getSession operation.
 //
 // Returns the admin the session cookie belongs to. A request without a session, or with one auth no
