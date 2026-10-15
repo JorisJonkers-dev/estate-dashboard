@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { listAlertHistoryOptions, listAlertsOptions, listAlertsQueryKey, listIssuesOptions, listReleasesOptions, silenceAlertMutation } from '../../../infrastructure/api/@tanstack/vue-query.gen'
 import { useNow } from '../../../infrastructure/useNow'
 import { toneText } from '../../../shared/tone'
@@ -25,7 +26,9 @@ const tab = ref<'All' | AlertClass>('All')
 const shown = computed(() => items.value.filter((i) => tab.value === 'All' || i.class === tab.value))
 const count = (c: 'All' | AlertClass) => items.value.filter((i) => c === 'All' || i.class === c).length
 
-const pickedKey = ref<string | null>(null)
+// A link can open one alert: /alerts?alert=<key>.
+const query = useRoute().query.alert
+const pickedKey = ref<string | null>(typeof query === 'string' ? query : null)
 const picked = computed(() => shown.value.find((i) => i.key === pickedKey.value) ?? shown.value[0])
 const pickedHistory = computed(() => (history.data.value?.items ?? []).filter((e) => picked.value?.fingerprint !== undefined && e.fingerprint === picked.value.fingerprint))
 

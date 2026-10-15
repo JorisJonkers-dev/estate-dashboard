@@ -5,6 +5,8 @@ export interface ProcessLogs {
   /** The container's name, which is the Process's. */
   process: string
   migration: boolean
+  /** How many of its containers are running. */
+  running: number
   streams: Stream[]
 }
 
@@ -13,14 +15,39 @@ export function isMigration(s: Stream): boolean {
   return /migrat/.test(s.pod) || /migrat/.test(s.container)
 }
 
-/** One release's containers by Process, or unversioned ones when no version is given. */
-export function byProcess(streams: Stream[], version: string | undefined): ProcessLogs[] {
+/** A container that wrote a line in the last ten minutes counts as running. */
+export const quietFor = 10 * 60_000
+
+export function isRunning(s: Stream, now: number): boolean {
+  return s.last !== undefined && now - Date.parse(s.last) <= quietFor
+}
+
+/**
+ * One release's containers. Those labelled with its version, or, while pods carry no version label,
+ * the unlabelled ones that started between the release and the next one.
+ */
+export function ofRelease(streams: Stream[], release: { version: string; at: string }, until?: string): Stream[] {
+  const labelled = streams.filter((s) => s.version === release.version)
+  if (labelled.length > 0) return labelled
+  const from = Date.parse(release.at)
+  const to = until === undefined ? Infinity : Date.parse(until)
+  return streams.filter((s) => {
+    if (s.version !== undefined || s.first === undefined) return false
+    const started = Date.parse(s.first)
+    return started >= from && started < to
+  })
+}
+
+/** Containers grouped by Process, migrations first. Each Process's containers are newest first. */
+export function byProcess(streams: Stream[], now: number): ProcessLogs[] {
   const out = new Map<string, ProcessLogs>()
-  for (const s of streams.filter((s) => s.version === version)) {
-    const p = out.get(s.container) ?? { process: s.container, migration: isMigration(s), streams: [] }
+  for (const s of streams) {
+    const p = out.get(s.container) ?? { process: s.container, migration: isMigration(s), running: 0, streams: [] }
     p.streams.push(s)
+    if (isRunning(s, now)) p.running += 1
     out.set(s.container, p)
   }
+  for (const p of out.values()) p.streams.sort((a, b) => (b.first ?? '').localeCompare(a.first ?? ''))
   return [...out.values()].sort((a, b) => Number(b.migration) - Number(a.migration) || a.process.localeCompare(b.process))
 }
 

@@ -1,18 +1,36 @@
 import { describe, expect, it } from 'vitest'
-import { byProcess, isMigration, readLine } from './logs'
+import { byProcess, isMigration, isRunning, ofRelease, readLine } from './logs'
 
-const s = (pod: string, container: string, version?: string) => ({ pod, container, ...(version ? { version } : {}) })
+const now = Date.parse('2026-10-15T12:00:00Z')
+const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000).toISOString()
+const s = (pod: string, container: string, version?: string, first = 60, last = 1) => ({ pod, container, ...(version ? { version } : {}), first: at(first), last: at(last) })
 
 describe('the containers of a release', () => {
-  it('groups one version by Process, migrations first', () => {
-    const streams = [s('api-1', 'api', '1.0.0'), s('api-2', 'api', '1.0.0'), s('api-migration-up', 'liquibase', '1.0.0'), s('api-0', 'api', '0.9.0'), s('old', 'api')]
-    expect(byProcess(streams, '1.0.0').map((p) => [p.process, p.migration, p.streams.length])).toEqual([
-      ['liquibase', true, 1],
-      ['api', false, 2],
+  it('takes the ones labelled with its version', () => {
+    const streams = [s('api-1', 'api', '1.0.0'), s('api-0', 'api', '0.9.0'), s('old', 'api')]
+    expect(ofRelease(streams, { version: '1.0.0', at: at(500) }).map((x) => x.pod)).toEqual(['api-1'])
+  })
+
+  it('takes unlabelled ones that started between this release and the next, until pods carry a version', () => {
+    const streams = [s('before', 'api', undefined, 300), s('during', 'api', undefined, 150), s('after', 'api', undefined, 50), { pod: 'unknown', container: 'api' }]
+    expect(ofRelease(streams, { version: '1.0.0', at: at(200) }, at(100)).map((x) => x.pod)).toEqual(['during'])
+    expect(ofRelease(streams, { version: '1.1.0', at: at(100) }).map((x) => x.pod)).toEqual(['after'])
+  })
+
+  it('groups by Process, migrations first, and counts only the running ones', () => {
+    const streams = [s('api-1', 'api', '1.0.0', 60, 1), s('api-2', 'api', '1.0.0', 30, 2), s('api-old', 'api', '1.0.0', 90, 45), s('api-migration-up', 'liquibase', '1.0.0', 95, 94)]
+    expect(byProcess(streams, now).map((p) => [p.process, p.migration, p.running, p.streams.map((x) => x.pod)])).toEqual([
+      ['liquibase', true, 0, ['api-migration-up']],
+      ['api', false, 2, ['api-2', 'api-1', 'api-old']],
     ])
-    expect(byProcess(streams, undefined).map((p) => p.streams[0]?.pod)).toEqual(['old'])
     expect(isMigration(s('web', 'web'))).toBe(false)
     expect(isMigration(s('x', 'auth-migrate'))).toBe(true)
+  })
+
+  it('reads a container that wrote nothing in ten minutes as finished', () => {
+    expect(isRunning(s('a', 'a', undefined, 60, 10), now)).toBe(true)
+    expect(isRunning(s('a', 'a', undefined, 60, 11), now)).toBe(false)
+    expect(isRunning({ pod: 'a', container: 'a' }, now)).toBe(false)
   })
 })
 

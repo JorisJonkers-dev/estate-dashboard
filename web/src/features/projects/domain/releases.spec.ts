@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Rollout, Unit } from '../../../infrastructure/api/types.gen'
-import { live, releases } from './releases'
+import { live, serving, releases } from './releases'
 
 const rollout = (id: number, version: string, states: string[]): Rollout => ({
   id,
@@ -20,6 +20,7 @@ describe('the releases of a Project', () => {
       ['0.5.0', 'past', 1],
     ])
     expect(live(views)?.version).toBe('0.6.0')
+    expect(serving(views)?.version).toBe('0.6.0')
   })
 
   it('is rolling until the unit runs it ready, and a failed stage is a failed release', () => {
@@ -29,6 +30,12 @@ describe('the releases of a Project', () => {
     const views = releases([rollout(3, '1.1.0', ['failure']), rollout(2, '1.0.0', ['error'])], unit('1.0.0'))
     expect(views.map((v) => v.state)).toEqual(['failed', 'failed'])
     expect(live(views)).toBeUndefined()
+  })
+
+  it('is served by the last good release while a newer one switches in', () => {
+    const views = releases([rollout(4, '1.2.0', ['in_progress']), rollout(3, '1.1.0', ['failure']), rollout(2, '1.0.0', [])], unit('1.0.0'))
+    expect(serving(views)?.version).toBe('1.0.0')
+    expect(serving(releases([rollout(2, '1.1.0', ['in_progress'])], unit('1.0.0')))).toBeUndefined()
   })
 
   it('keeps the run where there is one', () => {

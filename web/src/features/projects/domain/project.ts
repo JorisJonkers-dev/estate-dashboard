@@ -1,4 +1,4 @@
-import type { Issue, Release, Source, Stage, Unit } from '../../../infrastructure/api/types.gen'
+import type { Release, Source, Stage, Unit } from '../../../infrastructure/api/types.gen'
 import type { Tone } from '../../../shared/tone'
 
 /** The estate repository: pins, the deploy log and workflows. */
@@ -64,9 +64,4 @@ export function clusterRows(project: string, sources: Source[], units: Unit[], r
     }
   }
   return rows
-}
-
-/** The open conditions composition keeps for the Project. */
-export function conditionsOf(project: string, issues: Issue[]): Issue[] {
-  return issues.filter((i) => i.project === project)
 }

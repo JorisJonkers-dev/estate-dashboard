@@ -12,26 +12,30 @@ import StateTag from '../../../shared/ui/StateTag.vue'
 import StatusMark from '../../../shared/ui/StatusMark.vue'
 import { age, shortDigest } from '../../overview/domain/overview'
 import { useProject } from '../composables/useProject'
-import { byProcess, type ProcessLogs } from '../domain/logs'
+import { byProcess, isRunning, ofRelease, type ProcessLogs } from '../domain/logs'
 import { estateRepository, links, stageTone } from '../domain/project'
-import { live } from '../domain/releases'
+import { serving } from '../domain/releases'
 import DeclarationPanel from './DeclarationPanel.vue'
 import LogView from './LogView.vue'
 import NotesView from './NotesView.vue'
 
 const route = useRoute()
 const name = computed(() => String(route.params.name))
-const { isLoading, row, repository, pin, unit, cluster, conditions, deploys, releases, streams, rolloutsLoading } = useProject(name)
+const { isLoading, row, repository, pin, unit, cluster, alerts, deploys, releases, streams, rolloutsLoading } = useProject(name)
 const now = useNow()
 
 const legacy = computed(() => row.value?.path === 'legacy')
-const running = computed(() => live(releases.value))
-// The live release's containers, or unlabelled ones until pods carry a version.
-const runningProcesses = computed(() => {
-  const versioned = running.value ? byProcess(streams.value, running.value.version).filter((p) => !p.migration) : []
-  return versioned.length > 0 ? versioned : byProcess(streams.value, undefined).filter((p) => !p.migration)
-})
-const unversioned = computed(() => runningProcesses.value.length > 0 && !runningProcesses.value[0]?.streams[0]?.version)
+const running = computed(() => serving(releases.value))
+// The serving release's containers. Without one, whatever is running.
+const current = computed(() => byProcess(running.value ? ofRelease(streams.value, running.value) : streams.value.filter((s) => isRunning(s, now.value)), now.value))
+const runningProcesses = computed(() => current.value.filter((p) => !p.migration && p.running > 0))
+const finishedRuns = computed(() => current.value.filter((p) => p.migration))
+const unversioned = computed(() => current.value.some((p) => p.streams.some((s) => s.version === undefined)))
+/** A release's containers, up to the release after it. */
+const containersOf = (i: number) => {
+  const r = releases.value[i]
+  return r ? byProcess(ofRelease(streams.value, r, releases.value[i - 1]?.at), now.value) : []
+}
 
 const open = ref<number | null>(null)
 const toggle = (key: number) => (open.value = open.value === key ? null : key)
@@ -47,8 +51,7 @@ const drawerOpen = computed({
   },
 })
 function showLogs(p: ProcessLogs, version?: string) {
-  const pods = `${String(p.streams.length)} pod${p.streams.length === 1 ? '' : 's'}`
-  drawer.value = { kind: 'logs', title: p.process, subtitle: [name.value, version, pods].filter(Boolean).join(' · '), streams: p.streams }
+  drawer.value = { kind: 'logs', title: p.process, subtitle: [name.value, version].filter(Boolean).join(' · '), streams: p.streams }
 }
 function showNotes(version: string) {
   drawer.value = { kind: 'notes', title: `${name.value} ${version}`, subtitle: 'Changelog', version }
@@ -107,16 +110,22 @@ const button =
             Running now
             <span v-if="running" class="flex items-center gap-2 text-base font-normal text-text-muted"><StatusMark state="live" />{{ running.version }}</span>
           </h2>
-          <p v-if="runningProcesses.length === 0" class="m-0 text-text-muted">No container of {{ name }} logged anything this week.</p>
+          <p v-if="runningProcesses.length === 0 && finishedRuns.length === 0" class="m-0 text-text-muted">No container of {{ name }} is running.</p>
           <ul v-else class="m-0 list-none border-t border-line p-0">
             <li v-for="p in runningProcesses" :key="p.process" class="flex items-center gap-3 border-b border-line-soft py-2.5">
-              <span class="size-2 rounded-full bg-accent" aria-hidden="true" />
+              <StatusMark state="live" />
               <span class="font-medium">{{ p.process }}</span>
-              <span class="text-sm text-text-muted">{{ p.streams.length }} pod{{ p.streams.length === 1 ? '' : 's' }}</span>
+              <span class="text-sm text-text-muted">{{ p.running }} running</span>
+              <button type="button" :class="[button, 'ml-auto']" @click="showLogs(p, running?.version)">Logs</button>
+            </li>
+            <li v-for="p in finishedRuns" :key="p.process" class="flex items-center gap-3 border-b border-line-soft py-2.5">
+              <StatusMark state="past" />
+              <span class="font-medium">{{ p.process }}</span>
+              <span v-if="p.streams[0]?.last" class="text-sm text-text-muted">finished {{ age(p.streams[0].last, now) }} ago</span>
               <button type="button" :class="[button, 'ml-auto']" @click="showLogs(p, running?.version)">Logs</button>
             </li>
           </ul>
-          <p v-if="unversioned" class="m-0 mt-2 text-sm text-dim">These pods have no version label yet. Older releases may be mixed in.</p>
+          <p v-if="unversioned" class="m-0 mt-2 text-sm text-dim">These pods have no version label yet, so they are matched to a release by when they started.</p>
         </section>
 
         <section aria-labelledby="releases-h">
@@ -124,7 +133,7 @@ const button =
           <p v-if="rolloutsLoading" class="text-text-muted">Loading…</p>
           <EmptyPlate v-else-if="releases.length === 0" title="No releases yet" mark="quiet">The next release shows up here once composition pins it.</EmptyPlate>
           <ol v-else class="m-0 list-none border-t border-line p-0">
-            <li v-for="r in releases" :key="r.key" class="border-b border-line-soft">
+            <li v-for="(r, i) in releases" :key="r.key" class="border-b border-line-soft">
               <div class="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
                 <StatusMark :state="r.state" />
                 <span class="text-lg font-semibold">{{ r.version }}</span>
@@ -146,9 +155,9 @@ const button =
                 </ol>
                 <div>
                   <p class="m-0 mb-1.5" :class="label">Containers</p>
-                  <p v-if="byProcess(streams, r.version).length === 0" class="m-0 text-sm text-text-muted">No containers with this version.</p>
+                  <p v-if="containersOf(i).length === 0" class="m-0 text-sm text-text-muted">No containers with this version.</p>
                   <ul v-else class="m-0 flex list-none flex-wrap gap-2 p-0">
-                    <li v-for="p in byProcess(streams, r.version)" :key="p.process">
+                    <li v-for="p in containersOf(i)" :key="p.process">
                       <button type="button" :class="button" @click="showLogs(p, r.version)">
                         <span v-if="p.migration" class="mr-1.5 text-xs text-text-muted">migration</span>{{ p.process }}
                       </button>
@@ -181,13 +190,21 @@ const button =
           </ul>
         </section>
 
-        <section aria-labelledby="conditions-h">
-          <h2 id="conditions-h" class="m-0 mb-3 text-xl font-semibold">Open issues</h2>
-          <p v-if="conditions.length === 0" class="text-text-muted">None.</p>
+        <section aria-labelledby="alerts-h">
+          <div class="mb-3 flex items-end justify-between gap-4">
+            <h2 id="alerts-h" class="m-0 text-xl font-semibold">Alerts</h2>
+            <RouterLink to="/alerts" class="text-[15px]">All alerts</RouterLink>
+          </div>
+          <p v-if="alerts.length === 0" class="text-text-muted">All clear.</p>
           <ul v-else class="m-0 list-none border-t border-line p-0">
-            <li v-for="c in conditions" :key="c.number" class="border-b border-line-soft py-3">
-              <a :href="c.url" class="font-medium">{{ c.title }}</a>
-              <span class="ml-2 text-sm text-text-muted">#{{ c.number }}, {{ age(c.updatedAt, now) }} ago</span>
+            <li v-for="a in alerts" :key="a.key" class="flex flex-col gap-0.5 border-b border-line-soft py-3">
+              <span class="flex items-center gap-2 text-[13px]">
+                <span class="size-2 rounded-full" :class="a.silenced ? 'bg-dim' : ['bg-current', toneText[a.tone]]" aria-hidden="true" />
+                <span class="font-semibold" :class="a.silenced ? 'text-dim' : toneText[a.tone]">{{ a.severity }}</span>
+                <span class="text-text-muted">{{ a.class }}<template v-if="a.silenced"> · silenced</template></span>
+                <time class="ml-auto text-text-muted" :datetime="a.since">{{ age(a.since, now) }}</time>
+              </span>
+              <RouterLink :to="{ path: '/alerts', query: { alert: a.key } }" class="font-medium no-underline hover:underline">{{ a.title }}</RouterLink>
             </li>
           </ul>
         </section>

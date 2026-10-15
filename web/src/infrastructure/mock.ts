@@ -179,21 +179,25 @@ const rollouts: Record<string, unknown[]> = {
   ],
 }
 
-const streams: Record<string, { pod: string; container: string; version: string }[]> = {
+// Each container with when it wrote its first and latest line, in minutes ago.
+const stream = (pod: string, container: string, version: string, first: number, last: number) => ({ pod, container, version, first: minutesAgo(first), last: minutesAgo(last) })
+const streams: Record<string, ReturnType<typeof stream>[]> = {
   notes: [
-    { pod: 'notes-migration-up-0-10-0-x7k2p', container: 'liquibase', version: '0.10.0' },
-    { pod: 'notes-migration-down-0-10-0-9qv4m', container: 'liquibase-down', version: '0.10.0' },
-    { pod: 'notes-6c8f7d9b5-q1w2e', container: 'notes', version: '0.10.0' },
-    { pod: 'notes-primary-6d9f7c5b8-2hxlq', container: 'notes', version: '0.9.1' },
-    { pod: 'notes-primary-6d9f7c5b8-8kd3s', container: 'notes', version: '0.9.1' },
+    stream('notes-migration-up-0-10-0-x7k2p', 'liquibase', '0.10.0', 302, 301),
+    stream('notes-migration-down-0-10-0-9qv4m', 'liquibase-down', '0.10.0', 66, 65),
+    stream('notes-6c8f7d9b5-q1w2e', 'notes', '0.10.0', 299, 290),
+    stream('notes-primary-6d9f7c5b8-2hxlq', 'notes', '0.9.1', 60, 0.5),
+    stream('notes-primary-6d9f7c5b8-8kd3s', 'notes', '0.9.1', 58, 1),
   ],
   auth: [
-    { pod: 'auth-migration-up-3-5-0-p8d2c', container: 'liquibase', version: '3.5.0' },
-    { pod: 'auth-api-7f8c9d6b5-kq2lm', container: 'auth-api', version: '3.5.0' },
-    { pod: 'auth-ui-6b5c4d3e2-x9z8y', container: 'auth-ui', version: '3.5.0' },
-    { pod: 'auth-api-primary-5b6d7c8f9-z4w8n', container: 'auth-api', version: '3.4.2' },
-    { pod: 'auth-api-primary-5b6d7c8f9-r5t6u', container: 'auth-api', version: '3.4.2' },
-    { pod: 'auth-ui-primary-7c9d8b6f5-m2p7q', container: 'auth-ui', version: '3.4.2' },
+    stream('auth-migration-up-3-5-0-p8d2c', 'liquibase', '3.5.0', 6, 5),
+    stream('auth-api-7f8c9d6b5-kq2lm', 'auth-api', '3.5.0', 4, 0.2),
+    stream('auth-ui-6b5c4d3e2-x9z8y', 'auth-ui', '3.5.0', 4, 0.3),
+    stream('auth-migration-up-3-4-2-h3j4k', 'liquibase', '3.4.2', 4198, 4197),
+    stream('auth-api-primary-5b6d7c8f9-z4w8n', 'auth-api', '3.4.2', 4190, 0.1),
+    stream('auth-api-primary-5b6d7c8f9-r5t6u', 'auth-api', '3.4.2', 900, 0.4),
+    stream('auth-api-primary-5b6d7c8f9-old1x', 'auth-api', '3.4.2', 4190, 905),
+    stream('auth-ui-primary-7c9d8b6f5-m2p7q', 'auth-ui', '3.4.2', 4190, 2),
   ],
 }
 

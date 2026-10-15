@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/vue-query'
 import { computed, type Ref } from 'vue'
 import {
   getHandoverOptions,
+  listAlertsOptions,
   listDeploysOptions,
   listIssuesOptions,
   listLogStreamsOptions,
@@ -11,9 +12,10 @@ import {
   listSourcesOptions,
   listUnitsOptions,
 } from '../../../infrastructure/api/@tanstack/vue-query.gen'
+import { inbox } from '../../alerts/domain/inbox'
 import { projectRows } from '../../overview/domain/overview'
 import { window } from '../domain/logs'
-import { clusterRows, conditionsOf } from '../domain/project'
+import { clusterRows } from '../domain/project'
 import { releases as releaseViews } from '../domain/releases'
 
 const live = { refetchInterval: 30_000 }
@@ -26,6 +28,7 @@ export function useProject(name: Ref<string>) {
   const sources = useQuery({ ...listSourcesOptions(), ...live })
   const releases = useQuery({ ...listReleasesOptions(), ...live })
   const issues = useQuery({ ...listIssuesOptions(), ...live })
+  const alerts = useQuery({ ...listAlertsOptions(), ...live })
   const deploys = useQuery(computed(() => ({ ...listDeploysOptions({ path: { project: name.value }, query: { limit: 20 } }), ...live })))
 
   /** The repository the Project publishes from. */
@@ -59,7 +62,7 @@ export function useProject(name: Ref<string>) {
     pin: computed(() => pins.data.value?.items.find((p) => p.project === name.value)),
     unit: unitOf,
     cluster: computed(() => clusterRows(name.value, sources.data.value?.items ?? [], units.data.value?.items ?? [], releases.data.value?.items ?? [])),
-    conditions: computed(() => conditionsOf(name.value, issues.data.value?.items ?? [])),
+    alerts: computed(() => inbox(alerts.data.value?.items ?? [], issues.data.value?.items ?? [], releases.data.value?.items ?? []).filter((i) => i.project === name.value)),
     deploys: computed(() => deploys.data.value?.items ?? []),
     releases: computed(() => releaseViews(rollouts.data.value?.items ?? [], unitOf.value)),
     streams: computed(() => streams.data.value?.items ?? []),

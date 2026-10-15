@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clusterRows, conditionsOf, links, stageTone, stageWord } from './project'
+import { clusterRows, links, stageTone, stageWord } from './project'
 
 const stage = (state: string) => ({ state, description: '', at: '2026-10-15T08:00:00Z' })
 
@@ -70,10 +70,5 @@ describe('what the cluster holds for a Project', () => {
     expect(row).toMatchObject({ word: 'VerificationError', tone: 'crit', detail: 'no signature' })
     const [quiet] = clusterRows('a', [{ name: 'project-a', url: 'oci://r', digest: 'x', ready: false }], [], [])
     expect(quiet).toMatchObject({ word: 'Not ready' })
-  })
-
-  it('keeps only its own conditions', () => {
-    const issue = (project?: string) => ({ number: 1, title: 't', url: 'u', labels: [], updatedAt: '2026-10-15T08:00:00Z', ...(project ? { project } : {}) })
-    expect(conditionsOf('auth', [issue('auth'), issue('data'), issue()])).toHaveLength(1)
   })
 })

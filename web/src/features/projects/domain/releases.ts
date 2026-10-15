@@ -40,3 +40,9 @@ export function releases(rollouts: Rollout[], unit: Unit | undefined): ReleaseVi
 export function live(views: ReleaseView[]): ReleaseView | undefined {
   return views.find((v) => v.state === 'live')
 }
+
+/** The release that serves traffic: the live one, or, while a newer one switches in, the last that did not fail. */
+export function serving(views: ReleaseView[]): ReleaseView | undefined {
+  if (views[0]?.state !== 'rolling') return live(views)
+  return views.slice(1).find((v) => v.state !== 'failed')
+}
