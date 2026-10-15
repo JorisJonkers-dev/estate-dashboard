@@ -90,7 +90,7 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
       v-else
       class="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start lg:gap-12"
     >
-      <ul aria-label="Alerts" class="m-0 list-none border-t border-line p-0">
+      <ul aria-label="Alerts" class="scroll-pane m-0 list-none border-t border-line p-0">
         <li v-for="i in shown" :key="i.key">
           <button
             type="button"
@@ -117,7 +117,11 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
         </li>
       </ul>
 
-      <section v-if="picked" aria-labelledby="detail-h" class="flex flex-col gap-4 lg:border-l lg:border-line lg:pl-8">
+      <section
+        v-if="picked"
+        aria-labelledby="detail-h"
+        class="scroll-pane flex flex-col gap-4 lg:border-l lg:border-line lg:pl-8"
+      >
         <p class="m-0 text-xs font-semibold tracking-[0.12em] uppercase" :class="toneText[picked.tone]">
           {{ picked.severity }} · {{ picked.class }}
         </p>

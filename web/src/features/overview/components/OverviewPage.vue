@@ -58,7 +58,7 @@ const isExternal = (href: string) => href.startsWith('https://')
           <RouterLink to="/alerts" class="text-[15px]">All alerts</RouterLink>
         </div>
         <EmptyPlate v-if="needs.length === 0" title="All clear">Nothing is firing or stuck.</EmptyPlate>
-        <ul v-else class="m-0 list-none border-t border-line p-0">
+        <ul v-else class="scroll-pane m-0 list-none border-t border-line p-0">
           <li
             v-for="(n, i) in needs"
             :key="n.key"

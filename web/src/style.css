@@ -59,6 +59,17 @@
  */
 
 /* Items fade in, staggered by `--i`. Off for reduced motion. */
+/* A list beside another column scrolls on its own on a wide screen; the page stays put. */
+@utility scroll-pane {
+  @media (width >= 64rem) {
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100dvh - 3rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 @utility rise {
   animation: rise 420ms var(--ease-out-quint) both;
   animation-delay: calc(var(--i, 0) * 30ms);
