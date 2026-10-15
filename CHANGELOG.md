@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.1.0...v0.2.0) (2026-10-15)
+
+
+### Features
+
+* publish the image and the fragment, and run without Alertmanager ([#27](https://github.com/JorisJonkers-dev/estate-dashboard/issues/27)) ([9b3147c](https://github.com/JorisJonkers-dev/estate-dashboard/commit/9b3147c0051197783376a219289b2f7ef1b01b30))
+
+
+### Bug Fixes
+
+* read the gate's inputs and records from the Release Gate, and hold no ConfigMap access ([#24](https://github.com/JorisJonkers-dev/estate-dashboard/issues/24)) ([110353d](https://github.com/JorisJonkers-dev/estate-dashboard/commit/110353d1e396f4b711a080d7c0708bd4b36405a7))
+
 ## 0.1.0 (2026-10-07)
 
 
