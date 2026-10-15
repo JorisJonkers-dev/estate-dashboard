@@ -182,18 +182,21 @@ const rollouts: Record<string, unknown[]> = {
   ],
 }
 
-const streams: Record<string, { pod: string; container: string }[]> = {
+const streams: Record<string, { pod: string; container: string; version: string }[]> = {
   notes: [
-    { pod: 'notes-migration-up-0-10-0-x7k2p', container: 'liquibase' },
-    { pod: 'notes-migration-down-0-10-0-9qv4m', container: 'liquibase' },
-    { pod: 'notes-primary-6d9f7c5b8-2hxlq', container: 'notes' },
-    { pod: 'notes-primary-6d9f7c5b8-2hxlq', container: 'vault-agent' },
+    { pod: 'notes-migration-up-0-10-0-x7k2p', container: 'liquibase', version: '0.10.0' },
+    { pod: 'notes-migration-down-0-10-0-9qv4m', container: 'liquibase-down', version: '0.10.0' },
+    { pod: 'notes-6c8f7d9b5-q1w2e', container: 'notes', version: '0.10.0' },
+    { pod: 'notes-primary-6d9f7c5b8-2hxlq', container: 'notes', version: '0.9.1' },
+    { pod: 'notes-primary-6d9f7c5b8-8kd3s', container: 'notes', version: '0.9.1' },
   ],
   auth: [
-    { pod: 'auth-migration-up-3-5-0-p8d2c', container: 'liquibase' },
-    { pod: 'auth-api-7f8c9d6b5-kq2lm', container: 'auth-api' },
-    { pod: 'auth-api-primary-5b6d7c8f9-z4w8n', container: 'auth-api' },
-    { pod: 'auth-ui-primary-7c9d8b6f5-m2p7q', container: 'auth-ui' },
+    { pod: 'auth-migration-up-3-5-0-p8d2c', container: 'liquibase', version: '3.5.0' },
+    { pod: 'auth-api-7f8c9d6b5-kq2lm', container: 'auth-api', version: '3.5.0' },
+    { pod: 'auth-ui-6b5c4d3e2-x9z8y', container: 'auth-ui', version: '3.5.0' },
+    { pod: 'auth-api-primary-5b6d7c8f9-z4w8n', container: 'auth-api', version: '3.4.2' },
+    { pod: 'auth-api-primary-5b6d7c8f9-r5t6u', container: 'auth-api', version: '3.4.2' },
+    { pod: 'auth-ui-primary-7c9d8b6f5-m2p7q', container: 'auth-ui', version: '3.4.2' },
   ],
 }
 
@@ -205,7 +208,7 @@ const logLines: Record<string, [number, string][]> = {
     [301, 'Migration failed for changeset db/changelog/0010-pages.yaml::0010-1::joris'],
     [301, 'Liquibase update failed: 1 changeset did not apply'],
   ],
-  'notes-migration-down-0-10-0-9qv4m/liquibase': [
+  'notes-migration-down-0-10-0-9qv4m/liquibase-down': [
     [66, 'Rolling back to tag 0.9.1'],
     [66, 'Rolling back changeset db/changelog/0009-tags.yaml::0009-2::joris: nothing to undo'],
     [65, 'Rollback complete: database is at 0.9.1'],
@@ -221,6 +224,53 @@ function lines(pod: string, container: string) {
   }))
 }
 
+
+const runs = {
+  items: [
+    { id: 38707081285, at: minutesAgo(5), trigger: 'auth 3.5.0 published', outcome: 'isolated', lock: '9c41e07b2a1d', toolkit: '0.14.0', snapshotAt: minutesAgo(125), moved: ['auth'], url: run(38707081285),
+      fragments: [
+        { project: 'auth', version: '3.5.0', outcome: 'moved', published: minutesAgo(6) },
+        { project: 'knowledge', version: '1.13.1', outcome: 'isolated', reason: 'E_DUPLICATE_HOST: knowledge.jorisjonkers.dev is also declared by app', published: minutesAgo(2880) },
+        { project: 'notes', version: '0.9.1', outcome: 'held', reason: 'paused after a rollback', published: minutesAgo(62) },
+        { project: 'delivery', version: '0.6.0', outcome: 'unchanged', published: minutesAgo(820) },
+        { project: 'estate-dashboard', version: '0.2.0', outcome: 'unchanged', published: minutesAgo(120) },
+        { project: 'grimoire', version: '0.21.0', outcome: 'stale', reason: 'no fragment for 9 days', published: minutesAgo(12960) },
+      ] },
+    { id: 38706000001, at: minutesAgo(62), trigger: 'rollback of notes to 0.9.1', outcome: 'isolated', lock: '4b7d0e1f93c2', toolkit: '0.14.0', snapshotAt: minutesAgo(180), moved: ['notes'], url: run(38706000001),
+      fragments: [{ project: 'notes', version: '0.9.1', outcome: 'moved', published: minutesAgo(400) }] },
+    { id: 38700000002, at: minutesAgo(420), trigger: 'nightly', outcome: 'composed', lock: 'e2a85c4d10f7', toolkit: '0.14.0', snapshotAt: minutesAgo(500), moved: [], url: run(38700000002),
+      fragments: [{ project: 'delivery', version: '0.6.0', outcome: 'unchanged', published: minutesAgo(820) }] },
+  ],
+}
+
+const declarations: Record<string, unknown> = {
+  auth: {
+    version: '3.4.2',
+    applications: [{ id: 'auth', processes: [{ name: 'auth-api', switchover: 'blue-green', replicas: 2 }, { name: 'auth-ui', switchover: 'blue-green', replicas: 1 }],
+      migration: { runner: 'liquibase', identity: 'auth-migration', provenAgainst: '3.4.2', undo: 'allowed' } }],
+    grants: [
+      { process: 'auth-api', path: 'secret/data/platform/postgres/auth', access: 'read' },
+      { process: 'auth-api', path: 'secret/data/auth-api', access: 'read' },
+      { process: 'auth-api', path: 'transit/sign/auth-api-jwt', access: 'sign' },
+    ],
+    rollback: ['Back up auth_db on platform-postgres, kept 7 days', 'Wait for that backup to succeed, or stop', 'Compose auth at 3.4.2, then pause it'],
+  },
+  notes: {
+    version: '0.9.1',
+    applications: [{ id: 'notes', processes: [{ name: 'notes', switchover: 'interrupted', replicas: 1 }],
+      migration: { runner: 'liquibase', identity: 'notes-migration', provenAgainst: '0.9.1', undo: 'blocked', reason: '0.10.0 has a non-transactional changeset' } }],
+    grants: [{ process: 'notes', path: 'secret/data/platform/outline', access: 'read' }],
+    rollback: ['Back up notes_db, kept 7 days', 'Compose notes at 0.9.1, then pause it'],
+  },
+}
+
+const notes = (version: string) => ({
+  version,
+  body: `## [${version}](https://github.com/JorisJonkers-dev/x/compare/v0...v${version}) (2026-10-15)\n\n### Features\n\n* **api:** sign tokens with the transit key ([#97](https://github.com/JorisJonkers-dev/x/issues/97))\n* show each client's last sign-in\n\n### Bug Fixes\n\n* keep the session when the cookie domain changes`,
+  url: 'https://github.com/JorisJonkers-dev/x/releases',
+  publishedAt: minutesAgo(30),
+})
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
@@ -234,6 +284,13 @@ export function mockFetch(input: RequestInfo | URL, init?: RequestInit): Promise
     const project = deploys[1] ?? ''
     const history = (rollouts[project] ?? []) as { version: string; at: string; commit: string }[]
     return Promise.resolve(json({ items: history.map((r) => ({ commit: r.commit, at: r.at, message: `chore(deploy): ${project} ${r.version}` })) }))
+  }
+  if (pathname === '/api/v1/estate/composition/runs') return Promise.resolve(json(runs))
+  if (pathname === '/api/v1/estate/releases/notes') return Promise.resolve(json(notes(new URL(request.url).searchParams.get('version') ?? '')))
+  const declared = /^\/api\/v1\/estate\/projects\/([^/]+)\/declaration$/.exec(pathname)
+  if (declared) {
+    const d = declarations[declared[1] ?? '']
+    return Promise.resolve(d ? json(d) : json({ type: 'about:blank', title: 'Service Unavailable', status: 503, detail: 'Declarations are not read yet.' }, 503))
   }
   const logStreams = /^\/api\/v1\/projects\/([^/]+)\/logs\/streams$/.exec(pathname)
   if (logStreams) return Promise.resolve(json({ items: streams[logStreams[1] ?? ''] ?? [] }))
