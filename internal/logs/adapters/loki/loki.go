@@ -1,6 +1,7 @@
-// Package loki implements the logs context's Store on Loki's HTTP API: the series API for which
-// containers wrote logs, and query_range for what they wrote. Streams are found by the namespace,
-// pod and container labels Alloy puts on every pod's logs.
+// Package loki implements the logs context's Store on Loki's HTTP API: query_range, as a count of
+// lines for which containers wrote logs and as lines for what they wrote. Streams are found by the
+// namespace, pod and container labels Alloy puts on every pod's logs, and the version label where
+// a pod carries one.
 package loki
 
 import (
@@ -26,6 +27,10 @@ const maxBody = 16 << 20
 
 // spans is how many containers' first and latest lines are read at once.
 const spans = 8
+
+// maxSteps bounds the points in the count of lines that finds the containers: a week is steps of
+// about ten minutes.
+const maxSteps = 1000
 
 // Loki reads one Loki.
 type Loki struct {
@@ -83,38 +88,19 @@ func selector(labels ...[2]string) string {
 func nanos(t time.Time) string { return strconv.FormatInt(t.UnixNano(), 10) }
 
 // Streams implements domain.Store: one Stream per pod and container, by pod then container.
+//
+// One count of lines per container over the whole window finds every container and the step in
+// which it wrote its first and its latest line. A one-line read inside each of those two steps then
+// says exactly when. Reading a week of one pod's lines from the start is what made the first
+// version of this slow; a step is minutes, not days.
 func (l *Loki) Streams(ctx context.Context, namespace string, since time.Time) ([]domain.Stream, error) {
-	var reply struct {
-		Data []map[string]string `json:"data"`
+	end := l.now()
+	step := max(time.Minute, end.Sub(since)/maxSteps).Truncate(time.Second)
+	streams, err := l.counted(ctx, namespace, since, end, step)
+	if err != nil {
+		return nil, err
 	}
-	query := url.Values{"match[]": {selector([2]string{"namespace", namespace})}, "start": {nanos(since)}, "end": {nanos(l.now())}}
-	if err := l.get(ctx, "/loki/api/v1/series", query, &reply); err != nil {
-		return nil, fmt.Errorf("loki: read the streams of %s: %w", namespace, err)
-	}
-	seen := map[domain.Stream]bool{}
-	streams := []domain.Stream{}
-	for _, labels := range reply.Data {
-		s := domain.Stream{Pod: labels["pod"], Container: labels["container"], Version: labels["version"]}
-		if s.Pod == "" || s.Container == "" || seen[s] {
-			continue
-		}
-		seen[s] = true
-		streams = append(streams, s)
-	}
-	// Two reads per container add up over a week of pods, so a few run at once.
-	group, ctx := errgroup.WithContext(ctx)
-	group.SetLimit(spans)
-	for i := range streams {
-		group.Go(func() error {
-			first, last, err := l.span(ctx, namespace, streams[i], since)
-			if err != nil {
-				return fmt.Errorf("loki: read when %s/%s wrote: %w", streams[i].Pod, streams[i].Container, err)
-			}
-			streams[i].First, streams[i].Last = first, last
-			return nil
-		})
-	}
-	if err := group.Wait(); err != nil {
+	if err := l.refine(ctx, namespace, streams, step); err != nil {
 		return nil, err
 	}
 	slices.SortFunc(streams, func(a, b domain.Stream) int {
@@ -126,41 +112,109 @@ func (l *Loki) Streams(ctx context.Context, namespace string, since time.Time) (
 	return streams, nil
 }
 
-// span is when one container wrote its first and its latest line since then: one line read
-// forward and one backward.
-func (l *Loki) span(ctx context.Context, namespace string, s domain.Stream, since time.Time) (first, last time.Time, err error) {
-	one := func(direction string) (time.Time, error) {
-		var reply struct {
-			Data struct {
-				Result []struct {
-					Values [][2]string `json:"values"`
-				} `json:"result"`
-			} `json:"data"`
+// counted is every container that wrote a line between since and end, with First and Last the
+// ends of the steps in which it wrote its first and its latest.
+func (l *Loki) counted(ctx context.Context, namespace string, since, end time.Time, step time.Duration) ([]domain.Stream, error) {
+	var reply struct {
+		Data struct {
+			Result []struct {
+				Metric map[string]string `json:"metric"`
+				Values [][2]any          `json:"values"`
+			} `json:"result"`
+		} `json:"data"`
+	}
+	query := url.Values{
+		"query": {fmt.Sprintf("sum by (pod, container, version) (count_over_time(%s[%ds]))", selector([2]string{"namespace", namespace}), int(step.Seconds()))},
+		"start": {nanos(since)},
+		"end":   {nanos(end)},
+		"step":  {strconv.Itoa(int(step.Seconds()))},
+	}
+	if err := l.get(ctx, "/loki/api/v1/query_range", query, &reply); err != nil {
+		return nil, fmt.Errorf("loki: read the streams of %s: %w", namespace, err)
+	}
+	streams := []domain.Stream{}
+	for _, r := range reply.Data.Result {
+		s := domain.Stream{Pod: r.Metric["pod"], Container: r.Metric["container"], Version: r.Metric["version"]}
+		first, okFirst := stepAt(r.Values, 0)
+		last, okLast := stepAt(r.Values, len(r.Values)-1)
+		if s.Pod == "" || s.Container == "" || !okFirst || !okLast {
+			continue
 		}
-		query := url.Values{
-			"query":     {selector([2]string{"namespace", namespace}, [2]string{"pod", s.Pod}, [2]string{"container", s.Container})},
-			"start":     {nanos(since)},
-			"end":       {nanos(l.now())},
-			"limit":     {"1"},
-			"direction": {direction},
-		}
-		if err := l.get(ctx, "/loki/api/v1/query_range", query, &reply); err != nil {
-			return time.Time{}, err
-		}
-		for _, r := range reply.Data.Result {
-			for _, v := range r.Values {
-				if ns, err := strconv.ParseInt(v[0], 10, 64); err == nil {
-					return time.Unix(0, ns).UTC(), nil
-				}
+		// A point at t counts the lines in the step that ends at t.
+		s.First, s.Last = first, last
+		streams = append(streams, s)
+	}
+	return streams, nil
+}
+
+// refine reads one line inside each container's first and last step, so First and Last are when
+// it wrote rather than the step's end. A step it wrote nothing in keeps the step's end.
+func (l *Loki) refine(ctx context.Context, namespace string, streams []domain.Stream, step time.Duration) error {
+	group, ctx := errgroup.WithContext(ctx)
+	group.SetLimit(spans)
+	for i := range streams {
+		group.Go(func() error {
+			s := &streams[i]
+			first, err := l.oneLine(ctx, namespace, *s, s.First.Add(-step), s.First, "forward")
+			if err != nil {
+				return fmt.Errorf("loki: read when %s/%s first wrote: %w", s.Pod, s.Container, err)
+			}
+			last, err := l.oneLine(ctx, namespace, *s, s.Last.Add(-step), s.Last, "backward")
+			if err != nil {
+				return fmt.Errorf("loki: read when %s/%s last wrote: %w", s.Pod, s.Container, err)
+			}
+			if !first.IsZero() {
+				s.First = first
+			}
+			if !last.IsZero() {
+				s.Last = last
+			}
+			return nil
+		})
+	}
+	return group.Wait()
+}
+
+// stepAt is the time of the i-th point of a metric series, which Loki writes as seconds.
+func stepAt(values [][2]any, i int) (time.Time, bool) {
+	if i < 0 || i >= len(values) {
+		return time.Time{}, false
+	}
+	seconds, ok := values[i][0].(float64)
+	if !ok {
+		return time.Time{}, false
+	}
+	return time.Unix(0, int64(seconds*float64(time.Second))).UTC(), true
+}
+
+// oneLine is when the container wrote its first line between from and to, reading forward, or its
+// latest, reading backward; zero when it wrote none there.
+func (l *Loki) oneLine(ctx context.Context, namespace string, s domain.Stream, from, to time.Time, direction string) (time.Time, error) {
+	var reply struct {
+		Data struct {
+			Result []struct {
+				Values [][2]string `json:"values"`
+			} `json:"result"`
+		} `json:"data"`
+	}
+	query := url.Values{
+		"query":     {selector([2]string{"namespace", namespace}, [2]string{"pod", s.Pod}, [2]string{"container", s.Container})},
+		"start":     {nanos(from)},
+		"end":       {nanos(to)},
+		"limit":     {"1"},
+		"direction": {direction},
+	}
+	if err := l.get(ctx, "/loki/api/v1/query_range", query, &reply); err != nil {
+		return time.Time{}, err
+	}
+	for _, r := range reply.Data.Result {
+		for _, v := range r.Values {
+			if ns, err := strconv.ParseInt(v[0], 10, 64); err == nil {
+				return time.Unix(0, ns).UTC(), nil
 			}
 		}
-		return time.Time{}, nil
 	}
-	if first, err = one("forward"); err != nil {
-		return first, last, err
-	}
-	last, err = one("backward")
-	return first, last, err
+	return time.Time{}, nil
 }
 
 // Lines implements domain.Store: the newest limit lines since then, returned oldest first.
