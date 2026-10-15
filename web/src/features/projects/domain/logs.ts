@@ -33,9 +33,15 @@ export interface ReadLine {
 
 const quiet = new Set(['time', 'ts', 'timestamp', 'level', 'lvl', 'msg', 'message'])
 
-/** Reads one line: a JSON object's level, message and fields, or the text as it is. */
+/** A plain line's level, where it starts with one: `ERROR: ...`, `WARN ...`. */
+const plainLevel = /^(error|warn|warning|info|debug)\b/i
+
+/** Reads one line: a JSON object's level, message and fields, or the text with any level it starts with. */
 export function readLine(text: string): ReadLine {
-  if (!text.startsWith('{')) return { message: text, fields: [] }
+  if (!text.startsWith('{')) {
+    const level = plainLevel.exec(text)?.[1]
+    return { ...(level ? { level: level.toLowerCase() } : {}), message: text, fields: [] }
+  }
   let parsed: unknown
   try {
     parsed = JSON.parse(text)

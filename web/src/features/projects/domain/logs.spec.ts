@@ -31,6 +31,11 @@ describe('a log line', () => {
     expect(readLine('{"a":{"b":1}}')).toEqual({ message: '', fields: [['a', '{"b":1}']] })
   })
 
+  it('takes the level a plain line starts with', () => {
+    expect(readLine('ERROR: relation "pages" already exists')).toEqual({ level: 'error', message: 'ERROR: relation "pages" already exists', fields: [] })
+    expect(readLine('Warning low disk').level).toBe('warning')
+  })
+
   it('leaves anything else as it is', () => {
     for (const text of ['plain text', '{not json', '{}x', '[1]']) expect(readLine(text).message).toBe(text)
     expect(readLine('null')).toEqual({ message: 'null', fields: [] })
