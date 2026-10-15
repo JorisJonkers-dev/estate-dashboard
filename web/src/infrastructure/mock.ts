@@ -182,6 +182,45 @@ const rollouts: Record<string, unknown[]> = {
   ],
 }
 
+const streams: Record<string, { pod: string; container: string }[]> = {
+  notes: [
+    { pod: 'notes-migration-up-0-10-0-x7k2p', container: 'liquibase' },
+    { pod: 'notes-migration-down-0-10-0-9qv4m', container: 'liquibase' },
+    { pod: 'notes-primary-6d9f7c5b8-2hxlq', container: 'notes' },
+    { pod: 'notes-primary-6d9f7c5b8-2hxlq', container: 'vault-agent' },
+  ],
+  auth: [
+    { pod: 'auth-migration-up-3-5-0-p8d2c', container: 'liquibase' },
+    { pod: 'auth-api-7f8c9d6b5-kq2lm', container: 'auth-api' },
+    { pod: 'auth-api-primary-5b6d7c8f9-z4w8n', container: 'auth-api' },
+    { pod: 'auth-ui-primary-7c9d8b6f5-m2p7q', container: 'auth-ui' },
+  ],
+}
+
+const logLines: Record<string, [number, string][]> = {
+  'notes-migration-up-0-10-0-x7k2p/liquibase': [
+    [302, 'Liquibase 4.29.2 by Liquibase'],
+    [302, 'Running Changeset: db/changelog/0010-pages.yaml::0010-1::joris'],
+    [301, 'ERROR: relation "pages" already exists'],
+    [301, 'Migration failed for changeset db/changelog/0010-pages.yaml::0010-1::joris'],
+    [301, 'Liquibase update failed: 1 changeset did not apply'],
+  ],
+  'notes-migration-down-0-10-0-9qv4m/liquibase': [
+    [66, 'Rolling back to tag 0.9.1'],
+    [66, 'Rolling back changeset db/changelog/0009-tags.yaml::0009-2::joris: nothing to undo'],
+    [65, 'Rollback complete: database is at 0.9.1'],
+  ],
+}
+
+function lines(pod: string, container: string) {
+  const known = logLines[`${pod}/${container}`]
+  if (known) return known.map(([m, text]) => ({ at: minutesAgo(m), text }))
+  return Array.from({ length: 40 }, (_, i) => ({
+    at: minutesAgo(40 - i),
+    text: `{"time":"${minutesAgo(40 - i)}","level":"INFO","msg":"served","path":"/api/health","status":200,"ms":${String(3 + (i % 7))}}`,
+  }))
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
@@ -195,6 +234,12 @@ export function mockFetch(input: RequestInfo | URL, init?: RequestInit): Promise
     const project = deploys[1] ?? ''
     const history = (rollouts[project] ?? []) as { version: string; at: string; commit: string }[]
     return Promise.resolve(json({ items: history.map((r) => ({ commit: r.commit, at: r.at, message: `chore(deploy): ${project} ${r.version}` })) }))
+  }
+  const logStreams = /^\/api\/v1\/projects\/([^/]+)\/logs\/streams$/.exec(pathname)
+  if (logStreams) return Promise.resolve(json({ items: streams[logStreams[1] ?? ''] ?? [] }))
+  if (/^\/api\/v1\/projects\/[^/]+\/logs$/.test(pathname)) {
+    const query = new URL(request.url).searchParams
+    return Promise.resolve(json({ items: lines(query.get('pod') ?? '', query.get('container') ?? '') }))
   }
   const ofProject = /^\/api\/v1\/estate\/projects\/([^/]+)\/rollouts$/.exec(pathname)
   if (ofProject) return Promise.resolve(json({ items: rollouts[ofProject[1] ?? ''] ?? [] }))
