@@ -71,6 +71,9 @@ func (l *Loki) get(ctx context.Context, path string, query url.Values, into any)
 }
 
 // selector is the LogQL stream selector for the labels; each value is quoted so none can escape.
+// quiet drops what the collector writes into a stream once its container is gone.
+const quiet = ` != "unable to retrieve container logs for"`
+
 func selector(labels ...[2]string) string {
 	parts := make([]string, 0, len(labels))
 	for _, l := range labels {
@@ -115,7 +118,7 @@ func (l *Loki) counted(ctx context.Context, namespace string, since, end time.Ti
 		} `json:"data"`
 	}
 	query := url.Values{
-		"query": {fmt.Sprintf("sum by (pod, container, version) (count_over_time(%s[%ds]))", selector([2]string{"namespace", namespace}), int(step.Seconds()))},
+		"query": {fmt.Sprintf("sum by (pod, container, version) (count_over_time(%s%s[%ds]))", selector([2]string{"namespace", namespace}), quiet, int(step.Seconds()))},
 		"start": {nanos(since)},
 		"end":   {nanos(end)},
 		"step":  {strconv.Itoa(int(step.Seconds()))},
@@ -186,7 +189,7 @@ func (l *Loki) oneLine(ctx context.Context, namespace string, s domain.Stream, f
 		} `json:"data"`
 	}
 	query := url.Values{
-		"query":     {selector([2]string{"namespace", namespace}, [2]string{"pod", s.Pod}, [2]string{"container", s.Container})},
+		"query":     {selector([2]string{"namespace", namespace}, [2]string{"pod", s.Pod}, [2]string{"container", s.Container}) + quiet},
 		"start":     {nanos(from)},
 		"end":       {nanos(to)},
 		"limit":     {"1"},
@@ -215,7 +218,7 @@ func (l *Loki) Lines(ctx context.Context, namespace string, s domain.Stream, sin
 		} `json:"data"`
 	}
 	query := url.Values{
-		"query":     {selector([2]string{"namespace", namespace}, [2]string{"pod", s.Pod}, [2]string{"container", s.Container})},
+		"query":     {selector([2]string{"namespace", namespace}, [2]string{"pod", s.Pod}, [2]string{"container", s.Container}) + quiet},
 		"start":     {nanos(since)},
 		"end":       {nanos(l.now())},
 		"limit":     {strconv.Itoa(limit)},

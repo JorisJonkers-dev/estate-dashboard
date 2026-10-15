@@ -5,10 +5,11 @@ import { listLogLinesOptions } from '../../../infrastructure/api/@tanstack/vue-q
 import type { Stream } from '../../../infrastructure/api/types.gen'
 import { useNow } from '../../../infrastructure/useNow'
 import { describeError } from '../../alerts/composables/useAlertHistory'
-import { isRunning, readLine, window } from '../domain/logs'
+import { hoursOf, isRunning, podName, readLine } from '../domain/logs'
 
 /** One Process's log lines, one pod at a time. */
 const props = defineProps<{ project: string; streams: Stream[] }>()
+const now = useNow()
 const pod = ref(props.streams[0]?.pod ?? '')
 const stream = computed(() => props.streams.find((s) => s.pod === pod.value) ?? props.streams[0])
 
@@ -16,7 +17,12 @@ const lines = useQuery(
   computed(() => ({
     ...listLogLinesOptions({
       path: { project: props.project },
-      query: { pod: stream.value?.pod ?? '', container: stream.value?.container ?? '', hours: window, limit: 1000 },
+      query: {
+        pod: stream.value?.pod ?? '',
+        container: stream.value?.container ?? '',
+        hours: stream.value ? hoursOf(stream.value, now.value) : 1,
+        limit: 1000,
+      },
     }),
     enabled: stream.value !== undefined,
     refetchInterval: 10_000,
@@ -25,14 +31,7 @@ const lines = useQuery(
 const read = computed(() => (lines.data.value?.items ?? []).map((l) => ({ at: l.at, ...readLine(l.text) })))
 const failure = computed(() => (lines.error.value ? describeError(lines.error.value) : null))
 
-const now = useNow()
 const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-const started = new Intl.DateTimeFormat(undefined, {
-  day: 'numeric',
-  month: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-})
 const level: Record<string, string> = {
   error: 'text-crit',
   warn: 'text-warn',
@@ -51,7 +50,7 @@ watch(read, async () => {
 
 <template>
   <div class="flex h-full flex-col">
-    <!-- Each pod by when it started; its name is on hover. -->
+    <!-- Each pod by its role or suffix; its full name is on hover. -->
     <div
       v-if="streams.length > 1"
       role="group"
@@ -72,7 +71,7 @@ watch(read, async () => {
           :class="isRunning(s, now) ? 'bg-accent' : 'border border-dim'"
           aria-hidden="true"
         />
-        {{ s.first ? `started ${started.format(new Date(s.first))}` : s.pod }}
+        {{ podName(s, streams) }}
         <span class="sr-only">{{ isRunning(s, now) ? ', running' : ', finished' }}</span>
       </button>
     </div>

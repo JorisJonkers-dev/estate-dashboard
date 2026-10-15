@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { byProcess, isMigration, isRunning, ofRelease, readLine } from './logs'
+import { byProcess, hoursOf, isMigration, isRunning, ofRelease, podName, readLine } from './logs'
 
 const now = Date.parse('2026-10-15T12:00:00Z')
 const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000).toISOString()
@@ -45,6 +45,21 @@ describe('the containers of a release', () => {
     expect(isRunning(s('a', 'a', undefined, 60, 15), now)).toBe(true)
     expect(isRunning(s('a', 'a', undefined, 60, 16), now)).toBe(false)
     expect(isRunning({ pod: 'a', container: 'a' }, now)).toBe(false)
+  })
+})
+
+describe('a pod in the drawer', () => {
+  it('is read from just before it started, at most a week back', () => {
+    expect(hoursOf(s('a', 'a', undefined, 30), now)).toBe(2)
+    expect(hoursOf(s('a', 'a', undefined, 60 * 24 * 30), now)).toBe(168)
+    expect(hoursOf({ pod: 'a', container: 'a' }, now)).toBe(168)
+  })
+
+  it("is named by Flagger's role, or by its suffix", () => {
+    const flagger = [s('web-primary-7c9d8-abcde', 'web'), s('web-5b6c7-fghij', 'web')]
+    expect(flagger.map((x) => podName(x, flagger))).toEqual(['primary', 'canary'])
+    const plain = [s('gate-6b7c8-g5h6i', 'gate'), s('gate-6b7c8-j7k8l', 'gate')]
+    expect(plain.map((x) => podName(x, plain))).toEqual(['g5h6i', 'j7k8l'])
   })
 })
 

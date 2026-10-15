@@ -42,6 +42,18 @@ export function byProcess(streams: Stream[], now: number): ProcessLogs[] {
   )
 }
 
+/** Hours back to read a container: from just before it started, at most the window. */
+export function hoursOf(s: Stream, now: number): number {
+  if (s.first === undefined) return window
+  return Math.min(window, Math.max(1, Math.ceil((now - Date.parse(s.first)) / 3_600_000) + 1))
+}
+
+/** A pod's name in a list of its Process's pods: Flagger's role, or the pod's own suffix. */
+export function podName(s: Stream, all: Stream[]): string {
+  if (all.some((o) => o.pod.includes('-primary-'))) return s.pod.includes('-primary-') ? 'primary' : 'canary'
+  return s.pod.slice(s.pod.lastIndexOf('-') + 1)
+}
+
 /** A log line: JSON lines split into level, message and fields. */
 export interface ReadLine {
   level?: string

@@ -96,7 +96,7 @@ func TestStreamsAreEachPodAndContainerWithWhenTheyWrote(t *testing.T) {
 		t.Fatalf("streams = %+v, %v", got, err)
 	}
 	q, _ := url.ParseQuery(asked[0])
-	if q.Get("query") != `sum by (pod, container, version) (count_over_time({namespace="auth-system"}[60s]))` || q.Get("step") != "60" || q.Get("start") != "1792062000000000000" {
+	if q.Get("query") != `sum by (pod, container, version) (count_over_time({namespace="auth-system"} != "unable to retrieve container logs for"[60s]))` || q.Get("step") != "60" || q.Get("start") != "1792062000000000000" {
 		t.Fatalf("asked %v", asked[0])
 	}
 	// Each one-line read stays inside its step.
@@ -156,7 +156,7 @@ func TestLinesAreTheNewestOldestFirst(t *testing.T) {
 	if err != nil || len(got) != 2 || got[0].Text != "second" || got[1].Text != "third" || !got[1].At.Equal(time.Unix(0, 1792065595000000000)) {
 		t.Fatalf("lines = %+v, %v", got, err)
 	}
-	if asked[0] != "/loki/api/v1/query_range?direction=backward&end=1792065600000000000&limit=2&query=%7Bnamespace%3D%22auth-system%22%2Cpod%3D%22auth-api-1%22%2Ccontainer%3D%22auth-api%22%7D&start=1792062000000000000" {
+	if asked[0] != "/loki/api/v1/query_range?direction=backward&end=1792065600000000000&limit=2&query=%7Bnamespace%3D%22auth-system%22%2Cpod%3D%22auth-api-1%22%2Ccontainer%3D%22auth-api%22%7D+%21%3D+%22unable+to+retrieve+container+logs+for%22&start=1792062000000000000" {
 		t.Fatalf("asked %v", asked)
 	}
 }
@@ -168,7 +168,7 @@ func TestAValueCannotEscapeItsMatcher(t *testing.T) {
 		t.Fatal(err)
 	}
 	q, _ := url.ParseQuery(strings.SplitN(asked[0], "?", 2)[1])
-	if got := q.Get("query"); got != `{namespace="a-system",pod="p\",namespace=~\".+",container="c\\"}` {
+	if got := q.Get("query"); got != `{namespace="a-system",pod="p\",namespace=~\".+",container="c\\"} != "unable to retrieve container logs for"` {
 		t.Fatalf("query = %s", got)
 	}
 }
