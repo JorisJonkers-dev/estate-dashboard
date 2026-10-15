@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -55,8 +56,11 @@ func TestNewTakesOnlyAnHTTPURL(t *testing.T) {
 // counted answers the line count with counts and each one-line read with lines[direction].
 func counted(t *testing.T, counts string, lines map[string]string, asked *[]string) *loki.Loki {
 	t.Helper()
+	var mu sync.Mutex
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		*asked = append(*asked, r.URL.RawQuery)
+		mu.Unlock()
 		q := r.URL.Query()
 		if strings.Contains(q.Get("query"), "count_over_time") {
 			_, _ = io.WriteString(w, counts)
