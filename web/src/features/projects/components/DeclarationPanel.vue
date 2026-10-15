@@ -11,8 +11,7 @@ const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase
 </script>
 
 <template>
-  <p v-if="declaration.isError.value" class="m-0 text-sm text-dim">Processes, migration and grants show here once the dashboard reads fragments.</p>
-  <div v-else-if="d" class="flex flex-col gap-10">
+  <div v-if="d" class="flex flex-col gap-10">
     <section v-for="a in d.applications" :key="a.id" :aria-labelledby="`app-${a.id}`">
       <h2 :id="`app-${a.id}`" class="m-0 mb-3 text-xl font-semibold">{{ a.id }}</h2>
       <table class="w-full border-collapse">

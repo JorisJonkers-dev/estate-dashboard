@@ -51,7 +51,7 @@ function showLogs(p: ProcessLogs, version?: string) {
   drawer.value = { kind: 'logs', title: p.process, subtitle: [name.value, version, pods].filter(Boolean).join(' · '), streams: p.streams }
 }
 function showNotes(version: string) {
-  drawer.value = { kind: 'notes', title: `${name.value} ${version}`, subtitle: 'Release notes', version }
+  drawer.value = { kind: 'notes', title: `${name.value} ${version}`, subtitle: 'Changelog', version }
 }
 
 const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
@@ -131,7 +131,7 @@ const button =
                 <span v-if="r.pins > 1" class="rounded-full border border-control px-2 text-xs text-text-muted" :title="`Pinned ${String(r.pins)} times`">×{{ r.pins }}</span>
                 <time class="text-sm text-text-muted" :datetime="r.at" :title="when.format(new Date(r.at))">{{ age(r.at, now) }}</time>
                 <span class="ml-auto flex flex-wrap gap-2">
-                  <button v-if="repository" type="button" :class="button" @click="showNotes(r.version)">Notes</button>
+                  <button v-if="repository" type="button" :class="button" @click="showNotes(r.version)">Changelog</button>
                   <a v-if="r.run" :href="r.run" target="_blank" rel="noopener" :class="button">Run<span class="sr-only"> (opens in a new tab)</span></a>
                   <button type="button" :class="button" :aria-expanded="open === r.key" @click="toggle(r.key)">{{ open === r.key ? 'Hide' : 'Details' }}</button>
                 </span>
