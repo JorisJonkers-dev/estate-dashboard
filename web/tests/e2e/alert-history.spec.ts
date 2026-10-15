@@ -16,11 +16,11 @@ test('the history is read from the migrated database through the real API', asyn
   const answered = page.waitForResponse(
     (response) => response.url().endsWith('/api/v1/alerts/history') && response.status() === 200,
   )
-  await page.goto('/')
+  await page.goto('/alerts/history')
   await answered
   await expect(page.getByRole('heading', { name: 'Alert history' })).toBeVisible()
   // Nothing writes the history until the dashboard reads Alertmanager, so the table is empty.
-  await expect(page.getByText('No alert has been recorded yet.')).toBeVisible()
+  await expect(page.getByText('No alerts yet')).toBeVisible()
   await expectAccessible(page)
   expect(errors).toEqual([])
 })
@@ -28,5 +28,5 @@ test('the history is read from the migrated database through the real API', asyn
 test('a client route is served the app, and an unknown one goes home', async ({ page }) => {
   await page.goto('/no/such/page')
   await expect(page).toHaveURL('/')
-  await expect(page.getByRole('heading', { name: 'Alert history' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
 })

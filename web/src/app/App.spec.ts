@@ -152,7 +152,7 @@ describe('the sign-in page', () => {
     const { wrapper, fetch } = await mountApp(() => json({ items: [] }), '/sign-in', nobody)
     expect(wrapper.find('.shell').exists()).toBe(false)
     expect(wrapper.findAll('main')).toHaveLength(1)
-    expect(wrapper.get('.name').text()).toBe('estate')
+    expect(wrapper.get('main span').text()).toBe('estate')
     expect(wrapper.get('h1').text()).toBe('Sign in')
     expect(wrapper.text()).toContain(
       "The estate's delivery dashboard, for admins. Sign in with your jorisjonkers.dev account.",
@@ -192,7 +192,7 @@ describe('the not-an-admin page', () => {
   it('is the canvas page, and asks the API nothing', async () => {
     const { wrapper, fetch } = await mountApp(() => json({ items: [] }), '/not-an-admin', nobody)
     expect(wrapper.find('.shell').exists()).toBe(false)
-    expect(wrapper.get('main').classes()).toContain('wide')
+    expect(wrapper.get('main').classes()).toContain('max-w-[480px]')
     expect(wrapper.get('h1').text()).toBe('This dashboard is for admins')
     expect(wrapper.text()).toContain(
       "You're signed in, but your account doesn't have the admin role. Ask an admin to grant it in auth, then sign in again.",

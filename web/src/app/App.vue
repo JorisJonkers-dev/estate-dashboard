@@ -24,7 +24,8 @@ const pages = [
 const current = (names: readonly string[]) => (names.includes(String(route.name)) ? 'page' : undefined)
 
 // Only signed-in pages show the shell.
-const signedInPage = computed(() => !route.meta.public)
+// Until the router resolves, route.meta is empty, so wait for a name.
+const signedInPage = computed(() => route.name !== undefined && !route.meta.public)
 const session = useQuery(computed(() => ({ ...getSessionOptions(), enabled: signedInPage.value })))
 const alerts = useQuery(
   computed(() => ({ ...listAlertsOptions(), enabled: signedInPage.value, refetchInterval: 30_000 })),

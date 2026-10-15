@@ -20,6 +20,14 @@ const keepDist: Plugin = {
 export default defineConfig({
   plugins: [vue(), tailwindcss(), keepDist],
   server: { proxy },
+  build: {
+    rollupOptions: {
+      output: {
+        // zod and its jitless switch share a chunk, so the switch runs before any schema is built.
+        manualChunks: (id) => (/node_modules\/zod\/|infrastructure\/jitless\.ts$/.test(id) ? 'zod' : undefined),
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     include: ['src/**/*.spec.ts'],

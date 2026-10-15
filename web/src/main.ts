@@ -1,3 +1,4 @@
+import './infrastructure/jitless'
 import '@fontsource/barlow-semi-condensed/latin-400.css'
 import '@fontsource/barlow-semi-condensed/latin-500.css'
 import '@fontsource/barlow-semi-condensed/latin-600.css'
