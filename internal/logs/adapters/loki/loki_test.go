@@ -5,7 +5,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -83,6 +85,18 @@ func TestLinesAreTheNewestOldestFirst(t *testing.T) {
 	}
 	if asked[0] != "/loki/api/v1/query_range?direction=backward&end=1792065600000000000&limit=2&query=%7Bnamespace%3D%22auth-system%22%2Cpod%3D%22auth-api-1%22%2Ccontainer%3D%22auth-api%22%7D&start=1792062000000000000" {
 		t.Fatalf("asked %v", asked)
+	}
+}
+
+func TestAValueCannotEscapeItsMatcher(t *testing.T) {
+	var asked []string
+	l := serve(t, http.StatusOK, `{"data":{"result":[]}}`, &asked)
+	if _, err := l.Lines(t.Context(), "a-system", domain.Stream{Pod: `p",namespace=~".+`, Container: `c\`}, now, 1); err != nil {
+		t.Fatal(err)
+	}
+	q, _ := url.ParseQuery(strings.SplitN(asked[0], "?", 2)[1])
+	if got := q.Get("query"); got != `{namespace="a-system",pod="p\",namespace=~\".+",container="c\\"}` {
+		t.Fatalf("query = %s", got)
 	}
 }
 

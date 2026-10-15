@@ -64,12 +64,13 @@ func (l *Loki) get(ctx context.Context, path string, query url.Values, into any)
 	return json.Unmarshal(raw, into)
 }
 
-// selector is the LogQL stream selector for the labels given. Every value has already been held
-// to a name's pattern, so none can carry a quote.
+// selector is the LogQL stream selector for the labels given. Each value is quoted as a Go string
+// literal, which LogQL reads the same way, so no value can end the string or add a matcher, even one
+// that reached the adapter unchecked.
 func selector(labels ...[2]string) string {
 	parts := make([]string, 0, len(labels))
 	for _, l := range labels {
-		parts = append(parts, l[0]+`="`+l[1]+`"`)
+		parts = append(parts, l[0]+"="+strconv.Quote(l[1]))
 	}
 	return "{" + strings.Join(parts, ",") + "}"
 }
