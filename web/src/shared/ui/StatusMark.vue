@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** A release's state as a mark. Its word is for screen readers and hover. */
 const { state } = defineProps<{ state: 'live' | 'rolling' | 'failed' | 'past' }>()
-const word = { live: 'Running', rolling: 'Rolling out', failed: 'Failed', past: 'Not running' }
+const word = { live: 'Running', rolling: 'Switching in', failed: 'Failed', past: 'Not running' }
 </script>
 
 <template>

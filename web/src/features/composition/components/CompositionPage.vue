@@ -38,12 +38,12 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
 <template>
   <div class="flex flex-col gap-10">
     <HeadBand eyebrow="Production" title="Composition">
-      Each run builds the estate from the latest releases and updates what changed. A refused one is set aside. The rest still compose.
+      Each composition run reads the published fragments, builds the estate and moves the pins that changed. A refused fragment is set aside. The rest still compose.
     </HeadBand>
 
     <EmptyPlate v-if="failure" title="Runs aren't shown yet" mark="quiet">{{ failure }}</EmptyPlate>
     <p v-else-if="runs.isPending.value" class="m-0 text-text-muted">Loading…</p>
-    <EmptyPlate v-else-if="items.length === 0" title="No runs yet" mark="quiet">The next run shows up here.</EmptyPlate>
+    <EmptyPlate v-else-if="items.length === 0" title="No runs yet" mark="quiet">The next composition run shows up here.</EmptyPlate>
     <div v-else class="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)] lg:items-start lg:gap-12">
       <ul aria-label="Runs" class="m-0 list-none border-t border-line p-0">
         <li v-for="r in items" :key="r.id">

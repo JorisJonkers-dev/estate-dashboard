@@ -130,7 +130,7 @@ describe('the sign-in page', () => {
     expect(wrapper.get('.name').text()).toBe('estate')
     expect(wrapper.get('h1').text()).toBe('Sign in')
     expect(wrapper.text()).toContain("The estate's delivery dashboard, for admins. Sign in with your jorisjonkers.dev account.")
-    expect(wrapper.text()).toContain('You come back here after you sign in. If you use two-factor, auth asks for it there.')
+    expect(wrapper.text()).toContain('You come back here after you sign in. If your account has two-factor, auth asks for it there.')
     expect(wrapper.findAll('.links a').map((a) => [a.text(), a.attributes('href')])).toEqual([
       ['Forgot your password?', 'https://auth.jorisjonkers.dev/forgot-password'],
       ['jorisjonkers.dev', 'https://jorisjonkers.dev'],

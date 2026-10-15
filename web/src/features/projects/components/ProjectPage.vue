@@ -107,7 +107,7 @@ const button =
             Running now
             <span v-if="running" class="flex items-center gap-2 text-base font-normal text-text-muted"><StatusMark state="live" />{{ running.version }}</span>
           </h2>
-          <p v-if="runningProcesses.length === 0" class="m-0 text-text-muted">No logs from {{ name }} this week.</p>
+          <p v-if="runningProcesses.length === 0" class="m-0 text-text-muted">No container of {{ name }} logged anything this week.</p>
           <ul v-else class="m-0 list-none border-t border-line p-0">
             <li v-for="p in runningProcesses" :key="p.process" class="flex items-center gap-3 border-b border-line-soft py-2.5">
               <span class="size-2 rounded-full bg-accent" aria-hidden="true" />
@@ -146,7 +146,7 @@ const button =
                 </ol>
                 <div>
                   <p class="m-0 mb-1.5" :class="label">Containers</p>
-                  <p v-if="byProcess(streams, r.version).length === 0" class="m-0 text-sm text-text-muted">None with this version.</p>
+                  <p v-if="byProcess(streams, r.version).length === 0" class="m-0 text-sm text-text-muted">No containers with this version.</p>
                   <ul v-else class="m-0 flex list-none flex-wrap gap-2 p-0">
                     <li v-for="p in byProcess(streams, r.version)" :key="p.process">
                       <button type="button" :class="button" @click="showLogs(p, r.version)">
