@@ -127,8 +127,13 @@ func TestAWeekIsCountedInStepsOfMinutes(t *testing.T) {
 	if _, err := l.Streams(t.Context(), "a-system", now.Add(-7*24*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if q, _ := url.ParseQuery(asked[0]); q.Get("step") != "604" {
+	q, _ := url.ParseQuery(asked[0])
+	if q.Get("step") != "604" {
 		t.Fatalf("step = %s", q.Get("step"))
+	}
+	// The last point is now, so a container that started in the last step is counted.
+	if span := mustInt(t, q.Get("end")) - mustInt(t, q.Get("start")); span%int64(604*time.Second) != 0 || span < int64(7*24*time.Hour) {
+		t.Fatalf("window = %d", span)
 	}
 }
 
