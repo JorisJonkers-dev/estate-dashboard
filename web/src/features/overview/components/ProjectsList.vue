@@ -26,34 +26,29 @@ const head = 'py-2.5 pr-4 text-left text-xs font-semibold tracking-[0.12em] text
 
 <template>
   <section aria-labelledby="projects-h">
-    <div class="mb-3 flex flex-wrap items-end justify-between gap-4">
-      <h2 id="projects-h" class="m-0 text-xl font-semibold">Projects <span class="font-normal text-text-muted">{{ shown.length }}</span></h2>
-      <label class="flex min-h-10 w-full items-center gap-2 border-b border-control text-text-muted focus-within:border-accent md:w-72">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+    <h2 id="projects-h" class="m-0 mb-3 text-xl font-semibold">Projects <span class="font-normal text-text-muted">{{ shown.length }}</span></h2>
+
+    <!-- Filters and search share one line; on a phone the search wraps below. -->
+    <div class="flex flex-wrap items-end gap-x-6 md:flex-nowrap md:border-b md:border-line">
+      <ToggleGroupRoot type="single" :model-value="filter" aria-label="Filter by state" class="flex w-full min-w-0 gap-6 overflow-x-auto border-b border-line md:w-auto md:grow md:border-0" @update:model-value="pick">
+        <ToggleGroupItem
+          v-for="f in filters"
+          :key="f"
+          :value="f"
+          class="-mb-px min-h-11 shrink-0 cursor-pointer border-0 border-b-2 border-transparent bg-transparent px-0.5 font-sans text-[15px] whitespace-nowrap text-nav transition-colors hover:text-white data-[state=on]:border-accent data-[state=on]:text-white"
+        >
+          {{ f }} <span class="text-dim">{{ counts[f] }}</span>
+        </ToggleGroupItem>
+      </ToggleGroupRoot>
+      <label class="mt-3 flex min-h-9 w-full md:my-1.5 md:shrink-0 items-center gap-2 rounded-md border border-control px-2.5 text-text-muted focus-within:border-accent md:w-56">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <circle cx="11" cy="11" r="7" />
           <path d="M20 20l-4-4" />
         </svg>
         <span class="sr-only">Search projects</span>
-        <input v-model="query" type="search" placeholder="Search" class="min-h-10 grow border-0 bg-transparent font-sans text-base text-text-primary outline-none" />
+        <input v-model="query" type="search" placeholder="Search" class="min-h-9 min-w-0 grow border-0 bg-transparent font-sans text-[15px] text-text-primary outline-none" />
       </label>
     </div>
-
-    <ToggleGroupRoot
-      type="single"
-      :model-value="filter"
-      aria-label="Filter by state"
-      class="flex gap-6 overflow-x-auto border-b border-line md:flex-wrap md:overflow-visible"
-      @update:model-value="pick"
-    >
-      <ToggleGroupItem
-        v-for="f in filters"
-        :key="f"
-        :value="f"
-        class="-mb-px min-h-11 shrink-0 cursor-pointer border-0 border-b-2 border-transparent bg-transparent px-0.5 font-sans text-[15px] whitespace-nowrap text-nav transition-colors hover:text-white data-[state=on]:border-accent data-[state=on]:text-white"
-      >
-        {{ f }} <span class="text-dim">{{ counts[f] }}</span>
-      </ToggleGroupItem>
-    </ToggleGroupRoot>
 
     <p v-if="loading" class="my-4 text-text-muted">Loading…</p>
     <p v-else-if="shown.length === 0" class="my-4 text-text-muted">No projects match.</p>

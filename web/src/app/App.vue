@@ -78,7 +78,8 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
       </div>
     </header>
 
-    <main class="box-border w-full grow px-6 pb-24 md:pb-16 lg:px-10">
+    <!-- The theme pads main for a fixed phone header; this header scrolls, so drop it. -->
+    <main class="box-border w-full grow px-6 pt-0! pb-24 md:pb-16 lg:px-10">
       <RouterView />
     </main>
 
