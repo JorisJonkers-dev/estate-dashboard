@@ -9,9 +9,11 @@ const route = useRoute()
 
 /** The pages the nav holds; each screen joins it as it is built. */
 const pages = [
-  { to: '/', label: 'Overview', name: 'overview' },
-  { to: '/alerts', label: 'Alerts', name: 'alerts' },
+  { to: '/', label: 'Overview', names: ['overview'] },
+  { to: '/projects', label: 'Projects', names: ['projects', 'project'] },
+  { to: '/alerts', label: 'Alerts', names: ['alerts'] },
 ] as const
+const current = (names: readonly string[]) => (names.includes(String(route.name)) ? 'page' : undefined)
 
 // The shell lives on every signed-in page; outside one it asks the API nothing.
 const signedInPage = computed(() => !route.meta.public)
@@ -41,10 +43,10 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
             v-for="p in pages"
             :key="p.to"
             :to="p.to"
-            :aria-current="route.name === p.name ? 'page' : undefined"
+            :aria-current="current(p.names)"
             class="-mb-px flex items-center gap-1.5 border-b-2 border-transparent pt-0.5 text-nav no-underline hover:text-white aria-[current=page]:border-accent aria-[current=page]:text-white"
           >
-            {{ p.label }}<span v-if="p.name === 'alerts' && firing > 0" class="font-semibold text-warn">{{ firing }}</span>
+            {{ p.label }}<span v-if="p.to === '/alerts' && firing > 0" class="font-semibold text-warn">{{ firing }}</span>
           </RouterLink>
         </nav>
         <DropdownMenuRoot>
@@ -84,10 +86,10 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
         v-for="p in pages"
         :key="p.to"
         :to="p.to"
-        :aria-current="route.name === p.name ? 'page' : undefined"
+        :aria-current="current(p.names)"
         class="-mt-px flex min-h-13 items-center justify-center gap-1 border-t-2 border-transparent text-sm text-nav no-underline aria-[current=page]:border-accent aria-[current=page]:text-white"
       >
-        {{ p.label }}<span v-if="p.name === 'alerts' && firing > 0" class="font-semibold text-warn">{{ firing }}</span>
+        {{ p.label }}<span v-if="p.to === '/alerts' && firing > 0" class="font-semibold text-warn">{{ firing }}</span>
       </RouterLink>
     </nav>
   </div>

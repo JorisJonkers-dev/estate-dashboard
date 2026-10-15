@@ -27,7 +27,7 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.{ts,vue}'],
       // Generated code is the contract's, and main.ts is the composition root E2E covers.
-      exclude: ['src/infrastructure/api/**', 'src/main.ts', 'src/**/*.spec.ts', 'src/env.d.ts'],
+      exclude: ['src/infrastructure/api/**', 'src/infrastructure/mock.ts', 'src/main.ts', 'src/**/*.spec.ts', 'src/env.d.ts'],
       // 90% overall, and 100% on the domain and the composables (template-go-vue, docs/blueprints/vue-ts-spa.md §16).
       thresholds: {
         lines: 90,

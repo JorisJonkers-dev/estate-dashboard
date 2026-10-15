@@ -376,8 +376,14 @@ func (e *Estate) Rollouts(ctx context.Context, repository, name string, limit in
 			Run      string `json:"run"`
 			Artifact string `json:"artifact"`
 		}
+		// GraphQL serves the payload as a JSON string holding the JSON the deployment was given.
+		raw := d.Payload
+		var inner string
+		if json.Unmarshal([]byte(raw), &inner) == nil {
+			raw = inner
+		}
 		// A deployment composition did not open, or one for another Project, is not this one's.
-		if json.Unmarshal([]byte(d.Payload), &payload) != nil || payload.Project != name {
+		if json.Unmarshal([]byte(raw), &payload) != nil || payload.Project != name {
 			continue
 		}
 		r := domain.Rollout{ID: d.DatabaseID, Version: payload.Version, Commit: d.CommitOid, Run: payload.Run, Artifact: payload.Artifact, At: d.CreatedAt.UTC(), Stages: []domain.Stage{}}

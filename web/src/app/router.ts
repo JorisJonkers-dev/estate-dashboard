@@ -28,6 +28,8 @@ export function createAppRouter(history: RouterHistory = createWebHistory(), sig
     history,
     routes: [
       { path: '/', name: 'overview', component: () => import('../features/overview/components/OverviewPage.vue') },
+      { path: '/projects', name: 'projects', component: () => import('../features/projects/components/ProjectsPage.vue') },
+      { path: '/projects/:name', name: 'project', component: () => import('../features/projects/components/ProjectPage.vue') },
       { path: '/alerts', name: 'alerts', component: () => import('../features/alerts/components/AlertHistoryPage.vue') },
       { path: '/sign-in', name: 'sign-in', meta: { public: true }, component: () => import('../features/session/components/SignInPage.vue') },
       {

@@ -193,14 +193,15 @@ func TestARolloutIsADeploymentCompositionOpenedForTheProject(t *testing.T) {
 		{"databaseId":7,"createdAt":"2026-10-15T08:39:50Z","commitOid":"2a44","payload":"{\"project\":\"estate-dashboard\",\"version\":\"0.2.0\",\"run\":\"https://github.com/x/runs/1\",\"artifact\":\"ghcr.io/r@sha256:a\"}",
 		 "statuses":{"nodes":[{"state":"SUCCESS","description":"estate-dashboard 0.2.0 promoted","logUrl":"https://github.com/x/runs/1","createdAt":"2026-10-15T08:42:42Z"}]}},
 		{"databaseId":8,"createdAt":"2026-10-15T08:00:00Z","commitOid":"1","payload":"{\"project\":\"other\"}","statuses":{"nodes":[]}},
-		{"databaseId":9,"createdAt":"2026-10-15T08:00:00Z","commitOid":"1","payload":"not json","statuses":{"nodes":[]}}
+		{"databaseId":9,"createdAt":"2026-10-15T08:00:00Z","commitOid":"1","payload":"not json","statuses":{"nodes":[]}},
+		{"databaseId":10,"createdAt":"2026-10-15T07:00:00Z","commitOid":"0","payload":"\"{\\\"project\\\":\\\"estate-dashboard\\\",\\\"version\\\":\\\"0.1.0\\\"}\"","statuses":{"nodes":[]}}
 	]}}}}`}
 	e := f.serve(t)
 	got, err := e.Rollouts(t.Context(), "JorisJonkers-dev/estate-dashboard", "estate-dashboard", 5)
 	want := []domain.Rollout{{
 		ID: 7, Version: "0.2.0", Commit: "2a44", Run: "https://github.com/x/runs/1", Artifact: "ghcr.io/r@sha256:a", At: time.Date(2026, 10, 15, 8, 39, 50, 0, time.UTC),
 		Stages: []domain.Stage{{State: "success", Description: "estate-dashboard 0.2.0 promoted", Log: "https://github.com/x/runs/1", At: time.Date(2026, 10, 15, 8, 42, 42, 0, time.UTC)}},
-	}}
+	}, {ID: 10, Version: "0.1.0", Commit: "0", At: time.Date(2026, 10, 15, 7, 0, 0, 0, time.UTC), Stages: []domain.Stage{}}}
 	if err != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("rollouts = %+v, %v", got, err)
 	}

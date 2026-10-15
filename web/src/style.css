@@ -35,6 +35,16 @@
   --color-back: #c29bff;
   --color-idle: #a3a3a3;
 
+  /* Grounds, a step either side of the page: a band, a panel, a raised panel. */
+  --color-pit: #202020;
+  --color-panel: #262626;
+  --color-raised: #2e2e2e;
+  --color-hairline: oklch(1 0 0 / 10%);
+  --color-band: color-mix(in oklab, #202020 86%, transparent);
+
+  /* One curve for everything that moves. */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+
   --font-sans: 'Barlow Semi Condensed', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
@@ -45,5 +55,39 @@
   }
   a {
     @apply text-link hover:text-link-hover;
+  }
+}
+
+/*
+ * The cut: every edge the dashboard draws leans the same way, vertical edges sliced and
+ * horizontals straight (the house language of ESA-Blueshell/website, docs/design-language.md).
+ * `--cut` sets how far; a row cuts at its own height times tan 12 degrees so its edge runs
+ * parallel to the hover bar.
+ */
+@utility cut {
+  clip-path: polygon(var(--cut, 0.7rem) 0, 100% 0, calc(100% - var(--cut, 0.7rem)) 100%, 0 100%);
+}
+
+/* A diagonal hatch: the dashboard's texture, laid faint under a head band. */
+@utility hatch {
+  background-image: repeating-linear-gradient(112deg, oklch(1 0 0 / 3%) 0 1px, transparent 1px 14px);
+}
+
+/* Things arrive: a short rise into place, staggered by `--i`, and still for anyone who asked. */
+@utility rise {
+  animation: rise 560ms var(--ease-out-quint) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
   }
 }

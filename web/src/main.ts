@@ -10,7 +10,18 @@ import { backToSignIn } from './app/expired'
 import { createAppRouter } from './app/router'
 import { configureApi } from './infrastructure/http'
 
-configureApi()
-const router = createAppRouter()
-const queryClient = new QueryClient({ queryCache: new QueryCache({ onError: backToSignIn(router) }) })
-createApp(App).use(router).use(VueQueryPlugin, { queryClient }).mount('#app')
+/** The API, or with VITE_MOCK=1 on the dev server, a made-up estate to design against. */
+async function api(): Promise<void> {
+  if (import.meta.env.VITE_MOCK !== '1') {
+    configureApi()
+    return
+  }
+  const { mockFetch } = await import('./infrastructure/mock')
+  configureApi({ fetch: mockFetch })
+}
+
+void api().then(() => {
+  const router = createAppRouter()
+  const queryClient = new QueryClient({ queryCache: new QueryCache({ onError: backToSignIn(router) }) })
+  createApp(App).use(router).use(VueQueryPlugin, { queryClient }).mount('#app')
+})
