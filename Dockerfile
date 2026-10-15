@@ -4,11 +4,15 @@
 FROM --platform=$BUILDPLATFORM node:24-alpine AS web
 RUN npm install -g pnpm@12.6.0
 WORKDIR /src
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY openapi/package.json openapi/package.json
 COPY web/package.json web/package.json
+# The shared theme is on GitHub Packages; the token is a build secret, never a layer.
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter @estate-dashboard/web...
+    --mount=type=secret,id=github_token,required=true \
+    printf '//npm.pkg.github.com/:_authToken=%s\n' "$(cat /run/secrets/github_token)" > ~/.npmrc && \
+    pnpm install --frozen-lockfile --filter @estate-dashboard/web... && \
+    rm ~/.npmrc
 COPY openapi openapi
 COPY web web
 RUN pnpm --filter @estate-dashboard/web build

@@ -72,9 +72,11 @@ jobs:
         env:
           TAG: ${{ needs.release-please.outputs.tag_name }}
           IMAGE: ghcr.io/jorisjonkers-dev/estate-dashboard
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           docker buildx build . \
+            --secret id=github_token,env=GITHUB_TOKEN \
             --platform linux/amd64,linux/arm64 \
             --build-arg VERSION="${TAG#v}" \
             --tag "${IMAGE}:${TAG}" \
