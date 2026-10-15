@@ -11,7 +11,7 @@ import {
 } from '../../../infrastructure/api/@tanstack/vue-query.gen'
 import type { Deploy } from '../../../infrastructure/api/types.gen'
 import { describeError } from '../../alerts/composables/useAlertHistory'
-import { health, needs, projectRows, type Reads } from '../domain/overview'
+import { health, needs, projectRows, releaseOf, type Reads } from '../domain/overview'
 
 /** How often the Overview reads again. */
 const every = 30_000
@@ -26,18 +26,18 @@ export function useOverview() {
   const issues = useQuery({ ...listIssuesOptions(), ...live })
   const alerts = useQuery({ ...listAlertsOptions(), ...live })
 
-  // The newest deploy of each pinned Project.
+  // The newest release of each pinned Project, past any rewrite of its source.
   const pinned = computed(() => (pins.data.value?.items ?? []).map((p) => p.project).filter((p) => !p.startsWith('_')))
   const deploys = useQueries({
     queries: computed(() =>
-      pinned.value.map((project) => ({ ...listDeploysOptions({ path: { project }, query: { limit: 1 } }), ...live })),
+      pinned.value.map((project) => ({ ...listDeploysOptions({ path: { project }, query: { limit: 10 } }), ...live })),
     ),
   })
 
   const reads = computed<Reads>(() => {
     const newest: Record<string, Deploy | undefined> = {}
     pinned.value.forEach((project, i) => {
-      newest[project] = deploys.value[i]?.data?.items[0]
+      newest[project] = releaseOf(project, deploys.value[i]?.data?.items ?? [])
     })
     const out: Reads = { deploys: newest }
     if (handover.data.value) out.handover = handover.data.value
