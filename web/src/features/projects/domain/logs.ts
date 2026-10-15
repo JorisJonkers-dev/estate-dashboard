@@ -15,8 +15,8 @@ export function isMigration(s: Stream): boolean {
   return /migrat/.test(s.pod) || /migrat/.test(s.container)
 }
 
-/** A container that wrote a line in the last ten minutes counts as running. */
-export const quietFor = 10 * 60_000
+/** A container that wrote a line in the last 15 minutes counts as running; some, like the collector, write once every 10. */
+export const quietFor = 15 * 60_000
 
 export function isRunning(s: Stream, now: number): boolean {
   return s.last !== undefined && now - Date.parse(s.last) <= quietFor

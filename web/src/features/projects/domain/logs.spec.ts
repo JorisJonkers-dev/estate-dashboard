@@ -45,9 +45,9 @@ describe('the containers of a release', () => {
     expect(isMigration(s('x', 'auth-migrate'))).toBe(true)
   })
 
-  it('reads a container that wrote nothing in ten minutes as finished', () => {
-    expect(isRunning(s('a', 'a', undefined, 60, 10), now)).toBe(true)
-    expect(isRunning(s('a', 'a', undefined, 60, 11), now)).toBe(false)
+  it('reads a container that wrote nothing in 15 minutes as finished', () => {
+    expect(isRunning(s('a', 'a', undefined, 60, 15), now)).toBe(true)
+    expect(isRunning(s('a', 'a', undefined, 60, 16), now)).toBe(false)
     expect(isRunning({ pod: 'a', container: 'a' }, now)).toBe(false)
   })
 })
