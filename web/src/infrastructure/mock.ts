@@ -263,6 +263,13 @@ const streams: Record<string, ReturnType<typeof stream>[]> = {
     stream('notes-primary-6d9f7c5b8-2hxlq', 'notes', '0.9.1', 60, 0.5),
     stream('notes-primary-6d9f7c5b8-8kd3s', 'notes', '0.9.1', 58, 1),
   ],
+  delivery: [
+    stream('collector-7d9c8b6f5-a1b2c', 'collector', '0.6.0', 790, 0.5),
+    stream('reporter-5c6d7e8f9-d3e4f', 'reporter', '0.6.0', 790, 0.2),
+    stream('release-gate-6b7c8d9e0-g5h6i', 'release-gate', '0.6.0', 790, 0.1),
+    stream('release-gate-6b7c8d9e0-j7k8l', 'release-gate', '0.6.0', 785, 0.3),
+    stream('flagger-8e9f0a1b2-m9n0p', 'flagger', '0.6.0', 790, 0.4),
+  ],
   auth: [
     stream('auth-migration-up-3-5-0-p8d2c', 'liquibase', '3.5.0', 6, 5),
     stream('auth-api-7f8c9d6b5-kq2lm', 'auth-api', '3.5.0', 4, 0.2),
