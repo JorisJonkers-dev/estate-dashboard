@@ -4370,11 +4370,18 @@ func (s *Stream) encodeFields(e *jx.Encoder) {
 		e.FieldStart("container")
 		e.Str(s.Container)
 	}
+	{
+		if s.Version.Set {
+			e.FieldStart("version")
+			s.Version.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfStream = [2]string{
+var jsonFieldsNameOfStream = [3]string{
 	0: "pod",
 	1: "container",
+	2: "version",
 }
 
 // Decode decodes Stream from json.
@@ -4409,6 +4416,16 @@ func (s *Stream) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"container\"")
+			}
+		case "version":
+			if err := func() error {
+				s.Version.Reset()
+				if err := s.Version.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"version\"")
 			}
 		default:
 			return errors.Errorf("unexpected field %q", k)

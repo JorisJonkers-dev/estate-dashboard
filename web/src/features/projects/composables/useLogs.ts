@@ -13,7 +13,7 @@ export function useLogs(project: Ref<string>) {
   const streams = useQuery(computed(() => ({ ...listLogStreamsOptions({ path: { project: project.value }, query: { hours: hours.value } }), refetchInterval: 60_000 })))
   const groups = computed(() => groupStreams(streams.data.value?.items ?? []))
 
-  // Pick the first container once some are known, and drop a pick that is no longer there.
+  // Pick the first container, and drop a pick that has gone.
   watch(
     () => streams.data.value?.items,
     (items) => {

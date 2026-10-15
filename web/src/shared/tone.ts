@@ -1,9 +1,8 @@
-/** The hue a state is drawn in: one per kind of attention, never two for one meaning. */
+/** The colour of a state. One colour per kind of attention. */
 export type Tone = 'ok' | 'warn' | 'crit' | 'info' | 'back' | 'idle'
 
 /**
- * Each tone as a text colour. Written out whole, so Tailwind finds every class in the source: a
- * class built from a string at run time would never be generated.
+ * Each tone as a text colour. Written out in full, so Tailwind can find the classes.
  */
 export const toneText: Record<Tone, string> = {
   ok: 'text-ok',

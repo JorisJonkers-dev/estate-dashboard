@@ -88,7 +88,7 @@ func (l *Loki) Streams(ctx context.Context, namespace string, since time.Time) (
 	seen := map[domain.Stream]bool{}
 	streams := []domain.Stream{}
 	for _, labels := range reply.Data {
-		s := domain.Stream{Pod: labels["pod"], Container: labels["container"]}
+		s := domain.Stream{Pod: labels["pod"], Container: labels["container"], Version: labels["version"]}
 		if s.Pod == "" || s.Container == "" || seen[s] {
 			continue
 		}

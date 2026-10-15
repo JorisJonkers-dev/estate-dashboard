@@ -2,9 +2,8 @@ import type { Router } from 'vue-router'
 import { zProblem } from '../infrastructure/api/zod.gen'
 
 /**
- * Sends the browser back to sign in when a read is refused with a 401 mid-visit: the session
- * ended while the page was open. The router asks who is signed in only on navigation, so this is
- * what catches a session that lapses between two.
+ * Sends the browser to sign in when a read gets a 401 mid-visit, because the session ended while
+ * the page was open. The router checks only on navigation, so this catches the rest.
  */
 export function backToSignIn(router: Router): (error: unknown) => void {
   return (error) => {

@@ -13,13 +13,12 @@ import type { Deploy } from '../../../infrastructure/api/types.gen'
 import { describeError } from '../../alerts/composables/useAlertHistory'
 import { health, needs, projectRows, type Reads } from '../domain/overview'
 
-/** How often the Overview reads again: what it shows moves on the order of a minute. */
+/** How often the Overview reads again. */
 const every = 30_000
 
 /**
- * Server state for the Overview. Each source is read on its own, so one that does not answer
- * (no cluster, no Estate repository, no Alertmanager) leaves the rest on the page and is named in
- * `unread`. Components read the Overview through this and never call the API.
+ * Server state for the Overview. Each source is read on its own. One that fails leaves the rest on
+ * the page and is named in `unread`. Components never call the API.
  */
 export function useOverview() {
   const live = { refetchInterval: every }
@@ -30,7 +29,7 @@ export function useOverview() {
   const issues = useQuery({ ...listIssuesOptions(), ...live })
   const alerts = useQuery({ ...listAlertsOptions(), ...live })
 
-  // The newest deploy of each pinned Project: the last commit that moved its pin.
+  // The newest deploy of each pinned Project.
   const pinned = computed(() => (pins.data.value?.items ?? []).map((p) => p.project).filter((p) => !p.startsWith('_')))
   const deploys = useQueries({
     queries: computed(() => pinned.value.map((project) => ({ ...listDeploysOptions({ path: { project }, query: { limit: 1 } }), ...live }))),
@@ -63,9 +62,9 @@ export function useOverview() {
     projects: computed(() => projectRows(reads.value)),
     health: computed(() => health(reads.value)),
     needs: computed(() => needs(reads.value)),
-    /** Firing, unsilenced alerts: the count the nav carries. */
+    /** Firing alerts that are not silenced. The nav shows this count. */
     firing: computed(() => (alerts.data.value?.items ?? []).filter((a) => a.silencedBy.length === 0).length),
-    /** What could not be read, each with the API's own words for why. */
+    /** What could not be read, and why. */
     unread: computed(() =>
       sources.flatMap(([name, query]) => (query.error.value ? [{ name, why: describeError(query.error.value) }] : [])),
     ),

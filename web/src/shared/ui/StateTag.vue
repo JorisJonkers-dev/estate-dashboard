@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { toneText, type Tone } from '../tone'
 
-/** A word of state: an outlined pill in its colour, never filled. */
+/** A state word: an outlined pill in its colour. */
 defineProps<{ tone: Tone }>()
 </script>
 

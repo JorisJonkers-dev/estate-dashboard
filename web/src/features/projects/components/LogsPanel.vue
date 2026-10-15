@@ -8,7 +8,7 @@ const { hours, picked, groups, lines, isLoading, linesLoading, unread } = useLog
 
 const time = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
-// Keep the newest line in view as lines arrive.
+// Keep the newest line in view.
 const view = useTemplateRef<HTMLElement>('view')
 watch(lines, async () => {
   await nextTick()

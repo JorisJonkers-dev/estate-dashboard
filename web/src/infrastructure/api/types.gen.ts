@@ -154,6 +154,10 @@ export type Stream = {
      * The container.
      */
     container: string;
+    /**
+     * The release the pod ran, from its app.kubernetes.io/version label; absent without one.
+     */
+    version?: string;
 };
 
 /**

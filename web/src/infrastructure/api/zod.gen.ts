@@ -79,7 +79,8 @@ export const zRolloutList = z.object({
  */
 export const zStream = z.object({
     pod: z.string().max(253),
-    container: z.string().max(253)
+    container: z.string().max(253),
+    version: z.string().max(128).optional()
 });
 
 /**

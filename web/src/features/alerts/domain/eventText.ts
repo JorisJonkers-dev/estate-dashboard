@@ -1,11 +1,11 @@
-/** What the history needs of an event to describe it. */
+/** What an event needs to be described. */
 export interface EventTimes {
   status: 'firing' | 'resolved'
   startsAt: string
   endsAt?: string
 }
 
-/** How long an alert fired, in the two largest units that say something: "45 s", "2 h 5 min". */
+/** How long an alert fired, in its two largest units: "45 s", "2 h 5 min". */
 export function formatDuration(milliseconds: number): string {
   const seconds = Math.max(0, Math.round(milliseconds / 1000))
   const units: [number, string][] = [
@@ -23,7 +23,7 @@ export function formatDuration(milliseconds: number): string {
     .join(' ')
 }
 
-/** One line for an event: that the alert fired, or that it resolved and after how long. */
+/** One line for an event. */
 export function describeEvent(event: EventTimes): string {
   if (event.status === 'firing' || event.endsAt === undefined) return 'Fired'
   return `Resolved after ${formatDuration(Date.parse(event.endsAt) - Date.parse(event.startsAt))}`

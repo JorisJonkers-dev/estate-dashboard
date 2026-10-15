@@ -15,7 +15,7 @@ import { clusterRows, conditionsOf } from '../domain/project'
 
 const live = { refetchInterval: 30_000 }
 
-/** Everything the dashboard knows about one Project: its row, its history and what runs it. */
+/** What the dashboard knows about one Project. */
 export function useProject(name: Ref<string>) {
   const handover = useQuery({ ...getHandoverOptions(), ...live })
   const pins = useQuery({ ...listPinsOptions(), ...live })
@@ -25,7 +25,7 @@ export function useProject(name: Ref<string>) {
   const issues = useQuery({ ...listIssuesOptions(), ...live })
   const deploys = useQuery(computed(() => ({ ...listDeploysOptions({ path: { project: name.value }, query: { limit: 20 } }), ...live })))
 
-  /** The repository the Project publishes from, as composition annotated its unit. */
+  /** The repository the Project publishes from. */
   const repository = computed(() => (units.data.value?.items ?? []).find((u) => u.source === `project-${name.value}` && u.repository)?.repository)
   const rollouts = useQuery(
     computed(() => ({

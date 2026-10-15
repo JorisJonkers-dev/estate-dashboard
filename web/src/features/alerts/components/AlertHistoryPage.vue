@@ -8,7 +8,7 @@ import { describeError, useAlertHistory } from '../composables/useAlertHistory'
 import { describeEvent } from '../domain/eventText'
 
 const { events, isLoading, loadError } = useAlertHistory()
-// Whether Alertmanager answers at all: without it nothing fires and nothing is recorded.
+// Without Alertmanager nothing fires or gets recorded.
 const live = useQuery({ ...listAlertsOptions(), refetchInterval: 30_000 })
 const alertmanager = computed(() => (live.error.value ? describeError(live.error.value) : null))
 
@@ -24,7 +24,7 @@ const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', tim
     <p v-if="isLoading" class="m-0 text-text-muted">Loading…</p>
     <p v-else-if="loadError" role="alert" class="m-0 text-crit">{{ loadError }}</p>
     <EmptyPlate v-else-if="events.length === 0" title="No alerts yet" :mark="alertmanager ? 'quiet' : 'tick'">
-      Nothing has fired since the dashboard started keeping track.
+      Nothing has fired since the dashboard started.
     </EmptyPlate>
     <ul v-else aria-label="Alert history" class="m-0 list-none border-t border-line p-0">
       <li

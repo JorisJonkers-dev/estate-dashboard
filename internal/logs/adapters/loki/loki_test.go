@@ -44,11 +44,11 @@ func TestStreamsAreEachPodAndContainerOnce(t *testing.T) {
 	l := serve(t, http.StatusOK, `{"data":[
 		{"namespace":"auth-system","pod":"auth-api-1","container":"auth-api","level":"INFO"},
 		{"namespace":"auth-system","pod":"auth-api-1","container":"auth-api","level":"WARN"},
-		{"namespace":"auth-system","pod":"auth-migration-x","container":"liquibase"},
+		{"namespace":"auth-system","pod":"auth-migration-x","container":"liquibase","version":"3.5.0"},
 		{"namespace":"auth-system","pod":"","container":"x"}
 	]}`, &asked)
 	got, err := l.Streams(t.Context(), "auth-system", now.Add(-time.Hour))
-	want := []domain.Stream{{Pod: "auth-api-1", Container: "auth-api"}, {Pod: "auth-migration-x", Container: "liquibase"}}
+	want := []domain.Stream{{Pod: "auth-api-1", Container: "auth-api"}, {Pod: "auth-migration-x", Container: "liquibase", Version: "3.5.0"}}
 	if err != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("streams = %+v, %v", got, err)
 	}

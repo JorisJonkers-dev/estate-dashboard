@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** A designed nothing: a small mark, what is true, and what to expect. */
+/** An empty state: a mark, a title and a line of text. */
 defineProps<{ title: string; mark?: 'tick' | 'quiet' }>()
 </script>
 

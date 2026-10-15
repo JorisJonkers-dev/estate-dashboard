@@ -1938,6 +1938,8 @@ type Stream struct {
 	Pod string `json:"pod"`
 	// The container.
 	Container string `json:"container"`
+	// The release the pod ran, from its app.kubernetes.io/version label; absent without one.
+	Version OptString `json:"version"`
 }
 
 // GetPod returns the value of Pod.
@@ -1950,6 +1952,11 @@ func (s *Stream) GetContainer() string {
 	return s.Container
 }
 
+// GetVersion returns the value of Version.
+func (s *Stream) GetVersion() OptString {
+	return s.Version
+}
+
 // SetPod sets the value of Pod.
 func (s *Stream) SetPod(val string) {
 	s.Pod = val
@@ -1958,6 +1965,11 @@ func (s *Stream) SetPod(val string) {
 // SetContainer sets the value of Container.
 func (s *Stream) SetContainer(val string) {
 	s.Container = val
+}
+
+// SetVersion sets the value of Version.
+func (s *Stream) SetVersion(val OptString) {
+	s.Version = val
 }
 
 // The containers that wrote logs, by pod then container.

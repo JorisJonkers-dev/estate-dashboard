@@ -1,12 +1,12 @@
 import type { Issue, Release, Source, Stage, Unit } from '../../../infrastructure/api/types.gen'
 import type { Tone } from '../../../shared/tone'
 
-/** The Estate repository: where pins, the deploy log and the estate's workflows live. */
+/** The Estate repository, where pins, the deploy log and workflows live. */
 export const estateRepository = 'JorisJonkers-dev/estate'
 
 const github = 'https://github.com'
 
-/** Where to go on GitHub for a Project: its repository, its pin, its workflows, a commit. */
+/** Where to go on GitHub for a Project. */
 export const links = {
   repository: (repository: string) => `${github}/${repository}`,
   deployments: (repository: string) => `${github}/${repository}/deployments/production`,
@@ -17,7 +17,7 @@ export const links = {
   issue: (number: number) => `${github}/${estateRepository}/issues/${String(number)}`,
 }
 
-/** How a rollout's stage reads: GitHub's deployment state as a tone. */
+/** A rollout stage's tone, from GitHub's deployment state. */
 export function stageTone(stage: Stage): Tone {
   switch (stage.state) {
     case 'success':
@@ -34,11 +34,11 @@ export function stageTone(stage: Stage): Tone {
 
 /** A stage's state in words. */
 export function stageWord(stage: Stage): string {
-  const words: Record<string, string> = { success: 'Done', failure: 'Failed', error: 'Failed', inactive: 'Superseded', in_progress: 'Started', queued: 'Queued', pending: 'Pending' }
+  const words: Record<string, string> = { success: 'Done', failure: 'Failed', error: 'Failed', inactive: 'Replaced', in_progress: 'Started', queued: 'Queued', pending: 'Pending' }
   return words[stage.state] ?? stage.state
 }
 
-/** One thing Flux or Flagger holds for the Project, and what it says. */
+/** One thing Flux or Flagger holds for a Project. */
 export interface ClusterRow {
   kind: 'Source' | 'Unit' | 'Canary'
   name: string
@@ -47,7 +47,7 @@ export interface ClusterRow {
   detail?: string
 }
 
-/** The Project's source, units and Canaries, each with Flux's or Flagger's word on it. */
+/** A Project's source, units and Canaries, each with its word. */
 export function clusterRows(project: string, sources: Source[], units: Unit[], releases: Release[]): ClusterRow[] {
   const rows: ClusterRow[] = []
   for (const s of sources.filter((s) => s.name === `project-${project}`)) {

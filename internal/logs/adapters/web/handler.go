@@ -42,6 +42,14 @@ func (h *Logs) unavailable(ctx context.Context, err error) oas.ProblemStatusCode
 	return oas.ProblemStatusCode{StatusCode: http.StatusServiceUnavailable, Response: httpx.Problem(http.StatusServiceUnavailable, detail)}
 }
 
+// opt is an optional string of the contract: absent where s is empty.
+func opt(s string) oas.OptString {
+	if s == "" {
+		return oas.OptString{}
+	}
+	return oas.NewOptString(s)
+}
+
 func hours(o oas.OptInt32) time.Duration { return time.Duration(o.Or(0)) * time.Hour }
 
 // ListLogStreams implements listLogStreams.
@@ -56,7 +64,7 @@ func (h *Logs) ListLogStreams(ctx context.Context, params oas.ListLogStreamsPara
 	}
 	items := make([]oas.Stream, 0, len(streams))
 	for _, s := range streams {
-		items = append(items, oas.Stream{Pod: s.Pod, Container: s.Container})
+		items = append(items, oas.Stream{Pod: s.Pod, Container: s.Container, Version: opt(s.Version)})
 	}
 	return &oas.StreamList{Items: items}, nil
 }

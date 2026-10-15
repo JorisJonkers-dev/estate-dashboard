@@ -1,6 +1,6 @@
 /**
- * A made-up estate for working on the design: every state a screen can show, at once. Loaded only
- * when the dev server runs with VITE_MOCK=1, so no build ships it.
+ * A made-up estate for working on the design, with every state at once. Loaded only with
+ * VITE_MOCK=1 on the dev server, so no build ships it.
  */
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()

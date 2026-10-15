@@ -23,7 +23,7 @@ defineProps<{ wide?: boolean }>()
 </template>
 
 <style scoped>
-/* One centred surface on a deeper page, a hairline edge and a faint accent glow, as auth draws its sign-in. */
+/* A centred panel on a dark page, with a hairline edge and a faint glow. */
 .page {
   display: flex;
   align-items: center;
@@ -88,7 +88,7 @@ defineProps<{ wide?: boolean }>()
 .panel :deep(a:hover) {
   color: #8ab9ff;
 }
-/* The one action. White on this blue reaches AA only as large bold text, so it is set as that. */
+/* The one action. White on this blue only passes as large bold text, so it is set that way. */
 .panel :deep(.action) {
   display: flex;
   align-items: center;

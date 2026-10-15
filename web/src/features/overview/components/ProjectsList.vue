@@ -16,7 +16,7 @@ const shown = computed(() => {
 })
 const counts = computed(() => Object.fromEntries(filters.map((f) => [f, projects.filter((p) => passes(p, f)).length])))
 
-// Pressing the selected filter again clears it, so show everything.
+// Pressing the active filter again shows all.
 function pick(value: unknown) {
   filter.value = filters.find((f) => f === value) ?? 'All'
 }
@@ -74,7 +74,7 @@ const head = 'py-2.5 pr-4 text-left text-xs font-semibold tracking-[0.12em] text
           class="relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-line-soft py-3 transition-colors hover:bg-panel md:table-row md:py-0"
         >
           <th scope="row" class="text-left font-medium md:py-3 md:pr-4">
-            <!-- The whole row is the link: its ::after covers the row. -->
+            <!-- The link covers the whole row. -->
             <RouterLink :to="`/projects/${p.name}`" class="text-text-primary no-underline after:absolute after:inset-0 hover:text-text-primary">{{ p.name }}</RouterLink>
           </th>
           <td class="md:py-3 md:pr-4"><StateTag :tone="p.tone">{{ p.state }}</StateTag></td>
@@ -85,7 +85,7 @@ const head = 'py-2.5 pr-4 text-left text-xs font-semibold tracking-[0.12em] text
           <td class="hidden text-text-muted md:table-cell md:py-3 md:pr-4">
             <time v-if="p.deployedAt" :datetime="p.deployedAt">{{ age(p.deployedAt, now) }} ago</time>
           </td>
-          <td class="hidden text-text-muted md:table-cell md:py-3">{{ p.path }}</td>
+          <td class="hidden text-text-muted md:table-cell md:py-3">{{ p.path === 'legacy' ? 'old path' : 'estate path' }}</td>
         </tr>
       </tbody>
     </table>

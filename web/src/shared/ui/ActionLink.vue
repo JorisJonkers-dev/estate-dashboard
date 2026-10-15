@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-/** A square button that goes somewhere: in the app through the router, elsewhere in a new tab. */
+/** A button that links somewhere. In-app links use the router. Others open in a new tab. */
 const props = defineProps<{ to: string; primary?: boolean }>()
 const inside = computed(() => props.to.startsWith('/'))
 const look = computed(() => [

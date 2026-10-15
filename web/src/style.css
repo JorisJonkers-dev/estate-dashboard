@@ -4,11 +4,10 @@
 @source "../node_modules/@jorisjonkers-dev/vue-web-commons/dist/**/*.{js,vue,ts}";
 
 /*
- * The dashboard's look, from its design canvas (JorisJonkers-dev/estate-dashboard#4), on top of the
- * estate's shared tokens: dark only, hairline dividers and no cards, one lime accent used only for
- * what is current or selected, blue for actions. Where the canvas names a shared token's colour,
- * the shared token is set to it, so the commons components draw in the same palette. Clean and
- * quiet: no blue, no decoration, colour only where something needs attention.
+ * The dashboard's look, from its design canvas (JorisJonkers-dev/estate-dashboard#4), on the
+ * estate's shared tokens. Dark only, hairline dividers, no cards. Lime marks what is current or
+ * selected. Colour appears only where something needs attention. Shared tokens are set to the
+ * canvas colours, so the common components match.
  */
 @theme {
   --color-surface-dark: #1e1e1e;
@@ -29,12 +28,12 @@
   --color-ok: #6fd39a;
   --color-warn: #ffb020;
   --color-crit: #ff5a6a;
-  /* Something under way: neutral rather than a colour, so the colours stay for what needs you. */
+  /* Work under way is neutral, so colour stays for what needs you. */
   --color-info: #e8e8e8;
   --color-back: #c29bff;
   --color-idle: #a3a3a3;
 
-  /* Grounds a step above the page: the head band, and a row under the pointer. */
+  /* A step above the page: the head band and a hovered row. */
   --color-band: #232323;
   --color-panel: #282828;
 
@@ -55,12 +54,11 @@
 }
 
 /*
- * Shapes, the same everywhere: buttons, panels, menus and fields round at 6px (rounded-md); a
- * state is a pill (rounded-full); dots and the account button are circles. Bands, tables and
- * rules stay square.
+ * Buttons, panels, menus and fields round at 6px. A state is a pill. Dots and the account button
+ * are circles. Bands, tables and rules stay square.
  */
 
-/* Things arrive: a short fade into place, staggered by `--i`, and still for anyone who asked. */
+/* Items fade in, staggered by `--i`. Off for reduced motion. */
 @utility rise {
   animation: rise 420ms var(--ease-out-quint) both;
   animation-delay: calc(var(--i, 0) * 30ms);

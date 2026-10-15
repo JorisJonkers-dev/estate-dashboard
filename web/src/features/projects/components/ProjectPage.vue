@@ -59,7 +59,7 @@ const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase
     </HeadBand>
 
     <EmptyPlate v-if="legacy" title="Still on the old path" mark="quiet">
-      fleet-infra deploys {{ name }} for now. Its history shows up here once it moves to the estate path.
+      fleet-infra still deploys {{ name }}. Its history shows here once it moves to the estate path.
     </EmptyPlate>
 
     <div v-else class="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start lg:gap-12">
@@ -67,7 +67,7 @@ const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase
         <section aria-labelledby="rollouts-h">
           <h2 id="rollouts-h" class="m-0 mb-3 text-xl font-semibold">Rollouts <span class="font-normal text-text-muted">{{ rollouts.length }}</span></h2>
           <p v-if="rolloutsLoading" class="text-text-muted">Loading…</p>
-          <EmptyPlate v-else-if="rollouts.length === 0" title="No rollouts yet" mark="quiet">The next release shows up here once composition pins it.</EmptyPlate>
+          <EmptyPlate v-else-if="rollouts.length === 0" title="No rollouts yet" mark="quiet">The next release shows here once composition pins it.</EmptyPlate>
           <ol v-else class="m-0 list-none border-t border-line p-0">
             <li v-for="(r, i) in rollouts" :key="r.id" class="rise border-b border-line-soft py-4" :style="{ '--i': i }">
               <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -114,7 +114,7 @@ const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase
       <div class="flex flex-col gap-10">
         <section aria-labelledby="cluster-h">
           <h2 id="cluster-h" class="m-0 mb-3 text-xl font-semibold">In the cluster</h2>
-          <p v-if="cluster.length === 0" class="text-text-muted">Nothing of {{ name }} runs from its pin yet.</p>
+          <p v-if="cluster.length === 0" class="text-text-muted">Nothing runs from its pin yet.</p>
           <ul v-else class="m-0 list-none border-t border-line p-0">
             <li v-for="c in cluster" :key="c.kind + c.name" class="flex flex-col gap-0.5 border-b border-line-soft py-3">
               <span class="flex items-baseline justify-between gap-3">

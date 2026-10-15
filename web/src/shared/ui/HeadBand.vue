@@ -2,8 +2,7 @@
 import { toneText, type Tone } from '../tone'
 
 /**
- * The head of a page: full width under the top bar, a step lighter than the page, with an
- * optional faint wash in the page's state colour. Facts and actions go in its slots.
+ * The top of a page, with facts and actions in its slots. A tone adds a faint wash of colour.
  */
 const { eyebrow, title, tone = 'none' } = defineProps<{ eyebrow: string; title: string; tone?: Tone | 'none' }>()
 </script>
@@ -25,7 +24,7 @@ const { eyebrow, title, tone = 'none' } = defineProps<{ eyebrow: string; title: 
 </template>
 
 <style scoped>
-/* A tone, where the page has one, washes in faintly from the left. */
+/* A tone washes in faintly from the left. */
 .band {
   background: linear-gradient(90deg, color-mix(in oklab, currentColor 5%, transparent), transparent 45%), var(--color-band);
 }

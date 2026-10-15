@@ -7,7 +7,7 @@ import { getSessionOptions, listAlertsOptions } from '../infrastructure/api/@tan
 
 const route = useRoute()
 
-/** The pages the nav holds; each screen joins it as it is built. */
+/** The pages in the nav. */
 const pages = [
   { to: '/', label: 'Overview', names: ['overview'] },
   { to: '/projects', label: 'Projects', names: ['projects', 'project'] },
@@ -15,13 +15,13 @@ const pages = [
 ] as const
 const current = (names: readonly string[]) => (names.includes(String(route.name)) ? 'page' : undefined)
 
-// The shell lives on every signed-in page; outside one it asks the API nothing.
+// The shell only runs on signed-in pages.
 const signedInPage = computed(() => !route.meta.public)
 const session = useQuery(computed(() => ({ ...getSessionOptions(), enabled: signedInPage.value })))
 const alerts = useQuery(computed(() => ({ ...listAlertsOptions(), enabled: signedInPage.value, refetchInterval: 30_000 })))
 const firing = computed(() => (alerts.data.value?.items ?? []).filter((a) => a.silencedBy.length === 0).length)
 
-// Signing out is a form post the server answers with a redirect; the menu item submits it.
+// Sign out posts a form, and the server ends the session.
 const signOut = useTemplateRef<HTMLFormElement>('signOut')
 </script>
 

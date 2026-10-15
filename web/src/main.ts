@@ -10,7 +10,7 @@ import { backToSignIn } from './app/expired'
 import { createAppRouter } from './app/router'
 import { configureApi } from './infrastructure/http'
 
-/** The API, or with VITE_MOCK=1 on the dev server, a made-up estate to design against. */
+/** The API. With VITE_MOCK=1 on the dev server, a made-up estate instead. */
 async function api(): Promise<void> {
   if (import.meta.env.VITE_MOCK !== '1') {
     configureApi()

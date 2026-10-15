@@ -40,10 +40,10 @@ export interface Reads {
 /** Flagger phases in which a Canary is still switching (Flagger's CanaryPhase). */
 const switching = new Set(['Waiting', 'Progressing', 'WaitingPromotion', 'Promoting', 'Finalising'])
 
-/** The condition composition keeps for a Project that pauses it: shown from the pin, not twice. */
+/** The condition composition keeps for a pause. The pin already shows it. */
 const pausedCondition = 'paused'
 
-/** A Project's name from its unit: the render names each unit's source `project-<project>`. */
+/** A Project's name from its unit's source, `project-<project>`. */
 export function projectOfUnit(unit: Unit): string | undefined {
   return unit.source.startsWith('project-') ? unit.source.slice('project-'.length) : undefined
 }
@@ -93,7 +93,7 @@ export function describeCondition(condition: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
-/** Every Project in the handover ledger, and any the estate pins that the ledger does not name, by name. */
+/** Every Project in the handover ledger, plus any the estate pins that the ledger leaves out. */
 export function projectRows(reads: Reads): ProjectRow[] {
   const pins = new Map((reads.pins ?? []).map((p) => [p.project, p]))
   const conditions = conditionsByProject(reads.issues ?? [])
@@ -106,7 +106,7 @@ export function projectRows(reads: Reads): ProjectRow[] {
   const paths = new Map<string, Path>()
   for (const name of reads.handover?.legacy ?? []) paths.set(name, 'legacy')
   for (const name of reads.handover?.estate ?? []) paths.set(name, 'estate')
-  // A pin is the estate path's whatever the ledger says; `_estate` is the estate's own, no Project.
+  // A pin means the estate path, whatever the ledger says. `_estate` is not a Project.
   for (const name of pins.keys()) if (!name.startsWith('_') && !paths.has(name)) paths.set(name, 'estate')
 
   return [...paths.entries()]
@@ -125,7 +125,7 @@ export function projectRows(reads: Reads): ProjectRow[] {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** The first twelve hex digits of a digest: what the canvas shows and a reader can compare. */
+/** The first twelve hex digits of a digest, enough to compare. */
 export function shortDigest(digest: string): string {
   return digest.replace(/^sha256:/, '').slice(0, 12)
 }
@@ -160,10 +160,10 @@ export interface Health {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${String(n)} ${n === 1 ? one : many}`
 
-/** The health strip: one answer per class, from what was read; "Unknown" where a source was not. */
+/** One answer per class, from what was read. Unknown where a source was not read. */
 export function health(reads: Reads): Health[] {
   const composition: Health = (() => {
-    if (!reads.issues) return { name: 'Composition', status: 'Unknown', tone: 'idle', detail: 'the estate repository was not read' }
+    if (!reads.issues) return { name: 'Composition', status: 'Unknown', tone: 'idle', detail: 'could not read the estate repository' }
     const isolated = new Set(reads.issues.filter((i) => i.condition === 'isolated').map((i) => i.project))
     const open = reads.issues.filter((i) => i.condition && i.condition !== pausedCondition).length
     if (isolated.size > 0) return { name: 'Composition', status: `${String(isolated.size)} isolated`, tone: 'crit', detail: plural(open, 'open condition') }
@@ -171,14 +171,14 @@ export function health(reads: Reads): Health[] {
     return { name: 'Composition', status: 'All composed', tone: 'ok', detail: 'no open condition' }
   })()
   const delivery: Health = (() => {
-    if (!reads.units) return { name: 'Delivery', status: 'Unknown', tone: 'idle', detail: 'the cluster was not read' }
+    if (!reads.units) return { name: 'Delivery', status: 'Unknown', tone: 'idle', detail: 'could not read the cluster' }
     const ready = reads.units.filter((u) => u.ready).length
     const total = reads.units.length
     const detail = `${String(ready)} of ${plural(total, 'unit')} ready`
     return ready === total ? { name: 'Delivery', status: 'Healthy', tone: 'ok', detail } : { name: 'Delivery', status: `${String(total - ready)} not ready`, tone: 'crit', detail }
   })()
   const releases: Health = (() => {
-    if (!reads.releases) return { name: 'Releases', status: 'Unknown', tone: 'idle', detail: 'the Release Gate was not read' }
+    if (!reads.releases) return { name: 'Releases', status: 'Unknown', tone: 'idle', detail: 'could not read the Release Gate' }
     const flying = reads.releases.filter(inFlight).length
     const failed = reads.releases.filter((r) => r.members.some((m) => m.phase === 'Failed')).length
     const detail = failed === 0 ? 'none failed' : `${plural(failed, 'release')} failed`
@@ -186,7 +186,7 @@ export function health(reads: Reads): Health[] {
     return { name: 'Releases', status: 'None in flight', tone: failed > 0 ? 'warn' : 'ok', detail }
   })()
   const platform: Health = (() => {
-    if (!reads.alerts) return { name: 'Platform', status: 'Not read', tone: 'idle', detail: 'no Alertmanager answers' }
+    if (!reads.alerts) return { name: 'Platform', status: 'Not read', tone: 'idle', detail: 'Alertmanager did not answer' }
     const firing = reads.alerts.filter((a) => a.silencedBy.length === 0)
     const silenced = reads.alerts.length - firing.length
     const detail = silenced === 0 ? 'none silenced' : `${String(silenced)} silenced`
@@ -197,7 +197,7 @@ export function health(reads: Reads): Health[] {
   return [composition, delivery, releases, platform]
 }
 
-/** One item of "Needs you": what is refused, held or firing now. */
+/** One item under Needs you. */
 export interface Need {
   key: string
   severity: 'Critical' | 'Warning' | 'Info'
@@ -244,7 +244,7 @@ export function needs(reads: Reads): Need[] {
   return out.sort((a, b) => Date.parse(b.since) - Date.parse(a.since))
 }
 
-/** How long ago `at` was, as the canvas writes it: "4 min", "6 h", "2 d". */
+/** How long ago `at` was: "4 min", "6 h", "2 d". */
 export function age(at: string, now: number): string {
   const minutes = Math.max(0, Math.floor((now - Date.parse(at)) / 60_000))
   if (minutes < 1) return 'now'

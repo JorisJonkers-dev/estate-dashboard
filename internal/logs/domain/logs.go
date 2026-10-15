@@ -13,6 +13,9 @@ import (
 type Stream struct {
 	Pod       string
 	Container string
+	// Version is the release the pod ran, from its app.kubernetes.io/version label as Alloy carries
+	// it into Loki. Empty for a pod that has no such label.
+	Version string
 }
 
 // Line is one log line and when it was written.

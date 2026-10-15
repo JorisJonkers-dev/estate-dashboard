@@ -71,7 +71,7 @@ describe('the alert history page', () => {
 
   it('says so when nothing has been recorded', async () => {
     const { wrapper } = await mountApp(history(() => json({ items: [] })), '/alerts')
-    expect(wrapper.text()).toContain('No alert has been recorded yet.')
+    expect(wrapper.text()).toContain('No alerts yet')
   })
 
   it('shows the problem when the history cannot load', async () => {
@@ -130,7 +130,7 @@ describe('the sign-in page', () => {
     expect(wrapper.get('.name').text()).toBe('estate')
     expect(wrapper.get('h1').text()).toBe('Sign in')
     expect(wrapper.text()).toContain("The estate's delivery dashboard, for admins. You sign in with your jorisjonkers.dev account.")
-    expect(wrapper.text()).toContain('You return here once auth has signed you in. Two-factor, if your account has it, is asked there.')
+    expect(wrapper.text()).toContain('You come back here once you sign in. If your account uses two-factor, auth asks for it there.')
     expect(wrapper.findAll('.links a').map((a) => [a.text(), a.attributes('href')])).toEqual([
       ['Forgot your password?', 'https://auth.jorisjonkers.dev/forgot-password'],
       ['jorisjonkers.dev', 'https://jorisjonkers.dev'],
@@ -155,7 +155,7 @@ describe('the sign-in page', () => {
 
   it('says so when a sign-in did not complete, without saying why', async () => {
     const { wrapper } = await mountApp(() => json({ items: [] }), '/sign-in?failed=1', nobody)
-    expect(wrapper.get('[role="alert"]').text()).toBe('Signing in did not complete. Try again.')
+    expect(wrapper.get('[role="alert"]').text()).toBe('Sign-in did not finish. Try again.')
   })
 })
 
@@ -166,7 +166,7 @@ describe('the not-an-admin page', () => {
     expect(wrapper.get('main').classes()).toContain('wide')
     expect(wrapper.get('h1').text()).toBe('This dashboard is for admins')
     expect(wrapper.text()).toContain(
-      'You are signed in, but your account does not hold the admin role. Ask an admin to grant it in auth, then sign in again.',
+      'You are signed in, but your account does not have the admin role. Ask an admin to grant it in auth, then sign in again.',
     )
     expect(wrapper.findAll('.links a').map((a) => [a.text(), a.attributes('href')])).toEqual([['Back to jorisjonkers.dev', 'https://jorisjonkers.dev']])
     expect(fetch).not.toHaveBeenCalled()
@@ -246,7 +246,7 @@ describe('the overview', () => {
       ['Releases', 'None in flight'],
       ['Platform', 'Not read'],
     ])
-    expect(wrapper.get('[role="status"]').text()).toBe('Not read: Alertmanager (The dashboard runs without an Alertmanager.)')
+    expect(wrapper.get('[role="status"]').text()).toBe("Couldn't read Alertmanager. The dashboard runs without an Alertmanager.")
   })
 
   it('puts the isolated Project under Needs you, linking its issue', async () => {
@@ -264,13 +264,13 @@ describe('the overview', () => {
     await wrapper.get('input[type="search"]').setValue('deliv')
     expect(wrapper.findAll('tbody th').map((th) => th.text())).toEqual(['delivery'])
     await wrapper.get('input[type="search"]').setValue('nothing')
-    expect(wrapper.text()).toContain('No Project matches.')
+    expect(wrapper.text()).toContain('No projects match.')
   })
 
   it('says nothing needs you when nothing is refused or firing', async () => {
     const firing = { fingerprint: 'f', name: 'BackupFailed', class: 'urgent', startsAt: '2026-10-15T07:00:00Z', labels: { alertname: 'BackupFailed' }, silencedBy: [] }
     const quiet = await mountApp(estate({ '/api/v1/estate/issues': () => json({ items: [] }), '/api/v1/alerts': () => json({ items: [] }) }))
-    expect(quiet.wrapper.text()).toContain('Nothing needs you.')
+    expect(quiet.wrapper.text()).toContain('Nothing is firing or stuck.')
     const loud = await mountApp(estate({ '/api/v1/alerts': () => json({ items: [firing] }) }))
     expect(loud.wrapper.get('nav[aria-label="Primary"]').text()).toContain('Alerts1')
     expect(loud.wrapper.findAll('[aria-labelledby="needs-h"] li a').map((a) => a.attributes('href'))).toContain('/alerts')
@@ -283,6 +283,7 @@ describe('the shell', () => {
     for (const nav of wrapper.findAll('nav')) {
       expect(nav.findAll('a').map((a) => [a.text(), a.attributes('aria-current') ?? ''])).toEqual([
         ['Overview', 'page'],
+        ['Projects', ''],
         ['Alerts', ''],
       ])
     }

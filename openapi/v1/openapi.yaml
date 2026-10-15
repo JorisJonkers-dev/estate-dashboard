@@ -668,6 +668,10 @@ components:
           type: string
           maxLength: 253
           description: The container.
+        version:
+          type: string
+          maxLength: 128
+          description: The release the pod ran, from its app.kubernetes.io/version label; absent without one.
     StreamList:
       description: The containers that wrote logs, by pod then container.
       type: object
