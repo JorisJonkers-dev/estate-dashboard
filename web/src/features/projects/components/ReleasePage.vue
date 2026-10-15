@@ -10,7 +10,7 @@ import HeadBand from '../../../shared/ui/HeadBand.vue'
 import StatusMark from '../../../shared/ui/StatusMark.vue'
 import { age } from '../../overview/domain/overview'
 
-/** How many checks a member must pass before it may promote (the Platform document's analysis). */
+/** Checks a member must pass before it promotes. */
 const checks = 4
 
 const route = useRoute()
@@ -58,7 +58,7 @@ const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase
       </template>
     </HeadBand>
 
-    <EmptyPlate v-if="!releases.isPending.value && !release" title="Nothing switching" mark="quiet">The Release Gate holds no release for {{ name }}.</EmptyPlate>
+    <EmptyPlate v-if="!releases.isPending.value && !release" title="Nothing switching" mark="quiet">The Release Gate has no release for {{ name }}.</EmptyPlate>
     <template v-else-if="release">
       <section aria-labelledby="order-h">
         <h2 id="order-h" class="m-0 mb-3 text-xl font-semibold">Order</h2>
@@ -98,14 +98,14 @@ const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase
 
         <section aria-labelledby="down-h" class="flex flex-col gap-3 lg:border-l lg:border-line lg:pl-8">
           <h2 id="down-h" class="m-0 text-xl font-semibold">If it's held</h2>
-          <p class="m-0 text-text-muted">The down migration only runs when all of these hold:</p>
+          <p class="m-0 text-text-muted">The down migration runs only when all of these hold:</p>
           <ul class="m-0 flex list-none flex-col gap-2 p-0">
             <li v-for="c in conditions" :key="c.label" class="flex items-baseline gap-2.5">
               <span class="w-4 font-semibold" :class="c.met ? 'text-ok' : 'text-dim'">{{ c.met ? '✓' : '·' }}</span>
               <span>{{ c.label }}</span>
             </li>
           </ul>
-          <p class="m-0 text-sm text-text-muted">A promoted member is never undone automatically. The fix is forward.</p>
+          <p class="m-0 text-sm text-text-muted">A promoted member is never undone automatically. Fix it with a new release.</p>
         </section>
       </div>
     </template>

@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { toneText, type Tone } from '../tone'
 
-/**
- * The top of a page, with facts and actions in its slots. A tone adds a faint wash of colour.
- */
+/** Top of a page: title, facts and actions. A tone adds a faint wash of colour. */
 const { eyebrow, title, tone = 'none' } = defineProps<{ eyebrow: string; title: string; tone?: Tone | 'none' }>()
 </script>
 
@@ -24,7 +22,7 @@ const { eyebrow, title, tone = 'none' } = defineProps<{ eyebrow: string; title: 
 </template>
 
 <style scoped>
-/* A tone washes in faintly from the left. */
+/* A faint tone wash from the left. */
 .band {
   background: linear-gradient(90deg, color-mix(in oklab, currentColor 5%, transparent), transparent 45%), var(--color-band);
 }

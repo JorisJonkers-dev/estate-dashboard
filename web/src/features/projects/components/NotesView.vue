@@ -5,7 +5,7 @@ import { getReleaseNotesOptions } from '../../../infrastructure/api/@tanstack/vu
 import { describeError } from '../../alerts/composables/useAlertHistory'
 import { readNotes } from '../domain/notes'
 
-/** A release's notes, read from its GitHub Release and shown here. */
+/** A release's changelog, from its GitHub release. */
 const props = defineProps<{ repository: string; version: string }>()
 const notes = useQuery(computed(() => getReleaseNotesOptions({ query: { repository: props.repository, version: props.version } })))
 const blocks = computed(() => readNotes(notes.data.value?.body ?? ''))

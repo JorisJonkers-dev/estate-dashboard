@@ -1,7 +1,4 @@
-/**
- * A made-up estate for working on the design, with every state at once. Loaded only with
- * VITE_MOCK=1 on the dev server, so no build ships it.
- */
+/** A made-up estate with every state at once. Used only with VITE_MOCK=1. */
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
 const run = (id: number) => `https://github.com/JorisJonkers-dev/estate/actions/runs/${String(id)}`
@@ -253,14 +250,14 @@ const declarations: Record<string, unknown> = {
       { process: 'auth-api', path: 'secret/data/auth-api', access: 'read' },
       { process: 'auth-api', path: 'transit/sign/auth-api-jwt', access: 'sign' },
     ],
-    rollback: ['Back up auth_db on platform-postgres, kept 7 days', 'Wait for that backup to succeed, or stop', 'Compose auth at 3.4.2, then pause it'],
+    rollback: ['Back up auth_db on platform-postgres. Keep it 7 days.', 'Wait for that backup to succeed, or stop', 'Compose auth at 3.4.2, then pause it'],
   },
   notes: {
     version: '0.9.1',
     applications: [{ id: 'notes', processes: [{ name: 'notes', switchover: 'interrupted', replicas: 1 }],
       migration: { runner: 'liquibase', identity: 'notes-migration', provenAgainst: '0.9.1', undo: 'blocked', reason: '0.10.0 has a non-transactional changeset' } }],
     grants: [{ process: 'notes', path: 'secret/data/platform/outline', access: 'read' }],
-    rollback: ['Back up notes_db, kept 7 days', 'Compose notes at 0.9.1, then pause it'],
+    rollback: ['Back up notes_db. Keep it 7 days.', 'Compose notes at 0.9.1, then pause it'],
   },
 }
 

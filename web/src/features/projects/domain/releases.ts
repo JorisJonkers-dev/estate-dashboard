@@ -3,13 +3,13 @@ import type { Rollout, Stage, Unit } from '../../../infrastructure/api/types.gen
 /** Where a release stands now, read from its stages and the unit. */
 export type ReleaseState = 'live' | 'rolling' | 'failed' | 'past'
 
-/** One release of a Project, its rollouts of the same version folded into one. */
+/** One release of a Project. Rollouts of the same version are folded in. */
 export interface ReleaseView {
   key: number
   version: string
   at: string
   state: ReleaseState
-  /** How many times composition pinned this version: more than one when it was rendered again. */
+  /** How many times composition pinned this version. */
   pins: number
   commit: string
   run?: string
@@ -18,10 +18,7 @@ export interface ReleaseView {
 
 const failed = (s: Stage) => s.state === 'failure' || s.state === 'error'
 
-/**
- * Each release, newest first. The newest is live once the unit runs its version and is ready,
- * rolling until then; any release with a failed stage failed; the rest are past.
- */
+/** Each release, newest first. The newest is live once its unit runs it and is ready. */
 export function releases(rollouts: Rollout[], unit: Unit | undefined): ReleaseView[] {
   const out: ReleaseView[] = []
   for (const r of rollouts) {

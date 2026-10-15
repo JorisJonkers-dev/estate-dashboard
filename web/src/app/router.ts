@@ -3,24 +3,18 @@ import type { SignedIn } from '../features/session/composables/useSession'
 
 declare module 'vue-router' {
   interface RouteMeta {
-    /** A page reached without a session. It draws its own frame. */
+    /** A page that needs no session. It draws its own frame. */
     public?: boolean
   }
 }
 
-/**
- * Asks the API who is signed in. The client loads on demand, after main.ts has set up zod for the
- * server's Content-Security-Policy.
- */
+/** Asks the API who is signed in. Loads on demand, after main.ts sets up zod. */
 async function askTheApi(): Promise<SignedIn> {
   const { whoIsSignedIn } = await import('../features/session/composables/useSession')
   return whoIsSignedIn()
 }
 
-/**
- * The app's routes. Each page loads on demand. Every page but the two public ones needs a signed-in
- * admin. A browser the API refuses is sent to sign in, then back to the page it asked for.
- */
+/** The app's routes. Every page but the two public ones needs a signed-in admin. */
 export function createAppRouter(history: RouterHistory = createWebHistory(), signedIn: () => Promise<SignedIn> = askTheApi): Router {
   const router = createRouter({
     history,

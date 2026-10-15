@@ -16,10 +16,7 @@ import { health, needs, projectRows, type Reads } from '../domain/overview'
 /** How often the Overview reads again. */
 const every = 30_000
 
-/**
- * Server state for the Overview. Each source is read on its own. One that fails leaves the rest on
- * the page and is named in `unread`. Components never call the API.
- */
+/** Server state for the Overview. A source that fails is named in `unread`. */
 export function useOverview() {
   const live = { refetchInterval: every }
   const handover = useQuery({ ...getHandoverOptions(), ...live })
@@ -51,7 +48,7 @@ export function useOverview() {
   })
 
   const sources = [
-    ['the Estate repository', handover],
+    ['the estate repository', handover],
     ['the cluster', units],
     ['the Release Gate', releases],
     ['Alertmanager', alerts],
@@ -62,7 +59,7 @@ export function useOverview() {
     projects: computed(() => projectRows(reads.value)),
     health: computed(() => health(reads.value)),
     needs: computed(() => needs(reads.value)),
-    /** Firing alerts that are not silenced. The nav shows this count. */
+    /** Firing alerts not silenced. The nav shows this count. */
     firing: computed(() => (alerts.data.value?.items ?? []).filter((a) => a.silencedBy.length === 0).length),
     /** What could not be read, and why. */
     unread: computed(() =>

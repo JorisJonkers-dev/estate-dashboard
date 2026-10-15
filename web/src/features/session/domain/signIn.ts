@@ -1,13 +1,10 @@
-/** Pages that need no session. There is nothing to return to on them. */
+/** Pages that need no session. */
 const ownPages = ['/sign-in', '/not-an-admin']
 
 /** A backslash, which a browser reads as a slash, or a control character, which it drops. */
 const rewrittenByABrowser = /[\\\u0000-\u001f\u007f]/
 
-/**
- * Where sign-in returns to: a page of this app, never another site, and never sign-in itself.
- * `/\t/evil.test` becomes `//evil.test` in a browser, so it is refused too.
- */
+/** Where sign-in returns to: a page of this app, never another site or sign-in. */
 export function safeNext(next: unknown): string {
   if (typeof next !== 'string') return '/'
   if (!next.startsWith('/') || next.startsWith('//') || rewrittenByABrowser.test(next)) return '/'

@@ -6,7 +6,7 @@ import type { Stream } from '../../../infrastructure/api/types.gen'
 import { describeError } from '../../alerts/composables/useAlertHistory'
 import { readLine, window } from '../domain/logs'
 
-/** The lines of one Process's containers: one pod at a time, newest at the bottom. */
+/** One Process's log lines, one pod at a time. */
 const props = defineProps<{ project: string; streams: Stream[] }>()
 const pod = ref(props.streams[0]?.pod ?? '')
 const stream = computed(() => props.streams.find((s) => s.pod === pod.value) ?? props.streams[0])
@@ -24,7 +24,7 @@ const failure = computed(() => (lines.error.value ? describeError(lines.error.va
 const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 const level: Record<string, string> = { error: 'text-crit', warn: 'text-warn', warning: 'text-warn', info: 'text-dim', debug: 'text-dim' }
 
-// Keep the newest line in view as lines arrive.
+// Scroll to the newest line.
 const view = useTemplateRef<HTMLElement>('view')
 watch(read, async () => {
   await nextTick()

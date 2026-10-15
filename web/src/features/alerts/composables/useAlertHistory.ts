@@ -11,7 +11,7 @@ export function describeError(error: unknown): string {
   return problem.data.detail ?? problem.data.title
 }
 
-/** Server state for the alert history. Components never call the API. */
+/** Server state for the alert history. */
 export function useAlertHistory() {
   const list = useQuery(listAlertHistoryOptions())
 

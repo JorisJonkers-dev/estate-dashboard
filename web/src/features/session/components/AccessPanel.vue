@@ -23,7 +23,7 @@ defineProps<{ wide?: boolean }>()
 </template>
 
 <style scoped>
-/* A centred panel on a dark page, with a hairline edge and a faint glow. */
+/* A centred panel on a dark page. */
 .page {
   display: flex;
   align-items: center;
@@ -88,7 +88,7 @@ defineProps<{ wide?: boolean }>()
 .panel :deep(a:hover) {
   color: #8ab9ff;
 }
-/* The one action. White on this blue only passes as large bold text, so it is set that way. */
+/* The one action. White on this blue only passes at large bold size. */
 .panel :deep(.action) {
   display: flex;
   align-items: center;

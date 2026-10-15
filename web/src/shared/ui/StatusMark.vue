@@ -1,8 +1,5 @@
 <script setup lang="ts">
-/**
- * A release's state as a mark: running is a lime dot that breathes, rolling a ring half drawn,
- * failed a cross, past a hollow ring. Its word is there for screen readers and on hover.
- */
+/** A release's state as a mark. Its word is for screen readers and hover. */
 const { state } = defineProps<{ state: 'live' | 'rolling' | 'failed' | 'past' }>()
 const word = { live: 'Running', rolling: 'Rolling out', failed: 'Failed', past: 'Not running' }
 </script>

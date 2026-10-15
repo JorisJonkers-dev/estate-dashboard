@@ -74,7 +74,7 @@ const head = 'py-2.5 pr-4 text-left text-xs font-semibold tracking-[0.12em] text
           class="relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-line-soft py-3 transition-colors hover:bg-panel md:table-row md:py-0"
         >
           <th scope="row" class="text-left font-medium md:py-3 md:pr-4">
-            <!-- The link covers the whole row. -->
+            <!-- The link covers the row. -->
             <RouterLink :to="`/projects/${p.name}`" class="text-text-primary no-underline after:absolute after:inset-0 hover:text-text-primary">{{ p.name }}</RouterLink>
           </th>
           <td class="md:py-3 md:pr-4"><StateTag :tone="p.tone">{{ p.state }}</StateTag></td>

@@ -26,7 +26,7 @@ const now = useNow()
 
 const legacy = computed(() => row.value?.path === 'legacy')
 const running = computed(() => live(releases.value))
-// What runs now: the live release's containers, or the unlabelled ones until pods carry a version.
+// The live release's containers, or unlabelled ones until pods carry a version.
 const runningProcesses = computed(() => {
   const versioned = running.value ? byProcess(streams.value, running.value.version).filter((p) => !p.migration) : []
   return versioned.length > 0 ? versioned : byProcess(streams.value, undefined).filter((p) => !p.migration)
@@ -37,7 +37,7 @@ const open = ref<number | null>(null)
 const toggle = (key: number) => (open.value = open.value === key ? null : key)
 const allPins = ref(false)
 
-// One drawer, holding a Process's logs or a release's notes.
+// One drawer for logs or notes.
 type Drawer = { kind: 'logs'; title: string; subtitle: string; streams: Stream[] } | { kind: 'notes'; title: string; subtitle: string; version: string }
 const drawer = ref<Drawer | null>(null)
 const drawerOpen = computed({
@@ -97,7 +97,7 @@ const button =
     </HeadBand>
 
     <EmptyPlate v-if="legacy" title="Still on the old path" mark="quiet">
-      fleet-infra deploys {{ name }} for now. Its history shows up here once it moves to the estate path.
+      fleet-infra deploys {{ name }} for now. History shows up here once it moves to the estate path.
     </EmptyPlate>
 
     <div v-else class="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start lg:gap-12">
@@ -107,7 +107,7 @@ const button =
             Running now
             <span v-if="running" class="flex items-center gap-2 text-base font-normal text-text-muted"><StatusMark state="live" />{{ running.version }}</span>
           </h2>
-          <p v-if="runningProcesses.length === 0" class="m-0 text-text-muted">No container of {{ name }} wrote logs this week.</p>
+          <p v-if="runningProcesses.length === 0" class="m-0 text-text-muted">No logs from {{ name }} this week.</p>
           <ul v-else class="m-0 list-none border-t border-line p-0">
             <li v-for="p in runningProcesses" :key="p.process" class="flex items-center gap-3 border-b border-line-soft py-2.5">
               <span class="size-2 rounded-full bg-accent" aria-hidden="true" />
@@ -116,7 +116,7 @@ const button =
               <button type="button" :class="[button, 'ml-auto']" @click="showLogs(p, running?.version)">Logs</button>
             </li>
           </ul>
-          <p v-if="unversioned" class="m-0 mt-2 text-sm text-dim">These pods have no version label yet, so older releases may be mixed in.</p>
+          <p v-if="unversioned" class="m-0 mt-2 text-sm text-dim">These pods have no version label yet. Older releases may be mixed in.</p>
         </section>
 
         <section aria-labelledby="releases-h">
@@ -146,7 +146,7 @@ const button =
                 </ol>
                 <div>
                   <p class="m-0 mb-1.5" :class="label">Containers</p>
-                  <p v-if="byProcess(streams, r.version).length === 0" class="m-0 text-sm text-text-muted">None labelled with this version.</p>
+                  <p v-if="byProcess(streams, r.version).length === 0" class="m-0 text-sm text-text-muted">None with this version.</p>
                   <ul v-else class="m-0 flex list-none flex-wrap gap-2 p-0">
                     <li v-for="p in byProcess(streams, r.version)" :key="p.process">
                       <button type="button" :class="button" @click="showLogs(p, r.version)">

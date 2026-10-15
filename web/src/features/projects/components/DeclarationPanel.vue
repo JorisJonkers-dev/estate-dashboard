@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/vue-query'
 import { computed } from 'vue'
 import { getDeclarationOptions } from '../../../infrastructure/api/@tanstack/vue-query.gen'
 
-/** What the Project declares at its pinned release: Processes, migration, rollback and grants. */
+/** What the Project declares at its pinned release. */
 const props = defineProps<{ project: string }>()
 const declaration = useQuery(computed(() => getDeclarationOptions({ path: { project: props.project } })))
 const d = computed(() => declaration.data.value)

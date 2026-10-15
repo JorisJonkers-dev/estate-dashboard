@@ -7,7 +7,7 @@ import { getSessionOptions, listAlertsOptions } from '../infrastructure/api/@tan
 
 const route = useRoute()
 
-/** The pages in the nav. */
+/** Nav pages. */
 const pages = [
   { to: '/', label: 'Overview', names: ['overview'] },
   { to: '/projects', label: 'Projects', names: ['projects', 'project', 'release'] },
@@ -16,13 +16,13 @@ const pages = [
 ] as const
 const current = (names: readonly string[]) => (names.includes(String(route.name)) ? 'page' : undefined)
 
-// The shell only runs on signed-in pages.
+// Only signed-in pages show the shell.
 const signedInPage = computed(() => !route.meta.public)
 const session = useQuery(computed(() => ({ ...getSessionOptions(), enabled: signedInPage.value })))
 const alerts = useQuery(computed(() => ({ ...listAlertsOptions(), enabled: signedInPage.value, refetchInterval: 30_000 })))
 const firing = computed(() => (alerts.data.value?.items ?? []).filter((a) => a.silencedBy.length === 0).length)
 
-// Sign out posts a form, and the server ends the session.
+// Sign out posts a form. The server ends the session.
 const signOut = useTemplateRef<HTMLFormElement>('signOut')
 </script>
 
@@ -31,7 +31,7 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
   <div v-else class="flex min-h-screen flex-col">
     <header class="border-b border-line">
       <div class="flex h-14 items-stretch justify-between gap-4 px-6 md:justify-start md:gap-12 lg:px-10">
-        <RouterLink to="/" aria-label="estate, overview" class="flex items-center gap-2.5 text-lg font-semibold tracking-wider text-text-primary no-underline hover:text-text-primary">
+        <RouterLink to="/" aria-label="estate home" class="flex items-center gap-2.5 text-lg font-semibold tracking-wider text-text-primary no-underline hover:text-text-primary">
           <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
             <rect x="1" y="1" width="24" height="24" fill="none" stroke="#EDEDED" stroke-width="2" />
             <path d="M1 13h24M13 1v24" stroke="#EDEDED" stroke-width="2" />
@@ -39,7 +39,7 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
           </svg>
           <span>estate</span>
         </RouterLink>
-        <nav aria-label="Primary" class="hidden grow items-stretch gap-8 md:flex">
+        <nav aria-label="Pages" class="hidden grow items-stretch gap-8 md:flex">
           <RouterLink
             v-for="p in pages"
             :key="p.to"
@@ -82,7 +82,7 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
       <RouterView />
     </main>
 
-    <nav aria-label="Primary, tab bar" class="fixed inset-x-0 bottom-0 grid auto-cols-fr grid-flow-col border-t border-line bg-surface-dark md:hidden">
+    <nav aria-label="Pages, tab bar" class="fixed inset-x-0 bottom-0 grid auto-cols-fr grid-flow-col border-t border-line bg-surface-dark md:hidden">
       <RouterLink
         v-for="p in pages"
         :key="p.to"

@@ -1,11 +1,11 @@
 import type { Alert, Issue, Release } from '../../../infrastructure/api/types.gen'
 import type { Tone } from '../../../shared/tone'
 
-/** The classes the Alerts screen tabs by. */
+/** Tabs on the Alerts page. */
 export const classes = ['Composition', 'Delivery', 'Releases', 'Platform'] as const
 export type AlertClass = (typeof classes)[number]
 
-/** One thing on the Alerts screen: an Alertmanager alert, a condition issue, or a release in flight. */
+/** One row on the Alerts page. */
 export interface InboxItem {
   key: string
   class: AlertClass
@@ -16,7 +16,7 @@ export interface InboxItem {
   source: string
   since: string
   silenced: boolean
-  /** The Alertmanager alert's fingerprint, where it is one: it can be silenced, and has a history. */
+  /** Alertmanager fingerprint. Only Alertmanager alerts have one. */
   fingerprint?: string
   labels: [string, string][]
   link?: { href: string; label: string }

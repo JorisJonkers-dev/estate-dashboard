@@ -29,7 +29,7 @@ const pickedKey = ref<string | null>(null)
 const picked = computed(() => shown.value.find((i) => i.key === pickedKey.value) ?? shown.value[0])
 const pickedHistory = computed(() => (history.data.value?.items ?? []).filter((e) => picked.value?.fingerprint !== undefined && e.fingerprint === picked.value.fingerprint))
 
-// Silencing is the dashboard's one write. It goes to Alertmanager, which silences Discord too.
+// The one write here. It goes to Alertmanager, which also silences Discord.
 const queryClient = useQueryClient()
 const length = ref<'1h' | '4h' | '1d' | 'until-resolved'>('1h')
 const silence = useMutation(silenceAlertMutation())
@@ -47,7 +47,7 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
 
 <template>
   <div class="flex flex-col gap-10">
-    <HeadBand eyebrow="Production" title="Alerts">From Alertmanager, the estate's open issues and the Release Gate. A silence here silences Discord too.</HeadBand>
+    <HeadBand eyebrow="Production" title="Alerts">From Alertmanager, open estate issues and the Release Gate. A silence here also silences Discord.</HeadBand>
 
     <p v-if="alertmanager" role="status" class="-mt-4 mb-0 text-[15px] text-warn">{{ alertmanager }}</p>
 

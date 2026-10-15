@@ -1,7 +1,7 @@
 import type { Issue, Release, Source, Stage, Unit } from '../../../infrastructure/api/types.gen'
 import type { Tone } from '../../../shared/tone'
 
-/** The Estate repository, where pins, the deploy log and workflows live. */
+/** The estate repository: pins, the deploy log and workflows. */
 export const estateRepository = 'JorisJonkers-dev/estate'
 
 const github = 'https://github.com'

@@ -13,7 +13,7 @@ export function isMigration(s: Stream): boolean {
   return /migrat/.test(s.pod) || /migrat/.test(s.container)
 }
 
-/** The containers of one release, or those with no version when `version` is undefined, by Process. */
+/** One release's containers by Process, or unversioned ones when no version is given. */
 export function byProcess(streams: Stream[], version: string | undefined): ProcessLogs[] {
   const out = new Map<string, ProcessLogs>()
   for (const s of streams.filter((s) => s.version === version)) {
@@ -24,7 +24,7 @@ export function byProcess(streams: Stream[], version: string | undefined): Proce
   return [...out.values()].sort((a, b) => Number(b.migration) - Number(a.migration) || a.process.localeCompare(b.process))
 }
 
-/** A log line, read: JSON lines show their level and message, with every other field after. */
+/** A log line: JSON lines split into level, message and fields. */
 export interface ReadLine {
   level?: string
   message: string
@@ -33,10 +33,10 @@ export interface ReadLine {
 
 const quiet = new Set(['time', 'ts', 'timestamp', 'level', 'lvl', 'msg', 'message'])
 
-/** A plain line's level, where it starts with one: `ERROR: ...`, `WARN ...`. */
+/** A plain line's level, if it starts with one. */
 const plainLevel = /^(error|warn|warning|info|debug)\b/i
 
-/** Reads one line: a JSON object's level, message and fields, or the text with any level it starts with. */
+/** Reads one log line. */
 export function readLine(text: string): ReadLine {
   if (!text.startsWith('{')) {
     const level = plainLevel.exec(text)?.[1]

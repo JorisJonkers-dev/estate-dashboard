@@ -68,7 +68,7 @@ function conditionsByProject(issues: Issue[]): Map<string, string[]> {
   return out
 }
 
-/** One Project's state, the most pressing first: a refusal, a pause, a release, then readiness. */
+/** One Project's state, most pressing first. */
 function stateOf(
   path: Path,
   conditions: string[],
@@ -93,7 +93,7 @@ export function describeCondition(condition: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
-/** Every Project in the handover ledger, plus any the estate pins that the ledger leaves out. */
+/** Every Project in the ledger, plus any pinned Project the ledger leaves out. */
 export function projectRows(reads: Reads): ProjectRow[] {
   const pins = new Map((reads.pins ?? []).map((p) => [p.project, p]))
   const conditions = conditionsByProject(reads.issues ?? [])
@@ -125,7 +125,7 @@ export function projectRows(reads: Reads): ProjectRow[] {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** The first twelve hex digits of a digest, enough to compare. */
+/** The first twelve hex digits of a digest. */
 export function shortDigest(digest: string): string {
   return digest.replace(/^sha256:/, '').slice(0, 12)
 }
@@ -160,10 +160,10 @@ export interface Health {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${String(n)} ${n === 1 ? one : many}`
 
-/** One answer per class, from what was read. Unknown where a source was not read. */
+/** One cell per area, from what was read. */
 export function health(reads: Reads): Health[] {
   const composition: Health = (() => {
-    if (!reads.issues) return { name: 'Composition', status: 'Unknown', tone: 'idle', detail: 'could not read the estate repository' }
+    if (!reads.issues) return { name: 'Composition', status: 'Unknown', tone: 'idle', detail: "Couldn't read the estate repository" }
     const isolated = new Set(reads.issues.filter((i) => i.condition === 'isolated').map((i) => i.project))
     const open = reads.issues.filter((i) => i.condition && i.condition !== pausedCondition).length
     if (isolated.size > 0) return { name: 'Composition', status: `${String(isolated.size)} isolated`, tone: 'crit', detail: plural(open, 'open condition') }
@@ -171,14 +171,14 @@ export function health(reads: Reads): Health[] {
     return { name: 'Composition', status: 'All composed', tone: 'ok', detail: 'no open condition' }
   })()
   const delivery: Health = (() => {
-    if (!reads.units) return { name: 'Delivery', status: 'Unknown', tone: 'idle', detail: 'could not read the cluster' }
+    if (!reads.units) return { name: 'Delivery', status: 'Unknown', tone: 'idle', detail: "Couldn't read the cluster" }
     const ready = reads.units.filter((u) => u.ready).length
     const total = reads.units.length
     const detail = `${String(ready)} of ${plural(total, 'unit')} ready`
     return ready === total ? { name: 'Delivery', status: 'Healthy', tone: 'ok', detail } : { name: 'Delivery', status: `${String(total - ready)} not ready`, tone: 'crit', detail }
   })()
   const releases: Health = (() => {
-    if (!reads.releases) return { name: 'Releases', status: 'Unknown', tone: 'idle', detail: 'could not read the Release Gate' }
+    if (!reads.releases) return { name: 'Releases', status: 'Unknown', tone: 'idle', detail: "Couldn't read the Release Gate" }
     const flying = reads.releases.filter(inFlight).length
     const failed = reads.releases.filter((r) => r.members.some((m) => m.phase === 'Failed')).length
     const detail = failed === 0 ? 'none failed' : `${plural(failed, 'release')} failed`
@@ -210,7 +210,7 @@ export interface Need {
   href: string
 }
 
-/** The firing alerts and the open conditions, the newest first. */
+/** Firing alerts and open conditions, newest first. */
 export function needs(reads: Reads): Need[] {
   const out: Need[] = []
   for (const issue of reads.issues ?? []) {

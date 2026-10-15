@@ -59,36 +59,36 @@ afterEach(() => {
 describe('the alert history page', () => {
   it('lists the events the API returns, newest first as sent', async () => {
     const resolved = { ...fired('CollectorStopped', 2), status: 'resolved', endsAt: '2026-10-03T07:30:00Z', observedAt: '2026-10-03T07:30:20Z' }
-    const { wrapper } = await mountApp(history(() => json({ items: [resolved, fired('CollectorStopped')] })), '/alerts')
+    const { wrapper } = await mountApp(history(() => json({ items: [resolved, fired('CollectorStopped')] })), '/alerts/history')
     expect(wrapper.findAll('li').map((li) => li.find('.state').text())).toEqual(['Resolved after 30 min', 'Fired'])
     expect(wrapper.findAll('li .name').map((name) => name.text())).toEqual(['CollectorStopped', 'CollectorStopped'])
   })
 
   it('accepts a time with any offset, as RFC 3339 does', async () => {
-    const { wrapper } = await mountApp(history(() => json({ items: [{ ...fired('ReleaseHeld'), observedAt: '2026-10-03T09:00:20+02:00' }] })), '/alerts')
+    const { wrapper } = await mountApp(history(() => json({ items: [{ ...fired('ReleaseHeld'), observedAt: '2026-10-03T09:00:20+02:00' }] })), '/alerts/history')
     expect(wrapper.get('li time').attributes('datetime')).toBe('2026-10-03T09:00:20+02:00')
   })
 
   it('says so when nothing has been recorded', async () => {
-    const { wrapper } = await mountApp(history(() => json({ items: [] })), '/alerts')
+    const { wrapper } = await mountApp(history(() => json({ items: [] })), '/alerts/history')
     expect(wrapper.text()).toContain('No alerts yet')
   })
 
   it('shows the problem when the history cannot load', async () => {
     const { wrapper } = await mountApp(
       history(() => json({ type: 'about:blank', title: 'Internal Server Error', status: 500 }, 500, 'application/problem+json')),
-      '/alerts',
+      '/alerts/history',
     )
     expect(wrapper.get('[role="alert"]').text()).toBe('Internal Server Error')
   })
 
   it('refuses a response the contract does not allow', async () => {
-    const { wrapper } = await mountApp(history(() => json({ items: [{ ...fired('X'), status: 'pending', startsAt: 'yesterday' }] })), '/alerts')
+    const { wrapper } = await mountApp(history(() => json({ items: [{ ...fired('X'), status: 'pending', startsAt: 'yesterday' }] })), '/alerts/history')
     expect(wrapper.get('[role="alert"]').text()).toBe('Something went wrong. Try again.')
   })
 
   it('asks who is signed in, then for the history and what the shell shows, and only reads', async () => {
-    const { fetch } = await mountApp(history(() => json({ items: [] })), '/alerts')
+    const { fetch } = await mountApp(history(() => json({ items: [] })), '/alerts/history')
     expect(asked(fetch)[0]).toBe('/api/v1/session')
     expect(new Set(asked(fetch))).toEqual(new Set(['/api/v1/session', '/api/v1/alerts', '/api/v1/alerts/history']))
     for (const [request] of fetch.mock.calls) expect(request instanceof Request ? request.method : 'GET').toBe('GET')
@@ -116,8 +116,8 @@ describe('a browser nobody is signed in on', () => {
 
   it('still sees the page when the API cannot say who is there, and the page reports it', async () => {
     const away: Handler = () => json({ type: 'about:blank', title: 'Service Unavailable', status: 503 }, 503, 'application/problem+json')
-    const { wrapper, router } = await mountApp(away, '/alerts', away)
-    expect(router.currentRoute.value.fullPath).toBe('/alerts')
+    const { wrapper, router } = await mountApp(away, '/alerts/history', away)
+    expect(router.currentRoute.value.fullPath).toBe('/alerts/history')
     expect(wrapper.get('[role="alert"]').text()).toBe('Service Unavailable')
   })
 })
@@ -129,8 +129,8 @@ describe('the sign-in page', () => {
     expect(wrapper.findAll('main')).toHaveLength(1)
     expect(wrapper.get('.name').text()).toBe('estate')
     expect(wrapper.get('h1').text()).toBe('Sign in')
-    expect(wrapper.text()).toContain("The estate's delivery dashboard, for admins. You sign in with your jorisjonkers.dev account.")
-    expect(wrapper.text()).toContain('You come back here once you sign in. If your account uses two-factor, auth asks for it there.')
+    expect(wrapper.text()).toContain("The estate's delivery dashboard, for admins. Sign in with your jorisjonkers.dev account.")
+    expect(wrapper.text()).toContain('You come back here after you sign in. If you use two-factor, auth asks for it there.')
     expect(wrapper.findAll('.links a').map((a) => [a.text(), a.attributes('href')])).toEqual([
       ['Forgot your password?', 'https://auth.jorisjonkers.dev/forgot-password'],
       ['jorisjonkers.dev', 'https://jorisjonkers.dev'],
@@ -166,7 +166,7 @@ describe('the not-an-admin page', () => {
     expect(wrapper.get('main').classes()).toContain('wide')
     expect(wrapper.get('h1').text()).toBe('This dashboard is for admins')
     expect(wrapper.text()).toContain(
-      'You are signed in, but your account does not have the admin role. Ask an admin to grant it in auth, then sign in again.',
+      "You're signed in, but your account doesn't have the admin role. Ask an admin to grant it in auth, then sign in again.",
     )
     expect(wrapper.findAll('.links a').map((a) => [a.text(), a.attributes('href')])).toEqual([['Back to jorisjonkers.dev', 'https://jorisjonkers.dev']])
     expect(fetch).not.toHaveBeenCalled()
@@ -272,7 +272,7 @@ describe('the overview', () => {
     const quiet = await mountApp(estate({ '/api/v1/estate/issues': () => json({ items: [] }), '/api/v1/alerts': () => json({ items: [] }) }))
     expect(quiet.wrapper.text()).toContain('Nothing is firing or stuck.')
     const loud = await mountApp(estate({ '/api/v1/alerts': () => json({ items: [firing] }) }))
-    expect(loud.wrapper.get('nav[aria-label="Primary"]').text()).toContain('Alerts1')
+    expect(loud.wrapper.get('nav[aria-label="Pages"]').text()).toContain('Alerts1')
     expect(loud.wrapper.findAll('[aria-labelledby="needs-h"] li a').map((a) => a.attributes('href'))).toContain('/alerts')
   })
 })
@@ -280,11 +280,13 @@ describe('the overview', () => {
 describe('the shell', () => {
   it('marks the current page in both navs, and links every page', async () => {
     const { wrapper } = await mountApp(estate())
+    expect(wrapper.findAll('nav').map((nav) => nav.attributes('aria-label'))).toEqual(['Pages', 'Pages, tab bar'])
     for (const nav of wrapper.findAll('nav')) {
       expect(nav.findAll('a').map((a) => [a.text(), a.attributes('aria-current') ?? ''])).toEqual([
         ['Overview', 'page'],
         ['Projects', ''],
         ['Alerts', ''],
+        ['Composition', ''],
       ])
     }
   })

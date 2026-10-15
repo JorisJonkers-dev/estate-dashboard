@@ -25,10 +25,7 @@ function spans(line: string): Span[] {
   return out.map((s) => ({ ...s, text: s.text.replaceAll('**', '') }))
 }
 
-/**
- * Release notes, as release-please writes them, read into blocks: headings, list items and text.
- * Nothing in them becomes markup, so notes can never inject any.
- */
+/** Reads release notes into headings, items and text. Nothing becomes markup. */
 export function readNotes(markdown: string): Block[] {
   const blocks: Block[] = []
   for (const raw of markdown.split('\n')) {

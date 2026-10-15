@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
 
-/** A panel that slides in from the right over the page, for logs and notes. Escape closes it. */
+/** Side panel for logs and notes. Escape closes it. */
 const open = defineModel<boolean>('open', { required: true })
 defineProps<{ title: string; subtitle: string }>()
 </script>
