@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.3.2...v0.4.0) (2026-10-15)
+
+
+### Features
+
+* a list beside another column scrolls on its own ([#46](https://github.com/JorisJonkers-dev/estate-dashboard/issues/46)) ([140e7b2](https://github.com/JorisJonkers-dev/estate-dashboard/commit/140e7b22c608327b027c9cc4bb4a116a1fd50d7a))
+
 ## [0.3.2](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.3.1...v0.3.2) (2026-10-15)
 
 
