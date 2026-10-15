@@ -24,6 +24,8 @@ import (
 	estateweb "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/adapters/web"
 	estateapp "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/app"
 	estatedomain "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/domain"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/logs/adapters/loki"
+	logsapp "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/app"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpapi"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oidc"
 )
@@ -87,7 +89,7 @@ func serveAll(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases
 
 func serveEstate(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases, estate estateweb.UseCases) *httptest.Server {
 	t.Helper()
-	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l, delivery, estate)
+	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l, delivery, estate, logsapp.New(loki.Absent{}, time.Now))
 	if err != nil {
 		t.Fatal(err)
 	}

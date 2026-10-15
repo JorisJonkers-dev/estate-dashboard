@@ -75,6 +75,21 @@ type Invoker interface {
 	//
 	// GET /api/v1/estate/issues
 	ListIssues(ctx context.Context) (ListIssuesRes, error)
+	// ListLogLines invokes listLogLines operation.
+	//
+	// The newest lines one container of the Project wrote in the window, from Loki, oldest first. A 503
+	// means Loki did not answer, or the dashboard runs without one.
+	//
+	// GET /api/v1/projects/{project}/logs
+	ListLogLines(ctx context.Context, params ListLogLinesParams) (ListLogLinesRes, error)
+	// ListLogStreams invokes listLogStreams operation.
+	//
+	// Every pod and container in the Project's namespace that wrote logs in the window: running Processes,
+	// past ones and migration Jobs, from Loki. A 503 means Loki did not answer, or the dashboard runs
+	// without one.
+	//
+	// GET /api/v1/projects/{project}/logs/streams
+	ListLogStreams(ctx context.Context, params ListLogStreamsParams) (ListLogStreamsRes, error)
 	// ListPins invokes listPins operation.
 	//
 	// Every projects//source.yaml on the Estate repository's default branch: the digest its source names,
@@ -94,8 +109,8 @@ type Invoker interface {
 	// ListRollouts invokes listRollouts operation.
 	//
 	// The production deployments composition opened for the Project in its repository, with the stages the
-	// Reporter wrote on each. A repository outside the estate's owner has none. A 503 means GitHub did not
-	// answer, or the dashboard has no Estate repository.
+	// Reporter wrote on each and the run that logged them. A repository outside the estate's owner has
+	// none. A 503 means GitHub did not answer, or the dashboard has no Estate repository.
 	//
 	// GET /api/v1/estate/projects/{project}/rollouts
 	ListRollouts(ctx context.Context, params ListRolloutsParams) (ListRolloutsRes, error)
@@ -916,6 +931,360 @@ func (c *Client) sendListIssues(ctx context.Context) (res ListIssuesRes, err err
 	return result, nil
 }
 
+// ListLogLines invokes listLogLines operation.
+//
+// The newest lines one container of the Project wrote in the window, from Loki, oldest first. A 503
+// means Loki did not answer, or the dashboard runs without one.
+//
+// GET /api/v1/projects/{project}/logs
+func (c *Client) ListLogLines(ctx context.Context, params ListLogLinesParams) (ListLogLinesRes, error) {
+	res, err := c.sendListLogLines(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListLogLines(ctx context.Context, params ListLogLinesParams) (res ListLogLinesRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listLogLines"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/v1/projects/{project}/logs"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListLogLinesOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/api/v1/projects/"
+	{
+		// Encode "project" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.Project))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/logs"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "hours" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "hours",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Hours.Get(); ok {
+				return e.EncodeValue(conv.Int32ToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "pod" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "pod",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.Pod))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "container" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "container",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.Container))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				return e.EncodeValue(conv.Int32ToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListLogLinesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeListLogLinesResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListLogStreams invokes listLogStreams operation.
+//
+// Every pod and container in the Project's namespace that wrote logs in the window: running Processes,
+// past ones and migration Jobs, from Loki. A 503 means Loki did not answer, or the dashboard runs
+// without one.
+//
+// GET /api/v1/projects/{project}/logs/streams
+func (c *Client) ListLogStreams(ctx context.Context, params ListLogStreamsParams) (ListLogStreamsRes, error) {
+	res, err := c.sendListLogStreams(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListLogStreams(ctx context.Context, params ListLogStreamsParams) (res ListLogStreamsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listLogStreams"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/v1/projects/{project}/logs/streams"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListLogStreamsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/api/v1/projects/"
+	{
+		// Encode "project" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.Project))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/logs/streams"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "hours" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "hours",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Hours.Get(); ok {
+				return e.EncodeValue(conv.Int32ToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListLogStreamsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeListLogStreamsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // ListPins invokes listPins operation.
 //
 // Every projects//source.yaml on the Estate repository's default branch: the digest its source names,
@@ -1149,8 +1518,8 @@ func (c *Client) sendListReleases(ctx context.Context) (res ListReleasesRes, err
 // ListRollouts invokes listRollouts operation.
 //
 // The production deployments composition opened for the Project in its repository, with the stages the
-// Reporter wrote on each. A repository outside the estate's owner has none. A 503 means GitHub did not
-// answer, or the dashboard has no Estate repository.
+// Reporter wrote on each and the run that logged them. A repository outside the estate's owner has
+// none. A 503 means GitHub did not answer, or the dashboard has no Estate repository.
 //
 // GET /api/v1/estate/projects/{project}/rollouts
 func (c *Client) ListRollouts(ctx context.Context, params ListRolloutsParams) (ListRolloutsRes, error) {

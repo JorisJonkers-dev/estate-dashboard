@@ -77,6 +77,27 @@ func (UnimplementedHandler) ListIssues(ctx context.Context) (r ListIssuesRes, _ 
 	return r, ht.ErrNotImplemented
 }
 
+// ListLogLines implements listLogLines operation.
+//
+// The newest lines one container of the Project wrote in the window, from Loki, oldest first. A 503
+// means Loki did not answer, or the dashboard runs without one.
+//
+// GET /api/v1/projects/{project}/logs
+func (UnimplementedHandler) ListLogLines(ctx context.Context, params ListLogLinesParams) (r ListLogLinesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListLogStreams implements listLogStreams operation.
+//
+// Every pod and container in the Project's namespace that wrote logs in the window: running Processes,
+// past ones and migration Jobs, from Loki. A 503 means Loki did not answer, or the dashboard runs
+// without one.
+//
+// GET /api/v1/projects/{project}/logs/streams
+func (UnimplementedHandler) ListLogStreams(ctx context.Context, params ListLogStreamsParams) (r ListLogStreamsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListPins implements listPins operation.
 //
 // Every projects//source.yaml on the Estate repository's default branch: the digest its source names,
@@ -102,8 +123,8 @@ func (UnimplementedHandler) ListReleases(ctx context.Context) (r ListReleasesRes
 // ListRollouts implements listRollouts operation.
 //
 // The production deployments composition opened for the Project in its repository, with the stages the
-// Reporter wrote on each. A repository outside the estate's owner has none. A 503 means GitHub did not
-// answer, or the dashboard has no Estate repository.
+// Reporter wrote on each and the run that logged them. A repository outside the estate's owner has
+// none. A 503 means GitHub did not answer, or the dashboard has no Estate repository.
 //
 // GET /api/v1/estate/projects/{project}/rollouts
 func (UnimplementedHandler) ListRollouts(ctx context.Context, params ListRolloutsParams) (r ListRolloutsRes, _ error) {

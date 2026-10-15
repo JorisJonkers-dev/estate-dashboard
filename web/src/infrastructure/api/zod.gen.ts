@@ -37,7 +37,7 @@ export const zPinList = z.object({
 });
 
 /**
- * Which delivery path each Project is on.
+ * Each Project's delivery path.
  */
 export const zHandover = z.object({
     estate: z.array(z.string().max(63)).max(1000),
@@ -72,6 +72,36 @@ export const zRollout = z.object({
  */
 export const zRolloutList = z.object({
     items: z.array(zRollout).max(100)
+});
+
+/**
+ * One container of one pod that wrote logs.
+ */
+export const zStream = z.object({
+    pod: z.string().max(253),
+    container: z.string().max(253)
+});
+
+/**
+ * The containers that wrote logs, by pod then container.
+ */
+export const zStreamList = z.object({
+    items: z.array(zStream).max(1000)
+});
+
+/**
+ * One log line.
+ */
+export const zLogLine = z.object({
+    at: z.iso.datetime({ offset: true }).max(64),
+    text: z.string().max(65536)
+});
+
+/**
+ * A container's lines, oldest first.
+ */
+export const zLogLines = z.object({
+    items: z.array(zLogLine).max(5000)
 });
 
 /**
@@ -308,7 +338,7 @@ export const zSilenceAlertResponse = zSilence;
 export const zListPinsResponse = zPinList;
 
 /**
- * What the Estate repository holds.
+ * The handover ledger.
  */
 export const zGetHandoverResponse = zHandover;
 
@@ -335,9 +365,38 @@ export const zListRolloutsQuery = z.object({
 });
 
 /**
- * What GitHub holds.
+ * The rollouts.
  */
 export const zListRolloutsResponse = zRolloutList;
+
+export const zListLogStreamsPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+export const zListLogStreamsQuery = z.object({
+    hours: z.int().gte(1).lte(720).optional().default(24)
+});
+
+/**
+ * What Loki holds.
+ */
+export const zListLogStreamsResponse = zStreamList;
+
+export const zListLogLinesPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+export const zListLogLinesQuery = z.object({
+    hours: z.int().gte(1).lte(720).optional().default(24),
+    pod: z.string().min(1).max(253).regex(/^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$/),
+    container: z.string().min(1).max(253).regex(/^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$/),
+    limit: z.int().gte(1).lte(5000).optional().default(500)
+});
+
+/**
+ * What Loki holds.
+ */
+export const zListLogLinesResponse = zLogLines;
 
 /**
  * What the Estate repository holds.

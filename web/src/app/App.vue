@@ -29,8 +29,8 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
   <RouterView v-if="route.meta.public" />
   <div v-else class="flex min-h-screen flex-col">
     <header class="border-b border-line">
-      <div class="mx-auto flex h-14 max-w-7xl items-stretch justify-between gap-4 px-4 md:h-16 md:justify-start md:gap-12 md:px-8">
-        <RouterLink to="/" aria-label="estate, overview" class="flex items-center gap-2.5 text-lg font-semibold tracking-wider text-text-primary hover:text-text-primary md:text-[19px]">
+      <div class="flex h-14 items-stretch justify-between gap-4 px-6 md:justify-start md:gap-12 lg:px-10">
+        <RouterLink to="/" aria-label="estate, overview" class="flex items-center gap-2.5 text-lg font-semibold tracking-wider text-text-primary no-underline hover:text-text-primary">
           <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
             <rect x="1" y="1" width="24" height="24" fill="none" stroke="#EDEDED" stroke-width="2" />
             <path d="M1 13h24M13 1v24" stroke="#EDEDED" stroke-width="2" />
@@ -52,7 +52,7 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
         <DropdownMenuRoot>
           <DropdownMenuTrigger
             aria-label="Account"
-            class="flex size-11 cursor-pointer items-center justify-center self-center rounded-full border border-control bg-transparent text-nav md:size-10"
+            class="ml-auto flex size-10 cursor-pointer items-center justify-center self-center rounded-full border border-control bg-transparent text-nav transition-colors hover:border-accent hover:text-accent"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="8" r="4" />
@@ -60,12 +60,12 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
             </svg>
           </DropdownMenuTrigger>
           <DropdownMenuPortal>
-            <DropdownMenuContent align="end" :side-offset="8" class="z-10 min-w-52 border border-line bg-surface-dark p-3 font-sans text-text-primary">
+            <DropdownMenuContent align="end" :side-offset="8" class="z-10 min-w-52 rounded-md border border-line bg-surface-dark p-3 font-sans text-text-primary">
               <DropdownMenuLabel v-if="session.data.value" class="mb-2 text-[15px] text-text-muted">
                 Signed in as {{ session.data.value.name }}
               </DropdownMenuLabel>
               <DropdownMenuItem
-                class="flex min-h-11 cursor-pointer items-center justify-center rounded-xs border border-control font-medium outline-none data-highlighted:border-accent"
+                class="flex min-h-11 cursor-pointer items-center justify-center rounded-md border border-control font-medium outline-none data-highlighted:border-accent data-highlighted:text-accent"
                 @select="signOut?.requestSubmit()"
               >
                 Sign out
@@ -77,7 +77,7 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
       </div>
     </header>
 
-    <main class="mx-auto box-border w-full max-w-7xl grow px-4 pt-6 pb-24 md:px-8 md:pt-10 md:pb-16">
+    <main class="box-border w-full grow px-6 pb-24 md:pb-16 lg:px-10">
       <RouterView />
     </main>
 

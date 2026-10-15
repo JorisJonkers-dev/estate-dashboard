@@ -16,46 +16,28 @@ const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', tim
 </script>
 
 <template>
-  <div class="flex flex-col gap-8 md:gap-10">
-    <HeadBand eyebrow="Alerts" title="Alert history" accent="var(--color-warn)">
-      Every alert that fired, and when it cleared.
-    </HeadBand>
+  <div class="flex flex-col gap-10">
+    <HeadBand eyebrow="Alerts" title="Alert history">Every alert that fired, and when it cleared.</HeadBand>
 
-    <p v-if="alertmanager" role="status" class="m-0 text-[15px] text-warn">{{ alertmanager }}</p>
+    <p v-if="alertmanager" role="status" class="-mt-4 mb-0 text-[15px] text-warn">{{ alertmanager }}</p>
 
-    <p v-if="isLoading" class="m-0 text-text-muted">Loading the history…</p>
+    <p v-if="isLoading" class="m-0 text-text-muted">Loading…</p>
     <p v-else-if="loadError" role="alert" class="m-0 text-crit">{{ loadError }}</p>
     <EmptyPlate v-else-if="events.length === 0" title="No alerts yet" :mark="alertmanager ? 'quiet' : 'tick'">
       Nothing has fired since the dashboard started keeping track.
     </EmptyPlate>
-    <ul v-else aria-label="Alert history" class="m-0 flex list-none flex-col gap-1.5 p-0">
+    <ul v-else aria-label="Alert history" class="m-0 list-none border-t border-line p-0">
       <li
         v-for="(event, i) in events"
         :key="event.id"
-        class="event rise relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-0.5 py-3 pr-4 pl-7 md:grid-cols-[minmax(0,1fr)_auto_auto]"
-        :class="event.status === 'firing' ? 'text-warn' : 'text-ok'"
+        class="rise grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-line-soft py-3 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
         :style="{ '--i': Math.min(i, 12) }"
       >
-        <span class="name font-semibold text-text-primary">{{ event.name }}</span>
-        <span class="state font-semibold whitespace-nowrap" :data-status="event.status">{{ describeEvent(event) }}</span>
-        <time class="col-span-2 text-sm whitespace-nowrap text-text-muted md:col-span-1 md:text-base" :datetime="event.observedAt">{{ dateFormat.format(new Date(event.observedAt)) }}</time>
+        <span class="size-2 rounded-full" :class="event.status === 'firing' ? 'bg-warn' : 'bg-ok'" aria-hidden="true" />
+        <span class="name font-medium">{{ event.name }}</span>
+        <span class="state whitespace-nowrap" :class="event.status === 'firing' ? 'text-warn' : 'text-ok'" :data-status="event.status">{{ describeEvent(event) }}</span>
+        <time class="col-span-3 pl-5 text-sm whitespace-nowrap text-text-muted md:col-span-1 md:pl-0" :datetime="event.observedAt">{{ dateFormat.format(new Date(event.observedAt)) }}</time>
       </li>
     </ul>
   </div>
 </template>
-
-<style scoped>
-.event {
-  background: linear-gradient(90deg, color-mix(in oklab, currentColor 9%, transparent), transparent 60%), var(--color-band);
-}
-.event::before {
-  content: '';
-  position: absolute;
-  top: 0.7rem;
-  bottom: 0.7rem;
-  left: 0.75rem;
-  width: 3px;
-  background: currentColor;
-  transform: skewX(-12deg);
-}
-</style>

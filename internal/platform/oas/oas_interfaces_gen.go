@@ -25,6 +25,14 @@ type ListIssuesRes interface {
 	listIssuesRes()
 }
 
+type ListLogLinesRes interface {
+	listLogLinesRes()
+}
+
+type ListLogStreamsRes interface {
+	listLogStreamsRes()
+}
+
 type ListPinsRes interface {
 	listPinsRes()
 }

@@ -63,15 +63,15 @@ export type PinList = {
 };
 
 /**
- * Which delivery path each Project is on.
+ * Each Project's delivery path.
  */
 export type Handover = {
     /**
-     * The Projects delivered by their pins, by name.
+     * Names of the Projects delivered by their pins.
      */
     estate: Array<string>;
     /**
-     * The Projects fleet-infra still delivers, by name.
+     * Names of the Projects still delivered by fleet-infra.
      */
     legacy: Array<string>;
 };
@@ -93,7 +93,7 @@ export type Stage = {
      */
     log?: string;
     /**
-     * When.
+     * When it happened.
      */
     at: string;
 };
@@ -140,6 +140,54 @@ export type RolloutList = {
      * The rollouts.
      */
     items: Array<Rollout>;
+};
+
+/**
+ * One container of one pod that wrote logs.
+ */
+export type Stream = {
+    /**
+     * The pod.
+     */
+    pod: string;
+    /**
+     * The container.
+     */
+    container: string;
+};
+
+/**
+ * The containers that wrote logs, by pod then container.
+ */
+export type StreamList = {
+    /**
+     * The containers.
+     */
+    items: Array<Stream>;
+};
+
+/**
+ * One log line.
+ */
+export type LogLine = {
+    /**
+     * When it was written.
+     */
+    at: string;
+    /**
+     * The line.
+     */
+    text: string;
+};
+
+/**
+ * A container's lines, oldest first.
+ */
+export type LogLines = {
+    /**
+     * The lines.
+     */
+    items: Array<LogLine>;
 };
 
 /**
@@ -195,11 +243,11 @@ export type Issue = {
      */
     updatedAt: string;
     /**
-     * The Project of the condition composition keeps this issue for, from the marker its body ends with; absent on an issue a person opened.
+     * The Project the issue is for, from the marker at the end of its body. Absent if a person opened the issue.
      */
     project?: string;
     /**
-     * The condition, likewise.
+     * The condition, from the same marker.
      */
     condition?: string;
 };
@@ -287,11 +335,11 @@ export type Unit = {
      */
     applied?: string;
     /**
-     * The release the unit's pin names, from the event.toolkit.fluxcd.io/version annotation composition writes on it; absent on a unit no composition wrote.
+     * The release the unit's pin names, from the event.toolkit.fluxcd.io/version annotation. Absent if composition wrote none.
      */
     version?: string;
     /**
-     * The repository that release was published from, from the event.toolkit.fluxcd.io/repository annotation; absent likewise.
+     * The repository the release came from, from the event.toolkit.fluxcd.io/repository annotation. Absent if composition wrote none.
      */
     repository?: string;
     /**
@@ -736,7 +784,7 @@ export type GetHandoverError = GetHandoverErrors[keyof GetHandoverErrors];
 
 export type GetHandoverResponses = {
     /**
-     * What the Estate repository holds.
+     * The handover ledger.
      */
     200: Handover;
 };
@@ -796,7 +844,7 @@ export type ListRolloutsData = {
     };
     query: {
         /**
-         * The repository the Project publishes from, owner/name.
+         * The repository the Project publishes from, as owner/name.
          */
         repository: string;
         /**
@@ -826,12 +874,110 @@ export type ListRolloutsError = ListRolloutsErrors[keyof ListRolloutsErrors];
 
 export type ListRolloutsResponses = {
     /**
-     * What GitHub holds.
+     * The rollouts.
      */
     200: RolloutList;
 };
 
 export type ListRolloutsResponse = ListRolloutsResponses[keyof ListRolloutsResponses];
+
+export type ListLogStreamsData = {
+    body?: never;
+    path: {
+        /**
+         * The Project.
+         */
+        project: string;
+    };
+    query?: {
+        /**
+         * How many hours back to look.
+         */
+        hours?: number;
+    };
+    url: '/api/v1/projects/{project}/logs/streams';
+};
+
+export type ListLogStreamsErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListLogStreamsError = ListLogStreamsErrors[keyof ListLogStreamsErrors];
+
+export type ListLogStreamsResponses = {
+    /**
+     * What Loki holds.
+     */
+    200: StreamList;
+};
+
+export type ListLogStreamsResponse = ListLogStreamsResponses[keyof ListLogStreamsResponses];
+
+export type ListLogLinesData = {
+    body?: never;
+    path: {
+        /**
+         * The Project.
+         */
+        project: string;
+    };
+    query: {
+        /**
+         * How many hours back to look.
+         */
+        hours?: number;
+        /**
+         * The pod.
+         */
+        pod: string;
+        /**
+         * The container.
+         */
+        container: string;
+        /**
+         * How many lines to return.
+         */
+        limit?: number;
+    };
+    url: '/api/v1/projects/{project}/logs';
+};
+
+export type ListLogLinesErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListLogLinesError = ListLogLinesErrors[keyof ListLogLinesErrors];
+
+export type ListLogLinesResponses = {
+    /**
+     * What Loki holds.
+     */
+    200: LogLines;
+};
+
+export type ListLogLinesResponse = ListLogLinesResponses[keyof ListLogLinesResponses];
 
 export type ListIssuesData = {
     body?: never;

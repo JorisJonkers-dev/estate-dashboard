@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	rn21AllowedHeaders = map[string]string{
+	rn25AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
 )
@@ -161,7 +161,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn21AllowedHeaders,
+									allowedHeaders: rn25AllowedHeaders,
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -451,6 +451,84 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 							}
 
+						}
+
+					}
+
+				}
+
+			case 'p': // Prefix: "projects/"
+
+				if l := len("projects/"); len(elem) >= l && elem[0:l] == "projects/" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				// Param: "project"
+				// Match until "/"
+				idx := strings.IndexByte(elem, '/')
+				if idx < 0 {
+					idx = len(elem)
+				}
+				args[0] = elem[:idx]
+				elem = elem[idx:]
+
+				if len(elem) == 0 {
+					break
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/logs"
+
+					if l := len("/logs"); len(elem) >= l && elem[0:l] == "/logs" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						switch r.Method {
+						case "GET":
+							s.handleListLogLinesRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: nil,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/streams"
+
+						if l := len("/streams"); len(elem) >= l && elem[0:l] == "/streams" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleListLogStreamsRequest([1]string{
+									args[0],
+								}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: nil,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
+
+							return
 						}
 
 					}
@@ -801,7 +879,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						switch method {
 						case "GET":
 							r.name = GetHandoverOperation
-							r.summary = "Delivery path of each Project"
+							r.summary = "Show each Project's delivery path"
 							r.operationID = "getHandover"
 							r.operationGroup = ""
 							r.pathPattern = "/api/v1/estate/handover"
@@ -960,6 +1038,80 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 
 							}
 
+						}
+
+					}
+
+				}
+
+			case 'p': // Prefix: "projects/"
+
+				if l := len("projects/"); len(elem) >= l && elem[0:l] == "projects/" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				// Param: "project"
+				// Match until "/"
+				idx := strings.IndexByte(elem, '/')
+				if idx < 0 {
+					idx = len(elem)
+				}
+				args[0] = elem[:idx]
+				elem = elem[idx:]
+
+				if len(elem) == 0 {
+					break
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/logs"
+
+					if l := len("/logs"); len(elem) >= l && elem[0:l] == "/logs" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						switch method {
+						case "GET":
+							r.name = ListLogLinesOperation
+							r.summary = "Read one container's logs, oldest first"
+							r.operationID = "listLogLines"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/projects/{project}/logs"
+							r.args = args
+							r.count = 1
+							return r, true
+						default:
+							return
+						}
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/streams"
+
+						if l := len("/streams"); len(elem) >= l && elem[0:l] == "/streams" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = ListLogStreamsOperation
+								r.summary = "List the containers of a Project that wrote logs"
+								r.operationID = "listLogStreams"
+								r.operationGroup = ""
+								r.pathPattern = "/api/v1/projects/{project}/logs/streams"
+								r.args = args
+								r.count = 1
+								return r, true
+							default:
+								return
+							}
 						}
 
 					}

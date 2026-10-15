@@ -7,7 +7,8 @@
  * The dashboard's look, from its design canvas (JorisJonkers-dev/estate-dashboard#4), on top of the
  * estate's shared tokens: dark only, hairline dividers and no cards, one lime accent used only for
  * what is current or selected, blue for actions. Where the canvas names a shared token's colour,
- * the shared token is set to it, so the commons components draw in the same palette.
+ * the shared token is set to it, so the commons components draw in the same palette. Clean and
+ * quiet: no blue, no decoration, colour only where something needs attention.
  */
 @theme {
   --color-surface-dark: #1e1e1e;
@@ -23,24 +24,19 @@
   --color-control: #444444;
   --color-nav: #c8c8c8;
   --color-dim: #8f8f8f;
-  --color-action: #3387fa;
-  --color-link: #549aff;
-  --color-link-hover: #8ab9ff;
 
   /* One hue per kind of attention. */
   --color-ok: #6fd39a;
   --color-warn: #ffb020;
   --color-crit: #ff5a6a;
-  --color-info: #6ea8ff;
+  /* Something under way: neutral rather than a colour, so the colours stay for what needs you. */
+  --color-info: #e8e8e8;
   --color-back: #c29bff;
   --color-idle: #a3a3a3;
 
-  /* Grounds, a step either side of the page: a band, a panel, a raised panel. */
-  --color-pit: #202020;
-  --color-panel: #262626;
-  --color-raised: #2e2e2e;
-  --color-hairline: oklch(1 0 0 / 10%);
-  --color-band: color-mix(in oklab, #202020 86%, transparent);
+  /* Grounds a step above the page: the head band, and a row under the pointer. */
+  --color-band: #232323;
+  --color-panel: #282828;
 
   /* One curve for everything that moves. */
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
@@ -54,35 +50,26 @@
     @apply font-sans text-base/[1.45];
   }
   a {
-    @apply text-link hover:text-link-hover;
+    @apply text-text-primary underline decoration-line underline-offset-4 transition-colors hover:text-accent hover:decoration-accent;
   }
 }
 
 /*
- * The cut: every edge the dashboard draws leans the same way, vertical edges sliced and
- * horizontals straight (the house language of ESA-Blueshell/website, docs/design-language.md).
- * `--cut` sets how far; a row cuts at its own height times tan 12 degrees so its edge runs
- * parallel to the hover bar.
+ * Shapes, the same everywhere: buttons, panels, menus and fields round at 6px (rounded-md); a
+ * state is a pill (rounded-full); dots and the account button are circles. Bands, tables and
+ * rules stay square.
  */
-@utility cut {
-  clip-path: polygon(var(--cut, 0.7rem) 0, 100% 0, calc(100% - var(--cut, 0.7rem)) 100%, 0 100%);
-}
 
-/* A diagonal hatch: the dashboard's texture, laid faint under a head band. */
-@utility hatch {
-  background-image: repeating-linear-gradient(112deg, oklch(1 0 0 / 3%) 0 1px, transparent 1px 14px);
-}
-
-/* Things arrive: a short rise into place, staggered by `--i`, and still for anyone who asked. */
+/* Things arrive: a short fade into place, staggered by `--i`, and still for anyone who asked. */
 @utility rise {
-  animation: rise 560ms var(--ease-out-quint) both;
-  animation-delay: calc(var(--i, 0) * 45ms);
+  animation: rise 420ms var(--ease-out-quint) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
 }
 
 @keyframes rise {
   from {
     opacity: 0;
-    translate: 0 10px;
+    translate: 0 4px;
   }
 }
 

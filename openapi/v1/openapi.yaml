@@ -19,6 +19,8 @@ servers:
 security:
   - sessionCookie: []
 tags:
+  - name: logs
+    description: What a Project's containers wrote, from Loki.
   - name: estate
     description: >-
       What the Estate repository says, read through a token that may read it and nothing else: each
@@ -246,6 +248,117 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RolloutList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/projects/{project}/logs/streams:
+    get:
+      operationId: listLogStreams
+      summary: List the containers of a Project that wrote logs
+      description: >-
+        Every pod and container in the Project's namespace that wrote logs in the window: running
+        Processes, past ones and migration Jobs, from Loki. A 503 means Loki did not answer, or the
+        dashboard runs without one.
+      tags: [logs]
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: The Project.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+            pattern: "^[a-z0-9_][a-z0-9_-]{0,62}$"
+        - name: hours
+          in: query
+          required: false
+          description: How many hours back to look.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 720
+            default: 24
+      responses:
+        "200":
+          description: What Loki holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/projects/{project}/logs:
+    get:
+      operationId: listLogLines
+      summary: Read one container's logs, oldest first
+      description: >-
+        The newest lines one container of the Project wrote in the window, from Loki, oldest first.
+        A 503 means Loki did not answer, or the dashboard runs without one.
+      tags: [logs]
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: The Project.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+            pattern: "^[a-z0-9_][a-z0-9_-]{0,62}$"
+        - name: hours
+          in: query
+          required: false
+          description: How many hours back to look.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 720
+            default: 24
+        - name: pod
+          in: query
+          required: true
+          description: The pod.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+            pattern: "^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$"
+        - name: container
+          in: query
+          required: true
+          description: The container.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+            pattern: "^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$"
+        - name: limit
+          in: query
+          required: false
+          description: How many lines to return.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 5000
+            default: 500
+      responses:
+        "200":
+          description: What Loki holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogLines"
         "401":
           $ref: "#/components/responses/Problem"
         "503":
@@ -541,6 +654,59 @@ components:
           description: The rollouts.
           items:
             $ref: "#/components/schemas/Rollout"
+    Stream:
+      description: One container of one pod that wrote logs.
+      type: object
+      additionalProperties: false
+      required: [pod, container]
+      properties:
+        pod:
+          type: string
+          maxLength: 253
+          description: The pod.
+        container:
+          type: string
+          maxLength: 253
+          description: The container.
+    StreamList:
+      description: The containers that wrote logs, by pod then container.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 1000
+          description: The containers.
+          items:
+            $ref: "#/components/schemas/Stream"
+    LogLine:
+      description: One log line.
+      type: object
+      additionalProperties: false
+      required: [at, text]
+      properties:
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was written.
+        text:
+          type: string
+          maxLength: 65536
+          description: The line.
+    LogLines:
+      description: A container's lines, oldest first.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 5000
+          description: The lines.
+          items:
+            $ref: "#/components/schemas/LogLine"
     Deploy:
       description: One commit that moved a pin.
       type: object

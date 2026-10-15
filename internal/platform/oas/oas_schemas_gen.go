@@ -405,9 +405,9 @@ func (*GetHandoverUnauthorized) getHandoverRes() {}
 // Each Project's delivery path.
 // Ref: #/components/schemas/Handover
 type Handover struct {
-	// Projects delivered by their pins.
+	// Names of the Projects delivered by their pins.
 	Estate []string `json:"estate"`
-	// Projects still delivered by fleet-infra.
+	// Names of the Projects still delivered by fleet-infra.
 	Legacy []string `json:"legacy"`
 }
 
@@ -449,7 +449,7 @@ type Issue struct {
 	// The Project the issue is for, from the marker at the end of its body. Absent if a person opened the
 	// issue.
 	Project OptString `json:"project"`
-	// The condition the issue is for.
+	// The condition, from the same marker.
 	Condition OptString `json:"condition"`
 }
 
@@ -566,6 +566,22 @@ type ListIssuesUnauthorized ProblemStatusCode
 
 func (*ListIssuesUnauthorized) listIssuesRes() {}
 
+type ListLogLinesServiceUnavailable ProblemStatusCode
+
+func (*ListLogLinesServiceUnavailable) listLogLinesRes() {}
+
+type ListLogLinesUnauthorized ProblemStatusCode
+
+func (*ListLogLinesUnauthorized) listLogLinesRes() {}
+
+type ListLogStreamsServiceUnavailable ProblemStatusCode
+
+func (*ListLogStreamsServiceUnavailable) listLogStreamsRes() {}
+
+type ListLogStreamsUnauthorized ProblemStatusCode
+
+func (*ListLogStreamsUnauthorized) listLogStreamsRes() {}
+
 type ListPinsServiceUnavailable ProblemStatusCode
 
 func (*ListPinsServiceUnavailable) listPinsRes() {}
@@ -605,6 +621,54 @@ func (*ListUnitsServiceUnavailable) listUnitsRes() {}
 type ListUnitsUnauthorized ProblemStatusCode
 
 func (*ListUnitsUnauthorized) listUnitsRes() {}
+
+// One log line.
+// Ref: #/components/schemas/LogLine
+type LogLine struct {
+	// When it was written.
+	At time.Time `json:"at"`
+	// The line.
+	Text string `json:"text"`
+}
+
+// GetAt returns the value of At.
+func (s *LogLine) GetAt() time.Time {
+	return s.At
+}
+
+// GetText returns the value of Text.
+func (s *LogLine) GetText() string {
+	return s.Text
+}
+
+// SetAt sets the value of At.
+func (s *LogLine) SetAt(val time.Time) {
+	s.At = val
+}
+
+// SetText sets the value of Text.
+func (s *LogLine) SetText(val string) {
+	s.Text = val
+}
+
+// A container's lines, oldest first.
+// Ref: #/components/schemas/LogLines
+type LogLines struct {
+	// The lines.
+	Items []LogLine `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *LogLines) GetItems() []LogLine {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *LogLines) SetItems(val []LogLine) {
+	s.Items = val
+}
+
+func (*LogLines) listLogLinesRes() {}
 
 // One member of a gated Application, as Flagger switches it.
 // Ref: #/components/schemas/Member
@@ -1866,6 +1930,54 @@ func (s *Stage) SetLog(val OptString) {
 func (s *Stage) SetAt(val time.Time) {
 	s.At = val
 }
+
+// One container of one pod that wrote logs.
+// Ref: #/components/schemas/Stream
+type Stream struct {
+	// The pod.
+	Pod string `json:"pod"`
+	// The container.
+	Container string `json:"container"`
+}
+
+// GetPod returns the value of Pod.
+func (s *Stream) GetPod() string {
+	return s.Pod
+}
+
+// GetContainer returns the value of Container.
+func (s *Stream) GetContainer() string {
+	return s.Container
+}
+
+// SetPod sets the value of Pod.
+func (s *Stream) SetPod(val string) {
+	s.Pod = val
+}
+
+// SetContainer sets the value of Container.
+func (s *Stream) SetContainer(val string) {
+	s.Container = val
+}
+
+// The containers that wrote logs, by pod then container.
+// Ref: #/components/schemas/StreamList
+type StreamList struct {
+	// The containers.
+	Items []Stream `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *StreamList) GetItems() []Stream {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *StreamList) SetItems(val []Stream) {
+	s.Items = val
+}
+
+func (*StreamList) listLogStreamsRes() {}
 
 // One Flux Kustomization, one Reconcile Unit.
 // Ref: #/components/schemas/Unit

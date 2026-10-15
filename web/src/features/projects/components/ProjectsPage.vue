@@ -9,8 +9,8 @@ const onEstate = computed(() => projects.value.filter((p) => p.path === 'estate'
 </script>
 
 <template>
-  <div class="flex flex-col gap-8 md:gap-10">
-    <HeadBand eyebrow="Production" title="Projects">{{ projects.length }} projects · {{ onEstate }} on the estate path</HeadBand>
+  <div class="flex flex-col gap-10">
+    <HeadBand eyebrow="Production" title="Projects">{{ projects.length }} projects, {{ onEstate }} on the estate path</HeadBand>
     <ProjectsList :projects="projects" :loading="isLoading" />
   </div>
 </template>

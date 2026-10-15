@@ -12,6 +12,8 @@ const (
 	ListAlertsOperation       OperationName = "ListAlerts"
 	ListDeploysOperation      OperationName = "ListDeploys"
 	ListIssuesOperation       OperationName = "ListIssues"
+	ListLogLinesOperation     OperationName = "ListLogLines"
+	ListLogStreamsOperation   OperationName = "ListLogStreams"
 	ListPinsOperation         OperationName = "ListPins"
 	ListReleasesOperation     OperationName = "ListReleases"
 	ListRolloutsOperation     OperationName = "ListRollouts"

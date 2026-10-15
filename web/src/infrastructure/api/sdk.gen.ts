@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
-import { zGetHandoverResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListPinsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
+import type { GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListLogLinesData, ListLogLinesErrors, ListLogLinesResponses, ListLogStreamsData, ListLogStreamsErrors, ListLogStreamsResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
+import { zGetHandoverResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListLogLinesPath, zListLogLinesQuery, zListLogLinesResponse, zListLogStreamsPath, zListLogStreamsQuery, zListLogStreamsResponse, zListPinsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -110,9 +110,9 @@ export const listPins = <ThrowOnError extends boolean = false>(options?: Options
 });
 
 /**
- * Say which delivery path each Project is on
+ * Show each Project's delivery path
  *
- * The handover ledger of the Platform document, platform.intent.yml on the Estate repository's default branch: the Projects delivered by their pins, and those fleet-infra still delivers. A Platform document without a ledger has handed every Project over, and lists none as legacy. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ * The handover ledger from platform.intent.yml on the Estate repository's default branch. It lists the Projects their pins deliver, and the ones fleet-infra still delivers. A document with no ledger has handed every Project over, so nothing is legacy. A 503 means GitHub did not answer, or the dashboard has no Estate repository.
  */
 export const getHandover = <ThrowOnError extends boolean = false>(options?: Options<GetHandoverData, ThrowOnError>): RequestResult<GetHandoverResponses, GetHandoverErrors, ThrowOnError> => (options?.client ?? client).get<GetHandoverResponses, GetHandoverErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -154,7 +154,7 @@ export const listDeploys = <ThrowOnError extends boolean = false>(options: Optio
 /**
  * List a Project's rollouts to production, newest first
  *
- * The GitHub Deployments composition opened for the Project in its own repository, with the stages the Reporter wrote on each and the run that logged them. A repository outside the estate's owner has none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ * The production deployments composition opened for the Project in its repository, with the stages the Reporter wrote on each and the run that logged them. A repository outside the estate's owner has none. A 503 means GitHub did not answer, or the dashboard has no Estate repository.
  */
 export const listRollouts = <ThrowOnError extends boolean = false>(options: Options<ListRolloutsData, ThrowOnError>): RequestResult<ListRolloutsResponses, ListRolloutsErrors, ThrowOnError> => (options.client ?? client).get<ListRolloutsResponses, ListRolloutsErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -169,6 +169,48 @@ export const listRollouts = <ThrowOnError extends boolean = false>(options: Opti
             type: 'apiKey'
         }],
     url: '/api/v1/estate/projects/{project}/rollouts',
+    ...options
+});
+
+/**
+ * List the containers of a Project that wrote logs
+ *
+ * Every pod and container in the Project's namespace that wrote logs in the window: running Processes, past ones and migration Jobs, from Loki. A 503 means Loki did not answer, or the dashboard runs without one.
+ */
+export const listLogStreams = <ThrowOnError extends boolean = false>(options: Options<ListLogStreamsData, ThrowOnError>): RequestResult<ListLogStreamsResponses, ListLogStreamsErrors, ThrowOnError> => (options.client ?? client).get<ListLogStreamsResponses, ListLogStreamsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zListLogStreamsPath,
+        query: zListLogStreamsQuery.optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListLogStreamsResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects/{project}/logs/streams',
+    ...options
+});
+
+/**
+ * Read one container's logs, oldest first
+ *
+ * The newest lines one container of the Project wrote in the window, from Loki, oldest first. A 503 means Loki did not answer, or the dashboard runs without one.
+ */
+export const listLogLines = <ThrowOnError extends boolean = false>(options: Options<ListLogLinesData, ThrowOnError>): RequestResult<ListLogLinesResponses, ListLogLinesErrors, ThrowOnError> => (options.client ?? client).get<ListLogLinesResponses, ListLogLinesErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zListLogLinesPath,
+        query: zListLogLinesQuery
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListLogLinesResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/projects/{project}/logs',
     ...options
 });
 

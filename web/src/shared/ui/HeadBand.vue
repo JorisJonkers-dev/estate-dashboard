@@ -1,45 +1,32 @@
 <script setup lang="ts">
-import BandRule from './BandRule.vue'
+import { toneText, type Tone } from '../tone'
 
 /**
- * The head of a page: an eyebrow, the heading and a line under it, on a band washed from the top
- * left in the page's accent, over the hatch. A seam closes it. Facts and actions go in its slots.
+ * The head of a page: full width under the top bar, a step lighter than the page, with an
+ * optional faint wash in the page's state colour. Facts and actions go in its slots.
  */
-const { eyebrow, title, accent = 'var(--color-accent)' } = defineProps<{ eyebrow: string; title: string; accent?: string }>()
+const { eyebrow, title, tone = 'none' } = defineProps<{ eyebrow: string; title: string; tone?: Tone | 'none' }>()
 </script>
 
 <template>
-  <header class="relative -mx-4 md:-mx-8">
-    <div class="head hatch relative overflow-hidden px-4 pt-7 pb-6 md:px-8 md:pt-9 md:pb-8" :style="{ '--accent': accent }">
-      <span aria-hidden="true" class="blob" />
-      <div class="relative flex flex-wrap items-end justify-between gap-6">
+  <header class="band -mx-6 border-b border-line lg:-mx-10" :class="tone === 'none' ? 'text-text-muted' : toneText[tone]">
+    <div class="px-6 pt-8 pb-7 lg:px-10 lg:pt-10 lg:pb-8">
+      <div class="flex flex-wrap items-end justify-between gap-6">
         <div class="min-w-0">
-          <p class="rise m-0 text-[11px] font-semibold tracking-[0.3em] text-accent uppercase">{{ eyebrow }}</p>
-          <h1 class="rise m-0 mt-2 text-[30px] leading-[1.05] font-semibold tracking-[0.01em] md:text-[40px]" style="--i: 1">
-            {{ title }}<slot name="title" />
-          </h1>
-          <div class="rise mt-2 text-text-muted" style="--i: 2"><slot /></div>
+          <p class="m-0 text-xs font-semibold tracking-[0.2em] text-text-muted uppercase">{{ eyebrow }}</p>
+          <h1 class="m-0 mt-1.5 text-3xl leading-tight font-semibold text-text-primary lg:text-4xl">{{ title }}<slot name="title" /></h1>
+          <div class="mt-2 text-text-muted"><slot /></div>
         </div>
-        <div v-if="$slots.acts" class="rise flex flex-wrap gap-2.5" style="--i: 3"><slot name="acts" /></div>
+        <div v-if="$slots.acts" class="flex flex-wrap gap-2"><slot name="acts" /></div>
       </div>
-      <div v-if="$slots.facts" class="rise relative mt-6" style="--i: 3"><slot name="facts" /></div>
+      <div v-if="$slots.facts" class="mt-7"><slot name="facts" /></div>
     </div>
-    <BandRule />
   </header>
 </template>
 
 <style scoped>
-.head {
-  background: linear-gradient(150deg, color-mix(in oklab, var(--accent) 9%, transparent), transparent 62%), var(--color-band);
-}
-.blob {
-  position: absolute;
-  top: -40%;
-  right: -6%;
-  width: 34rem;
-  height: 34rem;
-  border-radius: 9999px;
-  background: radial-gradient(closest-side, color-mix(in oklab, var(--color-action) 16%, transparent), transparent);
-  pointer-events: none;
+/* A tone, where the page has one, washes in faintly from the left. */
+.band {
+  background: linear-gradient(90deg, color-mix(in oklab, currentColor 5%, transparent), transparent 45%), var(--color-band);
 }
 </style>

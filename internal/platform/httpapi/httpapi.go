@@ -13,6 +13,7 @@ import (
 	alertsweb "github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/adapters/web"
 	deliveryweb "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/adapters/web"
 	estateweb "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/adapters/web"
+	logsweb "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/adapters/web"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpx"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oas"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oidc"
@@ -29,6 +30,7 @@ type api struct {
 	*alertsweb.Live
 	*deliveryweb.Delivery
 	*estateweb.Estate
+	*logsweb.Logs
 	logger *slog.Logger
 }
 
@@ -71,9 +73,9 @@ func (s admitted) HandleSessionCookie(ctx context.Context, _ oas.OperationName, 
 }
 
 // New returns the API's http.Handler, serving every path the contract declares under /api.
-func New(logger *slog.Logger, gate Gate, alerts alertsweb.UseCases, live alertsweb.LiveUseCases, delivery deliveryweb.UseCases, estate estateweb.UseCases) (http.Handler, error) {
+func New(logger *slog.Logger, gate Gate, alerts alertsweb.UseCases, live alertsweb.LiveUseCases, delivery deliveryweb.UseCases, estate estateweb.UseCases, logs logsweb.UseCases) (http.Handler, error) {
 	return oas.NewServer(
-		&api{Handler: alertsweb.New(alerts), Live: alertsweb.NewLive(live, logger), Delivery: deliveryweb.New(delivery, logger), Estate: estateweb.New(estate, logger), logger: logger},
+		&api{Handler: alertsweb.New(alerts), Live: alertsweb.NewLive(live, logger), Delivery: deliveryweb.New(delivery, logger), Estate: estateweb.New(estate, logger), Logs: logsweb.New(logs, logger), logger: logger},
 		admitted{gate: gate},
 		oas.WithErrorHandler(func(_ context.Context, w http.ResponseWriter, _ *http.Request, err error) {
 			httpx.WriteProblem(w, ogenerrors.ErrorCode(err), "")
