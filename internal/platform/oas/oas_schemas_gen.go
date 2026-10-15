@@ -715,6 +715,8 @@ func (*Declaration) getDeclarationRes() {}
 type DeclaredApplication struct {
 	// The Application.
 	ID string `json:"id"`
+	// What it does, in one sentence, from the project file.
+	Description OptString `json:"description"`
 	// Its Processes.
 	Processes []DeclaredProcess    `json:"processes"`
 	Migration OptDeclaredMigration `json:"migration"`
@@ -723,6 +725,11 @@ type DeclaredApplication struct {
 // GetID returns the value of ID.
 func (s *DeclaredApplication) GetID() string {
 	return s.ID
+}
+
+// GetDescription returns the value of Description.
+func (s *DeclaredApplication) GetDescription() OptString {
+	return s.Description
 }
 
 // GetProcesses returns the value of Processes.
@@ -738,6 +745,11 @@ func (s *DeclaredApplication) GetMigration() OptDeclaredMigration {
 // SetID sets the value of ID.
 func (s *DeclaredApplication) SetID(val string) {
 	s.ID = val
+}
+
+// SetDescription sets the value of Description.
+func (s *DeclaredApplication) SetDescription(val OptString) {
+	s.Description = val
 }
 
 // SetProcesses sets the value of Processes.
@@ -862,6 +874,8 @@ func (s *DeclaredMigrationUndo) UnmarshalText(data []byte) error {
 type DeclaredProcess struct {
 	// The Process.
 	Name string `json:"name"`
+	// What it does, in one sentence, from the project file.
+	Description OptString `json:"description"`
 	// How a new release replaces it.
 	Switchover DeclaredProcessSwitchover `json:"switchover"`
 	// How many run.
@@ -871,6 +885,11 @@ type DeclaredProcess struct {
 // GetName returns the value of Name.
 func (s *DeclaredProcess) GetName() string {
 	return s.Name
+}
+
+// GetDescription returns the value of Description.
+func (s *DeclaredProcess) GetDescription() OptString {
+	return s.Description
 }
 
 // GetSwitchover returns the value of Switchover.
@@ -886,6 +905,11 @@ func (s *DeclaredProcess) GetReplicas() int32 {
 // SetName sets the value of Name.
 func (s *DeclaredProcess) SetName(val string) {
 	s.Name = val
+}
+
+// SetDescription sets the value of Description.
+func (s *DeclaredProcess) SetDescription(val OptString) {
+	s.Description = val
 }
 
 // SetSwitchover sets the value of Switchover.
@@ -2723,6 +2747,10 @@ type Stream struct {
 	Container string `json:"container"`
 	// The release the pod ran, from its app.kubernetes.io/version label; absent without one.
 	Version OptString `json:"version"`
+	// When it wrote its first line in the window.
+	First OptDateTime `json:"first"`
+	// When it wrote its latest line.
+	Last OptDateTime `json:"last"`
 }
 
 // GetPod returns the value of Pod.
@@ -2740,6 +2768,16 @@ func (s *Stream) GetVersion() OptString {
 	return s.Version
 }
 
+// GetFirst returns the value of First.
+func (s *Stream) GetFirst() OptDateTime {
+	return s.First
+}
+
+// GetLast returns the value of Last.
+func (s *Stream) GetLast() OptDateTime {
+	return s.Last
+}
+
 // SetPod sets the value of Pod.
 func (s *Stream) SetPod(val string) {
 	s.Pod = val
@@ -2753,6 +2791,16 @@ func (s *Stream) SetContainer(val string) {
 // SetVersion sets the value of Version.
 func (s *Stream) SetVersion(val OptString) {
 	s.Version = val
+}
+
+// SetFirst sets the value of First.
+func (s *Stream) SetFirst(val OptDateTime) {
+	s.First = val
+}
+
+// SetLast sets the value of Last.
+func (s *Stream) SetLast(val OptDateTime) {
+	s.Last = val
 }
 
 // The containers that wrote logs, by pod then container.

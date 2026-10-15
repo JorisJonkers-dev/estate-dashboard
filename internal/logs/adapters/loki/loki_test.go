@@ -18,9 +18,19 @@ var now = time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
 // serve is a Loki answering every request with status and body, recording what it was asked.
 func serve(t *testing.T, status int, body string, asked *[]string) *loki.Loki {
 	t.Helper()
+	return serveEach(t, status, map[string]string{"": body}, asked)
+}
+
+// serveEach answers each path with its own body, and any other with the one keyed "".
+func serveEach(t *testing.T, status int, bodies map[string]string, asked *[]string) *loki.Loki {
+	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		*asked = append(*asked, r.URL.Path+"?"+r.URL.RawQuery)
 		w.WriteHeader(status)
+		body, ok := bodies[r.URL.Path]
+		if !ok {
+			body = bodies[""]
+		}
 		_, _ = io.WriteString(w, body)
 	}))
 	t.Cleanup(srv.Close)
@@ -41,14 +51,18 @@ func TestNewTakesOnlyAnHTTPURL(t *testing.T) {
 
 func TestStreamsAreEachPodAndContainerOnce(t *testing.T) {
 	var asked []string
-	l := serve(t, http.StatusOK, `{"data":[
+	l := serveEach(t, http.StatusOK, map[string]string{
+		"/loki/api/v1/series": `{"data":[
 		{"namespace":"auth-system","pod":"auth-api-1","container":"auth-api","level":"INFO"},
 		{"namespace":"auth-system","pod":"auth-api-1","container":"auth-api","level":"WARN"},
 		{"namespace":"auth-system","pod":"auth-migration-x","container":"liquibase","version":"3.5.0"},
 		{"namespace":"auth-system","pod":"","container":"x"}
-	]}`, &asked)
+	]}`,
+		"/loki/api/v1/query_range": `{"data":{"result":[{"values":[["1792065590000000000","x"]]}]}}`,
+	}, &asked)
 	got, err := l.Streams(t.Context(), "auth-system", now.Add(-time.Hour))
-	want := []domain.Stream{{Pod: "auth-api-1", Container: "auth-api"}, {Pod: "auth-migration-x", Container: "liquibase", Version: "3.5.0"}}
+	at := time.Unix(0, 1792065590000000000).UTC()
+	want := []domain.Stream{{Pod: "auth-api-1", Container: "auth-api", First: at, Last: at}, {Pod: "auth-migration-x", Container: "liquibase", Version: "3.5.0", First: at, Last: at}}
 	if err != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("streams = %+v, %v", got, err)
 	}

@@ -769,6 +769,16 @@ components:
           type: string
           maxLength: 128
           description: The release the pod ran, from its app.kubernetes.io/version label; absent without one.
+        first:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it wrote its first line in the window.
+        last:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it wrote its latest line.
     StreamList:
       description: The containers that wrote logs, by pod then container.
       type: object
@@ -935,6 +945,10 @@ components:
           type: string
           maxLength: 63
           description: The Process.
+        description:
+          type: string
+          maxLength: 200
+          description: What it does, in one sentence, from the project file.
         switchover:
           type: string
           enum: [blue-green, continuous, interrupted]
@@ -981,6 +995,10 @@ components:
           type: string
           maxLength: 63
           description: The Application.
+        description:
+          type: string
+          maxLength: 200
+          description: What it does, in one sentence, from the project file.
         processes:
           type: array
           maxItems: 64

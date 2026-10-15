@@ -1597,6 +1597,12 @@ func (s *DeclaredApplication) encodeFields(e *jx.Encoder) {
 		e.Str(s.ID)
 	}
 	{
+		if s.Description.Set {
+			e.FieldStart("description")
+			s.Description.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("processes")
 		e.ArrStart()
 		for _, elem := range s.Processes {
@@ -1612,10 +1618,11 @@ func (s *DeclaredApplication) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfDeclaredApplication = [3]string{
+var jsonFieldsNameOfDeclaredApplication = [4]string{
 	0: "id",
-	1: "processes",
-	2: "migration",
+	1: "description",
+	2: "processes",
+	3: "migration",
 }
 
 // Decode decodes DeclaredApplication from json.
@@ -1639,8 +1646,18 @@ func (s *DeclaredApplication) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"id\"")
 			}
+		case "description":
+			if err := func() error {
+				s.Description.Reset()
+				if err := s.Description.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"description\"")
+			}
 		case "processes":
-			requiredBitSet[0] |= 1 << 1
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				s.Processes = make([]DeclaredProcess, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -1677,7 +1694,7 @@ func (s *DeclaredApplication) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000101,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -1939,6 +1956,12 @@ func (s *DeclaredProcess) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
+		if s.Description.Set {
+			e.FieldStart("description")
+			s.Description.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("switchover")
 		s.Switchover.Encode(e)
 	}
@@ -1948,10 +1971,11 @@ func (s *DeclaredProcess) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfDeclaredProcess = [3]string{
+var jsonFieldsNameOfDeclaredProcess = [4]string{
 	0: "name",
-	1: "switchover",
-	2: "replicas",
+	1: "description",
+	2: "switchover",
+	3: "replicas",
 }
 
 // Decode decodes DeclaredProcess from json.
@@ -1975,8 +1999,18 @@ func (s *DeclaredProcess) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
+		case "description":
+			if err := func() error {
+				s.Description.Reset()
+				if err := s.Description.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"description\"")
+			}
 		case "switchover":
-			requiredBitSet[0] |= 1 << 1
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				if err := s.Switchover.Decode(d); err != nil {
 					return err
@@ -1986,7 +2020,7 @@ func (s *DeclaredProcess) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"switchover\"")
 			}
 		case "replicas":
-			requiredBitSet[0] |= 1 << 2
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				v, err := d.Int32()
 				s.Replicas = int32(v)
@@ -2007,7 +2041,7 @@ func (s *DeclaredProcess) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000111,
+		0b00001101,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -6003,12 +6037,26 @@ func (s *Stream) encodeFields(e *jx.Encoder) {
 			s.Version.Encode(e)
 		}
 	}
+	{
+		if s.First.Set {
+			e.FieldStart("first")
+			s.First.Encode(e, json.EncodeDateTime)
+		}
+	}
+	{
+		if s.Last.Set {
+			e.FieldStart("last")
+			s.Last.Encode(e, json.EncodeDateTime)
+		}
+	}
 }
 
-var jsonFieldsNameOfStream = [3]string{
+var jsonFieldsNameOfStream = [5]string{
 	0: "pod",
 	1: "container",
 	2: "version",
+	3: "first",
+	4: "last",
 }
 
 // Decode decodes Stream from json.
@@ -6053,6 +6101,26 @@ func (s *Stream) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"version\"")
+			}
+		case "first":
+			if err := func() error {
+				s.First.Reset()
+				if err := s.First.Decode(d, json.DecodeDateTime); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"first\"")
+			}
+		case "last":
+			if err := func() error {
+				s.Last.Reset()
+				if err := s.Last.Decode(d, json.DecodeDateTime); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"last\"")
 			}
 		default:
 			return errors.Errorf("unexpected field %q", k)

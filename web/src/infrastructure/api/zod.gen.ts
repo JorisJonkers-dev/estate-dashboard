@@ -80,7 +80,9 @@ export const zRolloutList = z.object({
 export const zStream = z.object({
     pod: z.string().max(253),
     container: z.string().max(253),
-    version: z.string().max(128).optional()
+    version: z.string().max(128).optional(),
+    first: z.iso.datetime({ offset: true }).max(64).optional(),
+    last: z.iso.datetime({ offset: true }).max(64).optional()
 });
 
 /**
@@ -164,6 +166,7 @@ export const zCompositionRunList = z.object({
  */
 export const zDeclaredProcess = z.object({
     name: z.string().max(63),
+    description: z.string().max(200).optional(),
     switchover: z.enum([
         'blue-green',
         'continuous',
@@ -188,6 +191,7 @@ export const zDeclaredMigration = z.object({
  */
 export const zDeclaredApplication = z.object({
     id: z.string().max(63),
+    description: z.string().max(200).optional(),
     processes: z.array(zDeclaredProcess).max(64),
     migration: zDeclaredMigration.optional()
 });

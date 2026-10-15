@@ -95,6 +95,13 @@ func (l *Loki) Streams(ctx context.Context, namespace string, since time.Time) (
 		seen[s] = true
 		streams = append(streams, s)
 	}
+	for i := range streams {
+		first, last, err := l.span(ctx, namespace, streams[i], since)
+		if err != nil {
+			return nil, fmt.Errorf("loki: read when %s/%s wrote: %w", streams[i].Pod, streams[i].Container, err)
+		}
+		streams[i].First, streams[i].Last = first, last
+	}
 	slices.SortFunc(streams, func(a, b domain.Stream) int {
 		if c := strings.Compare(a.Pod, b.Pod); c != 0 {
 			return c
@@ -102,6 +109,43 @@ func (l *Loki) Streams(ctx context.Context, namespace string, since time.Time) (
 		return strings.Compare(a.Container, b.Container)
 	})
 	return streams, nil
+}
+
+// span is when one container wrote its first and its latest line since then: one line read
+// forward and one backward.
+func (l *Loki) span(ctx context.Context, namespace string, s domain.Stream, since time.Time) (first, last time.Time, err error) {
+	one := func(direction string) (time.Time, error) {
+		var reply struct {
+			Data struct {
+				Result []struct {
+					Values [][2]string `json:"values"`
+				} `json:"result"`
+			} `json:"data"`
+		}
+		query := url.Values{
+			"query":     {selector([2]string{"namespace", namespace}, [2]string{"pod", s.Pod}, [2]string{"container", s.Container})},
+			"start":     {nanos(since)},
+			"end":       {nanos(l.now())},
+			"limit":     {"1"},
+			"direction": {direction},
+		}
+		if err := l.get(ctx, "/loki/api/v1/query_range", query, &reply); err != nil {
+			return time.Time{}, err
+		}
+		for _, r := range reply.Data.Result {
+			for _, v := range r.Values {
+				if ns, err := strconv.ParseInt(v[0], 10, 64); err == nil {
+					return time.Unix(0, ns).UTC(), nil
+				}
+			}
+		}
+		return time.Time{}, nil
+	}
+	if first, err = one("forward"); err != nil {
+		return first, last, err
+	}
+	last, err = one("backward")
+	return first, last, err
 }
 
 // Lines implements domain.Store: the newest limit lines since then, returned oldest first.

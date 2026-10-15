@@ -158,6 +158,14 @@ export type Stream = {
      * The release the pod ran, from its app.kubernetes.io/version label; absent without one.
      */
     version?: string;
+    /**
+     * When it wrote its first line in the window.
+     */
+    first?: string;
+    /**
+     * When it wrote its latest line.
+     */
+    last?: string;
 };
 
 /**
@@ -307,6 +315,10 @@ export type DeclaredProcess = {
      */
     name: string;
     /**
+     * What it does, in one sentence, from the project file.
+     */
+    description?: string;
+    /**
      * How a new release replaces it.
      */
     switchover: 'blue-green' | 'continuous' | 'interrupted';
@@ -350,6 +362,10 @@ export type DeclaredApplication = {
      * The Application.
      */
     id: string;
+    /**
+     * What it does, in one sentence, from the project file.
+     */
+    description?: string;
     /**
      * Its Processes.
      */

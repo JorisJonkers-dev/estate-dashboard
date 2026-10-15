@@ -16,6 +16,9 @@ type Stream struct {
 	// Version is the release the pod ran, from its app.kubernetes.io/version label as Alloy carries
 	// it into Loki. Empty for a pod that has no such label.
 	Version string
+	// First and Last are when it wrote its first and its latest line in the window read.
+	First time.Time
+	Last  time.Time
 }
 
 // Line is one log line and when it was written.

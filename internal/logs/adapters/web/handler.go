@@ -64,7 +64,14 @@ func (h *Logs) ListLogStreams(ctx context.Context, params oas.ListLogStreamsPara
 	}
 	items := make([]oas.Stream, 0, len(streams))
 	for _, s := range streams {
-		items = append(items, oas.Stream{Pod: s.Pod, Container: s.Container, Version: opt(s.Version)})
+		stream := oas.Stream{Pod: s.Pod, Container: s.Container, Version: opt(s.Version)}
+		if !s.First.IsZero() {
+			stream.First = oas.NewOptDateTime(s.First)
+		}
+		if !s.Last.IsZero() {
+			stream.Last = oas.NewOptDateTime(s.Last)
+		}
+		items = append(items, stream)
 	}
 	return &oas.StreamList{Items: items}, nil
 }
