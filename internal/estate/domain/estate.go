@@ -62,6 +62,31 @@ type Issue struct {
 	Condition string
 }
 
+// Stage is one step of a rollout, as the Reporter wrote it on the GitHub Deployment.
+type Stage struct {
+	State       string
+	Description string
+	// Log is the run that did it, where there is one.
+	Log string
+	At  time.Time
+}
+
+// Rollout is one release of a Project reaching production: the GitHub Deployment composition
+// opened in the Project's own repository, and the stages it went through, newest first.
+type Rollout struct {
+	ID       int64
+	Version  string
+	Commit   string
+	Run      string
+	Artifact string
+	At       time.Time
+	Stages   []Stage
+}
+
+// ErrForeignRepository is returned for a repository outside the Estate repository's owner: the
+// dashboard reads the estate's own repositories and no others.
+var ErrForeignRepository = errors.New("not one of the estate's repositories")
+
 // ErrNoRepository is returned where the dashboard runs without the Estate repository to read.
 var ErrNoRepository = errors.New("no Estate repository is configured")
 
@@ -76,4 +101,6 @@ type Repository interface {
 	// Deploys returns at most limit commits that moved the Project's pin, newest first.
 	Deploys(ctx context.Context, project string, limit int) ([]Deploy, error)
 	Issues(ctx context.Context) ([]Issue, error)
+	// Rollouts returns at most limit of the Project's rollouts in repository, newest first.
+	Rollouts(ctx context.Context, repository, project string, limit int) ([]Rollout, error)
 }

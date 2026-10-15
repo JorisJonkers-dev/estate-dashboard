@@ -64,6 +64,25 @@ func (s *Service) Deploys(ctx context.Context, project string, limit int) ([]dom
 	return deploys, nil
 }
 
+// DefaultRollouts is how many rollouts a Project's history returns when the caller names no limit.
+const DefaultRollouts = 10
+
+// Rollouts returns up to limit of a Project's rollouts in repository, newest first. A limit below
+// 1 means DefaultRollouts, and one above MaxDeploys is MaxDeploys.
+func (s *Service) Rollouts(ctx context.Context, repository, project string, limit int) ([]domain.Rollout, error) {
+	switch {
+	case limit < 1:
+		limit = DefaultRollouts
+	case limit > MaxDeploys:
+		limit = MaxDeploys
+	}
+	rollouts, err := s.repo.Rollouts(ctx, repository, project, limit)
+	if err != nil {
+		return nil, fmt.Errorf("read the rollouts of %s: %w", project, err)
+	}
+	return rollouts, nil
+}
+
 // Issues returns the open issues, the most recently updated first.
 func (s *Service) Issues(ctx context.Context) ([]domain.Issue, error) {
 	issues, err := s.repo.Issues(ctx)

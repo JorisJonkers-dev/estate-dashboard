@@ -70,6 +70,14 @@ type Handler interface {
 	//
 	// GET /api/v1/delivery/releases
 	ListReleases(ctx context.Context) (ListReleasesRes, error)
+	// ListRollouts implements listRollouts operation.
+	//
+	// The GitHub Deployments composition opened for the Project in its own repository, with the stages the
+	// Reporter wrote on each and the run that logged them. A repository outside the estate's owner has
+	// none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+	//
+	// GET /api/v1/estate/projects/{project}/rollouts
+	ListRollouts(ctx context.Context, params ListRolloutsParams) (ListRolloutsRes, error)
 	// ListSources implements listSources operation.
 	//
 	// Every Flux OCIRepository the render wrote: the artifact it names by digest, what Flux last fetched,

@@ -582,6 +582,14 @@ type ListReleasesUnauthorized ProblemStatusCode
 
 func (*ListReleasesUnauthorized) listReleasesRes() {}
 
+type ListRolloutsServiceUnavailable ProblemStatusCode
+
+func (*ListRolloutsServiceUnavailable) listRolloutsRes() {}
+
+type ListRolloutsUnauthorized ProblemStatusCode
+
+func (*ListRolloutsUnauthorized) listRolloutsRes() {}
+
 type ListSourcesServiceUnavailable ProblemStatusCode
 
 func (*ListSourcesServiceUnavailable) listSourcesRes() {}
@@ -1369,6 +1377,114 @@ func (s *Rollback) SetFragment(val string) {
 	s.Fragment = val
 }
 
+// One release of a Project reaching production.
+// Ref: #/components/schemas/Rollout
+type Rollout struct {
+	// The GitHub Deployment's id.
+	ID int64 `json:"id"`
+	// The release.
+	Version string `json:"version"`
+	// The commit the release was built from.
+	Commit string `json:"commit"`
+	// The composition run that pinned it.
+	Run OptString `json:"run"`
+	// The rendered artifact its pin names.
+	Artifact OptString `json:"artifact"`
+	// When it was pinned.
+	At time.Time `json:"at"`
+	// Its stages, newest first.
+	Stages []Stage `json:"stages"`
+}
+
+// GetID returns the value of ID.
+func (s *Rollout) GetID() int64 {
+	return s.ID
+}
+
+// GetVersion returns the value of Version.
+func (s *Rollout) GetVersion() string {
+	return s.Version
+}
+
+// GetCommit returns the value of Commit.
+func (s *Rollout) GetCommit() string {
+	return s.Commit
+}
+
+// GetRun returns the value of Run.
+func (s *Rollout) GetRun() OptString {
+	return s.Run
+}
+
+// GetArtifact returns the value of Artifact.
+func (s *Rollout) GetArtifact() OptString {
+	return s.Artifact
+}
+
+// GetAt returns the value of At.
+func (s *Rollout) GetAt() time.Time {
+	return s.At
+}
+
+// GetStages returns the value of Stages.
+func (s *Rollout) GetStages() []Stage {
+	return s.Stages
+}
+
+// SetID sets the value of ID.
+func (s *Rollout) SetID(val int64) {
+	s.ID = val
+}
+
+// SetVersion sets the value of Version.
+func (s *Rollout) SetVersion(val string) {
+	s.Version = val
+}
+
+// SetCommit sets the value of Commit.
+func (s *Rollout) SetCommit(val string) {
+	s.Commit = val
+}
+
+// SetRun sets the value of Run.
+func (s *Rollout) SetRun(val OptString) {
+	s.Run = val
+}
+
+// SetArtifact sets the value of Artifact.
+func (s *Rollout) SetArtifact(val OptString) {
+	s.Artifact = val
+}
+
+// SetAt sets the value of At.
+func (s *Rollout) SetAt(val time.Time) {
+	s.At = val
+}
+
+// SetStages sets the value of Stages.
+func (s *Rollout) SetStages(val []Stage) {
+	s.Stages = val
+}
+
+// A Project's rollouts, newest first.
+// Ref: #/components/schemas/RolloutList
+type RolloutList struct {
+	// The rollouts.
+	Items []Rollout `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *RolloutList) GetItems() []Rollout {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *RolloutList) SetItems(val []Rollout) {
+	s.Items = val
+}
+
+func (*RolloutList) listRolloutsRes() {}
+
 // The signed-in admin.
 // Ref: #/components/schemas/Session
 type Session struct {
@@ -1697,6 +1813,59 @@ func (s *SourceList) SetItems(val []Source) {
 }
 
 func (*SourceList) listSourcesRes() {}
+
+// One step of a rollout.
+// Ref: #/components/schemas/Stage
+type Stage struct {
+	// GitHub's deployment state, lower case.
+	State string `json:"state"`
+	// What happened.
+	Description string `json:"description"`
+	// The run that logged it.
+	Log OptString `json:"log"`
+	// When.
+	At time.Time `json:"at"`
+}
+
+// GetState returns the value of State.
+func (s *Stage) GetState() string {
+	return s.State
+}
+
+// GetDescription returns the value of Description.
+func (s *Stage) GetDescription() string {
+	return s.Description
+}
+
+// GetLog returns the value of Log.
+func (s *Stage) GetLog() OptString {
+	return s.Log
+}
+
+// GetAt returns the value of At.
+func (s *Stage) GetAt() time.Time {
+	return s.At
+}
+
+// SetState sets the value of State.
+func (s *Stage) SetState(val string) {
+	s.State = val
+}
+
+// SetDescription sets the value of Description.
+func (s *Stage) SetDescription(val string) {
+	s.Description = val
+}
+
+// SetLog sets the value of Log.
+func (s *Stage) SetLog(val OptString) {
+	s.Log = val
+}
+
+// SetAt sets the value of At.
+func (s *Stage) SetAt(val time.Time) {
+	s.At = val
+}
 
 // One Flux Kustomization, one Reconcile Unit.
 // Ref: #/components/schemas/Unit

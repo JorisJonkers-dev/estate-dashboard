@@ -335,12 +335,13 @@ func TestAClusterThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 
 // repository is the Estate repository read in memory; asked is each deploys read.
 type repository struct {
-	pins    []estatedomain.Pin
-	ledger  estatedomain.Handover
-	deploys []estatedomain.Deploy
-	issues  []estatedomain.Issue
-	err     error
-	asked   []string
+	pins     []estatedomain.Pin
+	ledger   estatedomain.Handover
+	rollouts []estatedomain.Rollout
+	deploys  []estatedomain.Deploy
+	issues   []estatedomain.Issue
+	err      error
+	asked    []string
 }
 
 func (r *repository) Pins(context.Context) ([]estatedomain.Pin, error) { return r.pins, r.err }
@@ -353,6 +354,11 @@ func (r *repository) Deploys(_ context.Context, project string, limit int) ([]es
 }
 
 func (r *repository) Issues(context.Context) ([]estatedomain.Issue, error) { return r.issues, r.err }
+
+func (r *repository) Rollouts(_ context.Context, repository, project string, limit int) ([]estatedomain.Rollout, error) {
+	r.asked = append(r.asked, repository+" "+project+" "+strconv.Itoa(limit))
+	return r.rollouts, r.err
+}
 
 func TestTheEstateRepositoryIsServedInTheContractsShape(t *testing.T) {
 	at := time.Date(2026, 10, 3, 7, 0, 0, 0, time.UTC)
@@ -384,6 +390,12 @@ func TestTheEstateRepositoryIsServedInTheContractsShape(t *testing.T) {
 	if deploys.code != http.StatusOK || deploys.body["items"].([]any)[0].(map[string]any)["at"] != "2026-10-03T07:00:00Z" || repo.asked[0] != "auth 5" {
 		t.Fatalf("deploys = %d %v, asked %v", deploys.code, deploys.body, repo.asked)
 	}
+	repo.rollouts = []estatedomain.Rollout{{ID: 7, Version: "0.2.0", Commit: "2a44", Run: "https://github.com/x/runs/1", At: at, Stages: []estatedomain.Stage{{State: "success", Description: "promoted", Log: "https://github.com/x/runs/1", At: at}}}}
+	rollouts := call(t, srv, http.MethodGet, "/api/v1/estate/projects/auth/rollouts?repository=JorisJonkers-dev/auth-api&limit=3", "", true)
+	stage := rollouts.body["items"].([]any)[0].(map[string]any)["stages"].([]any)[0].(map[string]any)
+	if rollouts.code != http.StatusOK || stage["log"] != "https://github.com/x/runs/1" || repo.asked[len(repo.asked)-1] != "JorisJonkers-dev/auth-api auth 3" {
+		t.Fatalf("rollouts = %d %v, asked %v", rollouts.code, rollouts.body, repo.asked)
+	}
 	issues := call(t, srv, http.MethodGet, "/api/v1/estate/issues", "", true)
 	if issues.code != http.StatusOK || issues.body["items"].([]any)[0].(map[string]any)["number"] != float64(7) {
 		t.Fatalf("issues = %d %v", issues.code, issues.body)
@@ -399,7 +411,7 @@ func TestAnEstateRepositoryThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 		"The dashboard runs without the Estate repository to read.": estateapp.New(github.Absent{}),
 	} {
 		srv := serveEstate(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), uc)
-		for _, path := range []string{"/api/v1/estate/pins", "/api/v1/estate/handover", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys"} {
+		for _, path := range []string{"/api/v1/estate/pins", "/api/v1/estate/handover", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys", "/api/v1/estate/projects/auth/rollouts?repository=a/b"} {
 			if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
 				t.Fatalf("%s = %d %v", path, got.code, got.body)
 			}
@@ -408,6 +420,10 @@ func TestAnEstateRepositoryThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 	none := serveEstate(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(&repository{err: estatedomain.ErrNoProject}))
 	if got := call(t, none, http.MethodGet, "/api/v1/estate/projects/auth/deploys", "", true); got.code != http.StatusOK || len(got.body["items"].([]any)) != 0 {
 		t.Fatalf("a Project the repository does not know = %d %v", got.code, got.body)
+	}
+	foreign := serveEstate(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(&repository{err: estatedomain.ErrForeignRepository}))
+	if got := call(t, foreign, http.MethodGet, "/api/v1/estate/projects/auth/rollouts?repository=a/b", "", true); got.code != http.StatusOK || len(got.body["items"].([]any)) != 0 {
+		t.Fatalf("a repository outside the estate = %d %v", got.code, got.body)
 	}
 }
 

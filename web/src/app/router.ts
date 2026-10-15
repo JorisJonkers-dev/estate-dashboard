@@ -27,7 +27,8 @@ export function createAppRouter(history: RouterHistory = createWebHistory(), sig
   const router = createRouter({
     history,
     routes: [
-      { path: '/', name: 'alert-history', component: () => import('../features/alerts/components/AlertHistoryPage.vue') },
+      { path: '/', name: 'overview', component: () => import('../features/overview/components/OverviewPage.vue') },
+      { path: '/alerts', name: 'alerts', component: () => import('../features/alerts/components/AlertHistoryPage.vue') },
       { path: '/sign-in', name: 'sign-in', meta: { public: true }, component: () => import('../features/session/components/SignInPage.vue') },
       {
         path: '/not-an-admin',

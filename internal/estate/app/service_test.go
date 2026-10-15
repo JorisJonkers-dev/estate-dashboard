@@ -29,6 +29,23 @@ func (r *repository) Deploys(_ context.Context, _ string, limit int) ([]domain.D
 
 func (r *repository) Issues(context.Context) ([]domain.Issue, error) { return r.issues, r.err }
 
+func (r *repository) Rollouts(_ context.Context, _, _ string, limit int) ([]domain.Rollout, error) {
+	r.asked = limit
+	return nil, r.err
+}
+
+func TestRolloutsClampsTheLimit(t *testing.T) {
+	for asked, want := range map[int]int{0: app.DefaultRollouts, 3: 3, 101: app.MaxDeploys} {
+		repo := &repository{}
+		if _, err := app.New(repo).Rollouts(t.Context(), "a/b", "auth", asked); err != nil || repo.asked != want {
+			t.Errorf("Rollouts(%d) asked %d, %v", asked, repo.asked, err)
+		}
+	}
+	if _, err := app.New(&repository{err: domain.ErrNoRepository}).Rollouts(t.Context(), "a/b", "auth", 1); !errors.Is(err, domain.ErrNoRepository) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestPinsAreByProjectAndIssuesTheMostRecentlyUpdatedFirst(t *testing.T) {
 	at := time.Date(2026, 10, 3, 7, 0, 0, 0, time.UTC)
 	s := app.New(&repository{

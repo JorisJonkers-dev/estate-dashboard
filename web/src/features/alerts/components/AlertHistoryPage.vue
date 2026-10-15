@@ -8,46 +8,18 @@ const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', tim
 </script>
 
 <template>
-  <section class="history">
-    <h1>Alert history</h1>
+  <section class="grid gap-4">
+    <h1 class="m-0 text-[28px] font-semibold md:text-[34px]">Alert history</h1>
 
-    <p v-if="isLoading">Loading the history…</p>
-    <p v-else-if="loadError" role="alert" class="error">{{ loadError }}</p>
-    <p v-else-if="events.length === 0">No alert has been recorded yet.</p>
-    <ul v-else aria-label="Alert history" class="list">
-      <li v-for="event in events" :key="event.id">
+    <p v-if="isLoading" class="m-0">Loading the history…</p>
+    <p v-else-if="loadError" role="alert" class="m-0 text-crit">{{ loadError }}</p>
+    <p v-else-if="events.length === 0" class="m-0">No alert has been recorded yet.</p>
+    <ul v-else aria-label="Alert history" class="m-0 grid list-none p-0">
+      <li v-for="event in events" :key="event.id" class="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-line-soft py-2.5">
         <span class="name">{{ event.name }}</span>
-        <span class="state" :data-status="event.status">{{ describeEvent(event) }}</span>
-        <time :datetime="event.observedAt">{{ dateFormat.format(new Date(event.observedAt)) }}</time>
+        <span class="state whitespace-nowrap text-text-muted" :data-status="event.status">{{ describeEvent(event) }}</span>
+        <time class="whitespace-nowrap text-text-muted" :datetime="event.observedAt">{{ dateFormat.format(new Date(event.observedAt)) }}</time>
       </li>
     </ul>
   </section>
 </template>
-
-<style scoped>
-.history {
-  display: grid;
-  gap: 1rem;
-}
-.error {
-  color: #ff9e94;
-}
-.list {
-  display: grid;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-.list li {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 1rem;
-  padding: 0.625rem 0;
-  border-bottom: 1px solid #3a3a3a;
-}
-.state,
-time {
-  color: #b8b8b8;
-  white-space: nowrap;
-}
-</style>

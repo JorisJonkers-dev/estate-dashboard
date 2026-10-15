@@ -45,6 +45,7 @@ var operationRolesSessionCookie = map[string][]string{
 	ListIssuesOperation:       []string{},
 	ListPinsOperation:         []string{},
 	ListReleasesOperation:     []string{},
+	ListRolloutsOperation:     []string{},
 	ListSourcesOperation:      []string{},
 	ListUnitsOperation:        []string{},
 	SilenceAlertOperation:     []string{},

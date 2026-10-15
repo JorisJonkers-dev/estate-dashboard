@@ -1,0 +1,49 @@
+@import 'tailwindcss';
+@import '@jorisjonkers-dev/vue-web-commons/theme.css';
+
+@source "../node_modules/@jorisjonkers-dev/vue-web-commons/dist/**/*.{js,vue,ts}";
+
+/*
+ * The dashboard's look, from its design canvas (JorisJonkers-dev/estate-dashboard#4), on top of the
+ * estate's shared tokens: dark only, hairline dividers and no cards, one lime accent used only for
+ * what is current or selected, blue for actions. Where the canvas names a shared token's colour,
+ * the shared token is set to it, so the commons components draw in the same palette.
+ */
+@theme {
+  --color-surface-dark: #1e1e1e;
+  --color-surface-border: #333333;
+  --color-text-primary: #ededed;
+  --color-text-muted: #a3a3a3;
+  --color-accent: #a8ff00;
+  --color-accent-light: #a8ff00;
+  --color-focus: #a8ff00;
+
+  --color-line: #333333;
+  --color-line-soft: #2a2a2a;
+  --color-control: #444444;
+  --color-nav: #c8c8c8;
+  --color-dim: #8f8f8f;
+  --color-action: #3387fa;
+  --color-link: #549aff;
+  --color-link-hover: #8ab9ff;
+
+  /* One hue per kind of attention. */
+  --color-ok: #6fd39a;
+  --color-warn: #ffb020;
+  --color-crit: #ff5a6a;
+  --color-info: #6ea8ff;
+  --color-back: #c29bff;
+  --color-idle: #a3a3a3;
+
+  --font-sans: 'Barlow Semi Condensed', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+@layer base {
+  body {
+    @apply font-sans text-base/[1.45];
+  }
+  a {
+    @apply text-link hover:text-link-hover;
+  }
+}

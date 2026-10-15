@@ -77,6 +77,72 @@ export type Handover = {
 };
 
 /**
+ * One step of a rollout.
+ */
+export type Stage = {
+    /**
+     * GitHub's deployment state, lower case.
+     */
+    state: string;
+    /**
+     * What happened.
+     */
+    description: string;
+    /**
+     * The run that logged it.
+     */
+    log?: string;
+    /**
+     * When.
+     */
+    at: string;
+};
+
+/**
+ * One release of a Project reaching production.
+ */
+export type Rollout = {
+    /**
+     * The GitHub Deployment's id.
+     */
+    id: number;
+    /**
+     * The release.
+     */
+    version: string;
+    /**
+     * The commit the release was built from.
+     */
+    commit: string;
+    /**
+     * The composition run that pinned it.
+     */
+    run?: string;
+    /**
+     * The rendered artifact its pin names.
+     */
+    artifact?: string;
+    /**
+     * When it was pinned.
+     */
+    at: string;
+    /**
+     * Its stages, newest first.
+     */
+    stages: Array<Stage>;
+};
+
+/**
+ * A Project's rollouts, newest first.
+ */
+export type RolloutList = {
+    /**
+     * The rollouts.
+     */
+    items: Array<Rollout>;
+};
+
+/**
  * One commit that moved a pin.
  */
 export type Deploy = {
@@ -719,6 +785,53 @@ export type ListDeploysResponses = {
 };
 
 export type ListDeploysResponse = ListDeploysResponses[keyof ListDeploysResponses];
+
+export type ListRolloutsData = {
+    body?: never;
+    path: {
+        /**
+         * The Project.
+         */
+        project: string;
+    };
+    query: {
+        /**
+         * The repository the Project publishes from, owner/name.
+         */
+        repository: string;
+        /**
+         * How many rollouts to return.
+         */
+        limit?: number;
+    };
+    url: '/api/v1/estate/projects/{project}/rollouts';
+};
+
+export type ListRolloutsErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListRolloutsError = ListRolloutsErrors[keyof ListRolloutsErrors];
+
+export type ListRolloutsResponses = {
+    /**
+     * What GitHub holds.
+     */
+    200: RolloutList;
+};
+
+export type ListRolloutsResponse = ListRolloutsResponses[keyof ListRolloutsResponses];
 
 export type ListIssuesData = {
     body?: never;

@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/vue-query';
 
 import { client } from '../client.gen';
-import { getHandover, getSession, listAlertHistory, listAlerts, listDeploys, listIssues, listPins, listReleases, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
-import type { GetHandoverData, GetHandoverError, GetHandoverResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
+import { getHandover, getSession, listAlertHistory, listAlerts, listDeploys, listIssues, listPins, listReleases, listRollouts, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
+import type { GetHandoverData, GetHandoverError, GetHandoverResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -156,6 +156,26 @@ export const listDeploysOptions = (options: Options<ListDeploysData>) => queryOp
         return data;
     },
     queryKey: listDeploysQueryKey(options)
+});
+
+export const listRolloutsQueryKey = (options: Options<ListRolloutsData>) => createQueryKey('listRollouts', options);
+
+/**
+ * List a Project's rollouts to production, newest first
+ *
+ * The GitHub Deployments composition opened for the Project in its own repository, with the stages the Reporter wrote on each and the run that logged them. A repository outside the estate's owner has none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const listRolloutsOptions = (options: Options<ListRolloutsData>) => queryOptions<ListRolloutsResponse, ListRolloutsError, ListRolloutsResponse, ReturnType<typeof listRolloutsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listRollouts({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listRolloutsQueryKey(options)
 });
 
 export const listIssuesQueryKey = (options?: Options<ListIssuesData>) => createQueryKey('listIssues', options);

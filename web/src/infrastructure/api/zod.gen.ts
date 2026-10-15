@@ -45,6 +45,36 @@ export const zHandover = z.object({
 });
 
 /**
+ * One step of a rollout.
+ */
+export const zStage = z.object({
+    state: z.string().max(32),
+    description: z.string().max(256),
+    log: z.string().max(2048).optional(),
+    at: z.iso.datetime({ offset: true }).max(64)
+});
+
+/**
+ * One release of a Project reaching production.
+ */
+export const zRollout = z.object({
+    id: z.coerce.bigint().gte(BigInt(1)).lte(BigInt(9007199254740991)),
+    version: z.string().max(128),
+    commit: z.string().max(64),
+    run: z.string().max(2048).optional(),
+    artifact: z.string().max(512).optional(),
+    at: z.iso.datetime({ offset: true }).max(64),
+    stages: z.array(zStage).max(20)
+});
+
+/**
+ * A Project's rollouts, newest first.
+ */
+export const zRolloutList = z.object({
+    items: z.array(zRollout).max(100)
+});
+
+/**
  * One commit that moved a pin.
  */
 export const zDeploy = z.object({
@@ -294,6 +324,20 @@ export const zListDeploysQuery = z.object({
  * What the Estate repository holds.
  */
 export const zListDeploysResponse = zDeployList;
+
+export const zListRolloutsPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+export const zListRolloutsQuery = z.object({
+    repository: z.string().min(3).max(140).regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/),
+    limit: z.int().gte(1).lte(100).optional().default(10)
+});
+
+/**
+ * What GitHub holds.
+ */
+export const zListRolloutsResponse = zRolloutList;
 
 /**
  * What the Estate repository holds.

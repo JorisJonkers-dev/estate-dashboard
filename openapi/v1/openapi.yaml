@@ -201,6 +201,58 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/estate/projects/{project}/rollouts:
+    get:
+      operationId: listRollouts
+      summary: List a Project's rollouts to production, newest first
+      description: >-
+        The GitHub Deployments composition opened for the Project in its own repository, with the
+        stages the Reporter wrote on each and the run that logged them. A repository outside the
+        estate's owner has none. A 503 means GitHub did not answer, or the dashboard runs without
+        the Estate repository.
+      tags: [estate]
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: The Project.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+            pattern: "^[a-z0-9_][a-z0-9_-]{0,62}$"
+        - name: repository
+          in: query
+          required: true
+          description: The repository the Project publishes from, owner/name.
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 140
+            pattern: "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+        - name: limit
+          in: query
+          required: false
+          description: How many rollouts to return.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        "200":
+          description: What GitHub holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RolloutList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/estate/issues:
     get:
       operationId: listIssues
@@ -414,6 +466,82 @@ components:
           items:
             type: string
             maxLength: 63
+    Stage:
+      description: One step of a rollout.
+      type: object
+      additionalProperties: false
+      required: [state, description, at]
+      properties:
+        state:
+          type: string
+          maxLength: 32
+          description: GitHub's deployment state, lower case.
+          example: in_progress
+        description:
+          type: string
+          maxLength: 256
+          description: What happened.
+        log:
+          type: string
+          maxLength: 2048
+          description: The run that logged it.
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When.
+    Rollout:
+      description: One release of a Project reaching production.
+      type: object
+      additionalProperties: false
+      required: [id, version, commit, at, stages]
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: The GitHub Deployment's id.
+        version:
+          type: string
+          maxLength: 128
+          description: The release.
+          example: 0.2.0
+        commit:
+          type: string
+          maxLength: 64
+          description: The commit the release was built from.
+        run:
+          type: string
+          maxLength: 2048
+          description: The composition run that pinned it.
+        artifact:
+          type: string
+          maxLength: 512
+          description: The rendered artifact its pin names.
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was pinned.
+        stages:
+          type: array
+          maxItems: 20
+          description: Its stages, newest first.
+          items:
+            $ref: "#/components/schemas/Stage"
+    RolloutList:
+      description: A Project's rollouts, newest first.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          description: The rollouts.
+          items:
+            $ref: "#/components/schemas/Rollout"
     Deploy:
       description: One commit that moved a pin.
       type: object

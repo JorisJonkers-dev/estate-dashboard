@@ -188,6 +188,44 @@ func TestTheHandoverLedgerIsThePlatformDocumentsOwnNamesOnly(t *testing.T) {
 	}
 }
 
+func TestARolloutIsADeploymentCompositionOpenedForTheProject(t *testing.T) {
+	f := &fake{status: http.StatusOK, graphql: `{"data":{"repository":{"deployments":{"nodes":[
+		{"databaseId":7,"createdAt":"2026-10-15T08:39:50Z","commitOid":"2a44","payload":"{\"project\":\"estate-dashboard\",\"version\":\"0.2.0\",\"run\":\"https://github.com/x/runs/1\",\"artifact\":\"ghcr.io/r@sha256:a\"}",
+		 "statuses":{"nodes":[{"state":"SUCCESS","description":"estate-dashboard 0.2.0 promoted","logUrl":"https://github.com/x/runs/1","createdAt":"2026-10-15T08:42:42Z"}]}},
+		{"databaseId":8,"createdAt":"2026-10-15T08:00:00Z","commitOid":"1","payload":"{\"project\":\"other\"}","statuses":{"nodes":[]}},
+		{"databaseId":9,"createdAt":"2026-10-15T08:00:00Z","commitOid":"1","payload":"not json","statuses":{"nodes":[]}}
+	]}}}}`}
+	e := f.serve(t)
+	got, err := e.Rollouts(t.Context(), "JorisJonkers-dev/estate-dashboard", "estate-dashboard", 5)
+	want := []domain.Rollout{{
+		ID: 7, Version: "0.2.0", Commit: "2a44", Run: "https://github.com/x/runs/1", Artifact: "ghcr.io/r@sha256:a", At: time.Date(2026, 10, 15, 8, 39, 50, 0, time.UTC),
+		Stages: []domain.Stage{{State: "success", Description: "estate-dashboard 0.2.0 promoted", Log: "https://github.com/x/runs/1", At: time.Date(2026, 10, 15, 8, 42, 42, 0, time.UTC)}},
+	}}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("rollouts = %+v, %v", got, err)
+	}
+	for _, repository := range []string{"someone-else/repo", "no-slash", "a/b/c"} {
+		if _, err := e.Rollouts(t.Context(), repository, "estate-dashboard", 5); !errors.Is(err, domain.ErrForeignRepository) {
+			t.Errorf("Rollouts(%q) = %v", repository, err)
+		}
+	}
+	if _, err := e.Rollouts(t.Context(), "JorisJonkers-dev/x", "Not A Name", 5); !errors.Is(err, domain.ErrNoProject) {
+		t.Errorf("a name that is no Project = %v", err)
+	}
+	f.graphql = `{"data":{"repository":null}}`
+	if got, err := e.Rollouts(t.Context(), "JorisJonkers-dev/gone", "x", 5); err != nil || len(got) != 0 || got == nil {
+		t.Fatalf("a repository GitHub does not show = %#v, %v", got, err)
+	}
+	f.graphql = `{"errors":[{"message":"nope"}]}`
+	if _, err := e.Rollouts(t.Context(), "JorisJonkers-dev/x", "x", 5); err == nil {
+		t.Fatal("a refused query read as rollouts")
+	}
+	f.status = http.StatusBadGateway
+	if _, err := e.Rollouts(t.Context(), "JorisJonkers-dev/x", "x", 5); err == nil {
+		t.Fatal("a failed read was rollouts")
+	}
+}
+
 func TestTheIssuesAreTheOpenOnesWithoutPullRequests(t *testing.T) {
 	f := &fake{status: http.StatusOK, rest: `[
 		{"number":7,"title":"auth is held","html_url":"https://github.com/x/7","updated_at":"2026-10-03T09:00:00+02:00","labels":[{"name":"held"}],"body":"auth is held.\n\n<!-- estate-condition: auth/held -->"},
@@ -227,7 +265,8 @@ func TestWithoutARepositoryEveryReadSaysSo(t *testing.T) {
 	_, e2 := a.Deploys(t.Context(), "auth", 1)
 	_, e3 := a.Issues(t.Context())
 	_, e4 := a.Handover(t.Context())
-	for _, err := range []error{e1, e2, e3, e4} {
+	_, e5 := a.Rollouts(t.Context(), "a/b", "x", 1)
+	for _, err := range []error{e1, e2, e3, e4, e5} {
 		if !errors.Is(err, domain.ErrNoRepository) {
 			t.Fatalf("error = %v", err)
 		}

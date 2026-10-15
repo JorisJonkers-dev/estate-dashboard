@@ -305,6 +305,90 @@ func (e *Estate) Issues(ctx context.Context) ([]domain.Issue, error) {
 	return out, nil
 }
 
+// repositoryName is what may name one of the estate's repositories.
+var repositoryName = regexp.MustCompile(`^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$`)
+
+// rolloutsQuery reads a repository's production deployments with their stages in one request.
+const rolloutsQuery = `query($owner: String!, $name: String!, $first: Int!) {
+  repository(owner: $owner, name: $name) {
+    deployments(environments: ["production"], first: $first, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes {
+        databaseId createdAt commitOid payload
+        statuses(first: 20) { nodes { state description logUrl createdAt } }
+      }
+    }
+  }
+}`
+
+type rolloutsReply struct {
+	Data struct {
+		Repository *struct {
+			Deployments struct {
+				Nodes []struct {
+					DatabaseID int64     `json:"databaseId"`
+					CreatedAt  time.Time `json:"createdAt"`
+					CommitOid  string    `json:"commitOid"`
+					Payload    string    `json:"payload"`
+					Statuses   struct {
+						Nodes []struct {
+							State       string    `json:"state"`
+							Description string    `json:"description"`
+							LogURL      string    `json:"logUrl"`
+							CreatedAt   time.Time `json:"createdAt"`
+						} `json:"nodes"`
+					} `json:"statuses"`
+				} `json:"nodes"`
+			} `json:"deployments"`
+		} `json:"repository"`
+	} `json:"data"`
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
+// Rollouts implements domain.Repository: the production deployments composition opened in
+// repository for the Project, read from the payload it writes on each.
+func (e *Estate) Rollouts(ctx context.Context, repository, name string, limit int) ([]domain.Rollout, error) {
+	if !project.MatchString(name) {
+		return nil, fmt.Errorf("%w: %q", domain.ErrNoProject, name)
+	}
+	owner, repo, _ := strings.Cut(repository, "/")
+	estateOwner, _, _ := strings.Cut(e.repository, "/")
+	if !repositoryName.MatchString(repository) || !strings.EqualFold(owner, estateOwner) {
+		return nil, fmt.Errorf("%w: %q", domain.ErrForeignRepository, repository)
+	}
+	var reply rolloutsReply
+	body := map[string]any{"query": rolloutsQuery, "variables": map[string]any{"owner": owner, "name": repo, "first": limit}}
+	if err := e.do(ctx, http.MethodPost, "/graphql", nil, body, &reply); err != nil {
+		return nil, fmt.Errorf("github: read the rollouts of %s: %w", name, err)
+	}
+	if len(reply.Errors) > 0 {
+		return nil, fmt.Errorf("github: read the rollouts of %s: %s", name, reply.Errors[0].Message)
+	}
+	rollouts := []domain.Rollout{}
+	if reply.Data.Repository == nil {
+		return rollouts, nil
+	}
+	for _, d := range reply.Data.Repository.Deployments.Nodes {
+		var payload struct {
+			Project  string `json:"project"`
+			Version  string `json:"version"`
+			Run      string `json:"run"`
+			Artifact string `json:"artifact"`
+		}
+		// A deployment composition did not open, or one for another Project, is not this one's.
+		if json.Unmarshal([]byte(d.Payload), &payload) != nil || payload.Project != name {
+			continue
+		}
+		r := domain.Rollout{ID: d.DatabaseID, Version: payload.Version, Commit: d.CommitOid, Run: payload.Run, Artifact: payload.Artifact, At: d.CreatedAt.UTC(), Stages: []domain.Stage{}}
+		for _, s := range d.Statuses.Nodes {
+			r.Stages = append(r.Stages, domain.Stage{State: strings.ToLower(s.State), Description: s.Description, Log: s.LogURL, At: s.CreatedAt.UTC()})
+		}
+		rollouts = append(rollouts, r)
+	}
+	return rollouts, nil
+}
+
 // Absent is the repository of a dashboard that runs without one: every read is ErrNoRepository.
 type Absent struct{}
 
@@ -321,6 +405,11 @@ func (Absent) Deploys(context.Context, string, int) ([]domain.Deploy, error) {
 // Handover implements domain.Repository.
 func (Absent) Handover(context.Context) (domain.Handover, error) {
 	return domain.Handover{}, domain.ErrNoRepository
+}
+
+// Rollouts implements domain.Repository.
+func (Absent) Rollouts(context.Context, string, string, int) ([]domain.Rollout, error) {
+	return nil, domain.ErrNoRepository
 }
 
 // Issues implements domain.Repository.

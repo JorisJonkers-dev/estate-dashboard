@@ -99,6 +99,17 @@ func (UnimplementedHandler) ListReleases(ctx context.Context) (r ListReleasesRes
 	return r, ht.ErrNotImplemented
 }
 
+// ListRollouts implements listRollouts operation.
+//
+// The GitHub Deployments composition opened for the Project in its own repository, with the stages the
+// Reporter wrote on each and the run that logged them. A repository outside the estate's owner has
+// none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+//
+// GET /api/v1/estate/projects/{project}/rollouts
+func (UnimplementedHandler) ListRollouts(ctx context.Context, params ListRolloutsParams) (r ListRolloutsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListSources implements listSources operation.
 //
 // Every Flux OCIRepository the render wrote: the artifact it names by digest, what Flux last fetched,

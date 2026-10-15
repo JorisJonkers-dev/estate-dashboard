@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
-import { zGetHandoverResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListPinsResponse, zListReleasesResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
+import type { GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
+import { zGetHandoverResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListPinsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -148,6 +148,27 @@ export const listDeploys = <ThrowOnError extends boolean = false>(options: Optio
             type: 'apiKey'
         }],
     url: '/api/v1/estate/projects/{project}/deploys',
+    ...options
+});
+
+/**
+ * List a Project's rollouts to production, newest first
+ *
+ * The GitHub Deployments composition opened for the Project in its own repository, with the stages the Reporter wrote on each and the run that logged them. A repository outside the estate's owner has none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const listRollouts = <ThrowOnError extends boolean = false>(options: Options<ListRolloutsData, ThrowOnError>): RequestResult<ListRolloutsResponses, ListRolloutsErrors, ThrowOnError> => (options.client ?? client).get<ListRolloutsResponses, ListRolloutsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zListRolloutsPath,
+        query: zListRolloutsQuery
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListRolloutsResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/estate/projects/{project}/rollouts',
     ...options
 });
 

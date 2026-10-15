@@ -19,6 +19,7 @@ type UseCases interface {
 	Handover(ctx context.Context) (domain.Handover, error)
 	Deploys(ctx context.Context, project string, limit int) ([]domain.Deploy, error)
 	Issues(ctx context.Context) ([]domain.Issue, error)
+	Rollouts(ctx context.Context, repository, project string, limit int) ([]domain.Rollout, error)
 }
 
 // Estate implements the estate operations.
@@ -90,6 +91,28 @@ func (h *Estate) ListDeploys(ctx context.Context, params oas.ListDeploysParams) 
 		items = append(items, oas.Deploy{Commit: d.Commit, At: d.At, Message: d.Message})
 	}
 	return &oas.DeployList{Items: items}, nil
+}
+
+// ListRollouts implements listRollouts. A repository outside the estate's owner, like a name that
+// is no Project, has no rollouts the dashboard reads.
+func (h *Estate) ListRollouts(ctx context.Context, params oas.ListRolloutsParams) (oas.ListRolloutsRes, error) {
+	rollouts, err := h.uc.Rollouts(ctx, params.Repository, params.Project, int(params.Limit.Or(0)))
+	switch {
+	case errors.Is(err, domain.ErrNoProject), errors.Is(err, domain.ErrForeignRepository):
+		return &oas.RolloutList{Items: []oas.Rollout{}}, nil
+	case err != nil:
+		down := oas.ListRolloutsServiceUnavailable(h.unavailable(ctx, "rollouts", err))
+		return &down, nil
+	}
+	items := make([]oas.Rollout, 0, len(rollouts))
+	for _, r := range rollouts {
+		stages := make([]oas.Stage, 0, len(r.Stages))
+		for _, s := range r.Stages {
+			stages = append(stages, oas.Stage{State: s.State, Description: s.Description, Log: opt(s.Log), At: s.At})
+		}
+		items = append(items, oas.Rollout{ID: r.ID, Version: r.Version, Commit: r.Commit, Run: opt(r.Run), Artifact: opt(r.Artifact), At: r.At, Stages: stages})
+	}
+	return &oas.RolloutList{Items: items}, nil
 }
 
 // ListIssues implements listIssues.

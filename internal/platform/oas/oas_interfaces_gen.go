@@ -33,6 +33,10 @@ type ListReleasesRes interface {
 	listReleasesRes()
 }
 
+type ListRolloutsRes interface {
+	listRolloutsRes()
+}
+
 type ListSourcesRes interface {
 	listSourcesRes()
 }

@@ -91,6 +91,14 @@ type Invoker interface {
 	//
 	// GET /api/v1/delivery/releases
 	ListReleases(ctx context.Context) (ListReleasesRes, error)
+	// ListRollouts invokes listRollouts operation.
+	//
+	// The GitHub Deployments composition opened for the Project in its own repository, with the stages the
+	// Reporter wrote on each and the run that logged them. A repository outside the estate's owner has
+	// none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+	//
+	// GET /api/v1/estate/projects/{project}/rollouts
+	ListRollouts(ctx context.Context, params ListRolloutsParams) (ListRolloutsRes, error)
 	// ListSources invokes listSources operation.
 	//
 	// Every Flux OCIRepository the render wrote: the artifact it names by digest, what Flux last fetched,
@@ -1131,6 +1139,175 @@ func (c *Client) sendListReleases(ctx context.Context) (res ListReleasesRes, err
 
 	stage = "DecodeResponse"
 	result, err := decodeListReleasesResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListRollouts invokes listRollouts operation.
+//
+// The GitHub Deployments composition opened for the Project in its own repository, with the stages the
+// Reporter wrote on each and the run that logged them. A repository outside the estate's owner has
+// none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+//
+// GET /api/v1/estate/projects/{project}/rollouts
+func (c *Client) ListRollouts(ctx context.Context, params ListRolloutsParams) (ListRolloutsRes, error) {
+	res, err := c.sendListRollouts(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListRollouts(ctx context.Context, params ListRolloutsParams) (res ListRolloutsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listRollouts"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/v1/estate/projects/{project}/rollouts"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListRolloutsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/api/v1/estate/projects/"
+	{
+		// Encode "project" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.Project))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/rollouts"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "repository" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "repository",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.Repository))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				return e.EncodeValue(conv.Int32ToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListRolloutsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeListRolloutsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
