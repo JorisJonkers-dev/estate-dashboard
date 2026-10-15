@@ -126,6 +126,12 @@ export function projectRows(reads: Reads): ProjectRow[] {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/** The newest pin commit that moved the Project to a release; a rewrite of its source names none. */
+export function releaseOf(project: string, deploys: Deploy[]): Deploy | undefined {
+  const named = new RegExp(`(^|[\\s:,])${project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} v?\\d+\\.\\d+\\.\\d+`)
+  return deploys.find((d) => named.test(d.message))
+}
+
 /** The first twelve hex digits of a digest. */
 export function shortDigest(digest: string): string {
   return digest.replace(/^sha256:/, '').slice(0, 12)

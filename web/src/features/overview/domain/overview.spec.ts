@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Alert, Issue, Release, Unit } from '../../../infrastructure/api/types.gen'
-import { age, describeCondition, health, needs, passes, projectRows, type Reads } from './overview'
+import { age, describeCondition, health, needs, passes, projectRows, releaseOf, type Reads } from './overview'
 
 const unit = (project: string, ready = true, version?: string): Unit => ({
   name: `apps-${project}`,
@@ -190,6 +190,21 @@ describe('the health strip', () => {
 
   it('says what it could not read rather than calling it healthy', () => {
     expect(health({ deploys: {} }).map((h) => h.status)).toEqual(['Unknown', 'Unknown', 'Unknown', 'Not read'])
+  })
+})
+
+describe('when a Project was released', () => {
+  it('skips a rewrite of its source and a release of another Project', () => {
+    const deploy = (message: string, commit: string) => ({ commit, at: '2026-10-15T08:00:00Z', message })
+    const deploys = [
+      deploy('chore(deploy): rewrite the pin source of delivery,estate-dashboard [ci skip]', 'r'),
+      deploy('chore(deploy): estate-dashboard 0.3.0 [ci skip]', 'd'),
+      deploy('chore(deploy): _estate, delivery 0.6.0, estate-dashboard 0.2.0 [ci skip]', 'm'),
+    ]
+    expect(releaseOf('delivery', deploys)?.commit).toBe('m')
+    expect(releaseOf('estate-dashboard', deploys)?.commit).toBe('d')
+    expect(releaseOf('dashboard', deploys)).toBeUndefined()
+    expect(releaseOf('notes', deploys)).toBeUndefined()
   })
 })
 

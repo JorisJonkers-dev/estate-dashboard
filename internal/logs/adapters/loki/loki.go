@@ -86,7 +86,9 @@ func nanos(t time.Time) string { return strconv.FormatInt(t.UnixNano(), 10) }
 func (l *Loki) Streams(ctx context.Context, namespace string, since time.Time) ([]domain.Stream, error) {
 	end := l.now()
 	step := max(time.Minute, end.Sub(since)/maxSteps).Truncate(time.Second)
-	streams, err := l.counted(ctx, namespace, since, end, step)
+	// Points fall at start, start+step, ...; a start a whole number of steps back puts the last one at end.
+	start := end.Add(-step * time.Duration((end.Sub(since)+step-1)/step))
+	streams, err := l.counted(ctx, namespace, start, end, step)
 	if err != nil {
 		return nil, err
 	}
