@@ -37,6 +37,23 @@ func New(base string, client *http.Client) (*Alertmanager, error) {
 	return &Alertmanager{base: u, client: client}, nil
 }
 
+// Absent is the Alertmanager of a dashboard that runs without one: every call is
+// domain.ErrNoAlertmanager.
+type Absent struct{}
+
+var _ domain.Alertmanager = Absent{}
+
+// Alerts implements domain.Alertmanager.
+func (Absent) Alerts(context.Context) ([]domain.Alert, error) { return nil, domain.ErrNoAlertmanager }
+
+// Silence implements domain.Alertmanager.
+func (Absent) Silence(context.Context, domain.SilenceRequest) (string, error) {
+	return "", domain.ErrNoAlertmanager
+}
+
+// Expire implements domain.Alertmanager.
+func (Absent) Expire(context.Context, string) error { return domain.ErrNoAlertmanager }
+
 var errStatus = errors.New("alertmanager: unexpected status")
 
 func (a *Alertmanager) do(ctx context.Context, method, path string, body any, want int, into any) error {

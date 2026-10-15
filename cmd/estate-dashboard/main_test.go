@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/adapters/gateway"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/pg/pgtest"
 )
 
@@ -68,7 +69,6 @@ func TestStartRefusesABadEnvironment(t *testing.T) {
 		"no redirect URL":      signedInThrough(anywhere, map[string]string{"DATABASE_URL": unreachable, "OIDC_REDIRECT_URL": ""}),
 		"no session key":       signedInThrough(anywhere, map[string]string{"DATABASE_URL": unreachable, "SESSION_KEY": ""}),
 		"a short session key":  signedInThrough(anywhere, map[string]string{"DATABASE_URL": unreachable, "SESSION_KEY": "short"}),
-		"no Alertmanager":      {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": ""},
 		"no Alertmanager URL":  {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": "alertmanager:9093"},
 		"half a gate address":  {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": "http://alertmanager:9093", "RELEASE_GATE_HOST": "release-gate"},
 	}
@@ -78,6 +78,20 @@ func TestStartRefusesABadEnvironment(t *testing.T) {
 				t.Fatalf("start = %d, want 1", code)
 			}
 		})
+	}
+}
+
+func TestTheEnvironmentSaysWhichAlertmanagerToRead(t *testing.T) {
+	am, watched, err := readAlertmanager(env(map[string]string{"ALERTMANAGER_URL": ""}))
+	if _, absent := am.(gateway.Absent); err != nil || !absent || watched {
+		t.Fatalf("without one: %T, watched %v, %v", am, watched, err)
+	}
+	am, watched, err = readAlertmanager(env(map[string]string{}))
+	if _, talks := am.(*gateway.Alertmanager); err != nil || !talks || !watched {
+		t.Fatalf("with one: %T, watched %v, %v", am, watched, err)
+	}
+	if _, _, err := readAlertmanager(env(map[string]string{"ALERTMANAGER_URL": "alertmanager:9093"})); err == nil {
+		t.Fatal("an Alertmanager that is no http(s) URL was read")
 	}
 }
 

@@ -60,7 +60,7 @@ paths:
       description: >-
         Returns every alert Alertmanager holds now, silenced or not, newest first. Read from
         Alertmanager on every request; nothing here is copied into the dashboard's database. A 503
-        means Alertmanager did not answer.
+        means Alertmanager did not answer, or that the dashboard runs without one.
       tags: [alerts]
       responses:
         "200":
@@ -84,7 +84,8 @@ paths:
         hours, a day, or until it resolves. The silence is set in Alertmanager, so Discord goes
         quiet too; it is the dashboard's only write. A silence until resolved lasts at most seven
         days in Alertmanager and is ended as soon as the dashboard sees the alert resolve. A 404
-        means the alert is not firing; a 503 that Alertmanager did not answer.
+        means the alert is not firing; a 503 that Alertmanager did not answer, or that the
+        dashboard runs without one.
       tags: [alerts]
       parameters:
         - name: fingerprint

@@ -29,18 +29,24 @@ func NewLive(uc LiveUseCases, logger *slog.Logger) *Live {
 	return &Live{uc: uc, logger: logger}
 }
 
-// unavailable is the problem for an Alertmanager that did not answer: its cause is the log's.
-func unavailable() oas.ProblemStatusCode {
-	return oas.ProblemStatusCode{StatusCode: http.StatusServiceUnavailable, Response: httpx.Problem(http.StatusServiceUnavailable, "Alertmanager did not answer.")}
+// unavailable is the problem for an Alertmanager that did not answer, whose cause it logs as
+// what with attrs, or for a dashboard without one, which is no failure to log.
+func (h *Live) unavailable(ctx context.Context, err error, what string, attrs ...any) oas.ProblemStatusCode {
+	detail := "Alertmanager did not answer."
+	if errors.Is(err, domain.ErrNoAlertmanager) {
+		detail = "The dashboard runs without an Alertmanager."
+	} else {
+		h.logger.ErrorContext(ctx, what, append(attrs, "error", err)...)
+	}
+	return oas.ProblemStatusCode{StatusCode: http.StatusServiceUnavailable, Response: httpx.Problem(http.StatusServiceUnavailable, detail)}
 }
 
 // ListAlerts implements listAlerts.
 func (h *Live) ListAlerts(ctx context.Context) (oas.ListAlertsRes, error) {
 	alerts, err := h.uc.Alerts(ctx)
 	if err != nil {
-		h.logger.ErrorContext(ctx, "list alerts", "error", err)
-		down := oas.ListAlertsServiceUnavailable(unavailable())
-		return &down, nil //nolint:nilerr // the cause is logged; the contract's 503 is the answer
+		down := oas.ListAlertsServiceUnavailable(h.unavailable(ctx, err, "list alerts"))
+		return &down, nil //nolint:nilerr // a cause is logged; the contract's 503 is the answer
 	}
 	items := make([]oas.Alert, 0, len(alerts))
 	for _, a := range alerts {
@@ -83,9 +89,8 @@ func (h *Live) SilenceAlert(ctx context.Context, req *oas.SilenceRequest, params
 		bad := oas.SilenceAlertBadRequest{StatusCode: http.StatusBadRequest, Response: httpx.Problem(http.StatusBadRequest, "A silence lasts 1h, 4h, 1d or until-resolved.")}
 		return &bad, nil
 	case err != nil:
-		h.logger.ErrorContext(ctx, "silence an alert", "fingerprint", params.Fingerprint, "error", err)
-		down := oas.SilenceAlertServiceUnavailable(unavailable())
-		return &down, nil //nolint:nilerr // the cause is logged; the contract's 503 is the answer
+		down := oas.SilenceAlertServiceUnavailable(h.unavailable(ctx, err, "silence an alert", "fingerprint", params.Fingerprint))
+		return &down, nil //nolint:nilerr // a cause is logged; the contract's 503 is the answer
 	}
 	out := &oas.Silence{ID: silence.ID, Fingerprint: silence.Fingerprint, CreatedBy: silence.CreatedBy, CreatedAt: silence.CreatedAt}
 	if silence.EndsAt != nil {

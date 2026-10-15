@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -193,15 +194,20 @@ func TestTheAlertsFiringNowAreServedInTheContractsShape(t *testing.T) {
 	}
 }
 
-func TestAnAlertmanagerThatDoesNotAnswerIsA503(t *testing.T) {
-	srv := serveLive(t, &memory{}, &live{err: errors.New("connection refused")})
-	for _, req := range []struct{ method, path, body string }{
-		{http.MethodGet, "/api/v1/alerts", ""},
-		{http.MethodPost, "/api/v1/alerts/9f2c/silences", `{"length":"1h"}`},
+func TestAnAlertmanagerThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
+	for want, err := range map[string]error{
+		"Alertmanager did not answer.":                errors.New("connection refused"),
+		"The dashboard runs without an Alertmanager.": fmt.Errorf("read the alerts: %w", domain.ErrNoAlertmanager),
 	} {
-		got := call(t, srv, req.method, req.path, req.body, true)
-		if got.code != http.StatusServiceUnavailable || got.body["detail"] != "Alertmanager did not answer." || got.header.Get("Content-Type") != "application/problem+json" {
-			t.Fatalf("%s %s = %d %v", req.method, req.path, got.code, got.body)
+		srv := serveLive(t, &memory{}, &live{err: err})
+		for _, req := range []struct{ method, path, body string }{
+			{http.MethodGet, "/api/v1/alerts", ""},
+			{http.MethodPost, "/api/v1/alerts/9f2c/silences", `{"length":"1h"}`},
+		} {
+			got := call(t, srv, req.method, req.path, req.body, true)
+			if got.code != http.StatusServiceUnavailable || got.body["detail"] != want || got.header.Get("Content-Type") != "application/problem+json" {
+				t.Fatalf("%s %s = %d %v", req.method, req.path, got.code, got.body)
+			}
 		}
 	}
 }

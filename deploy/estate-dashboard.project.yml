@@ -38,11 +38,12 @@ applications:
         provides:
           http: 8080 # matches the default ADDR; above 1024, so no CAP_NET_BIND_SERVICE
 
-        # The edge derives the project's database and this Process's data credential.
+        # The project's database. Its credential is the `database` grant below for now: deploy-kit
+        # derives none from this edge yet (JorisJonkers-dev/deploy-kit#378), and while `data` is
+        # legacy nothing on the estate path creates the database either. When it does, this edge
+        # takes `credentials` and the grant goes.
         dependsOn:
-          - application: platform-postgres
-            surface: postgres
-            credentials: { rotation: { tolerates: restart } } # pgxpool reads its URL once
+          - { application: platform-postgres, surface: postgres }
           # Signing in and every renewal call auth: discovery, its keys and its token endpoint.
           - { application: auth, surface: http }
           # Each gated Application's release-gate inputs and the gate's record of it, from the
@@ -57,6 +58,13 @@ applications:
         secrets:
           - path: secret/data/estate-dashboard-system/sign-in
             keys: [oidc-client-secret, session-key, github-token]
+            access: read
+            delivery: env
+            rotation: { tolerates: restart }
+          # The connection URL of estate-dashboard_db and its login, which JorisJonkers-dev/estate's
+          # bootstrap/cluster.sh creates on the live Postgres and writes here. pgxpool reads it once.
+          - path: secret/data/estate-dashboard-system/database
+            keys: [url]
             access: read
             delivery: env
             rotation: { tolerates: restart }

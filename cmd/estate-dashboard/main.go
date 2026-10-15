@@ -1,7 +1,8 @@
 // Command estate-dashboard serves the API and the embedded web app, migrates its database at
 // startup, and drains on SIGTERM.
 //
-// Environment: DATABASE_URL and ALERTMANAGER_URL (both required), and ADDR (default :8080). The
+// Environment: DATABASE_URL (required), ALERTMANAGER_URL, and ADDR (default :8080). Without
+// ALERTMANAGER_URL the alert reads answer that there is none, and nothing is watched. The
 // cluster is the one the dashboard runs in; on a local run KUBECONFIG may name one, and without
 // either the delivery reads answer that there is none. The Estate repository is read with
 // GITHUB_TOKEN, a token that may read it and nothing else, at ESTATE_REPOSITORY (default
@@ -31,6 +32,7 @@ import (
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/adapters/gateway"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/adapters/persistence"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/app"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/adapters/cluster"
 	deliveryapp "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/app"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/estate/adapters/github"
@@ -185,6 +187,20 @@ func readGate(getenv func(string) string) (*url.URL, error) {
 	return &url.URL{Scheme: "http", Host: net.JoinHostPort(host, port)}, nil
 }
 
+// readAlertmanager reads the Alertmanager to read alerts from and silence them in: the one at
+// ALERTMANAGER_URL, which is watched, or none, which is not.
+func readAlertmanager(getenv func(string) string) (domain.Alertmanager, bool, error) {
+	base := getenv("ALERTMANAGER_URL")
+	if base == "" {
+		return gateway.Absent{}, false, nil
+	}
+	am, err := gateway.New(base, &http.Client{Timeout: alertmanagerTimeout})
+	if err != nil {
+		return nil, false, fmt.Errorf("ALERTMANAGER_URL: %w", err)
+	}
+	return am, true, nil
+}
+
 // watch records what Alertmanager holds, now and then every interval, until ctx is done.
 func watch(ctx context.Context, logger *slog.Logger, live interface{ Watch(context.Context) error }, every time.Duration) {
 	tick := time.NewTicker(every)
@@ -208,9 +224,9 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	if dbURL == "" {
 		return errors.New("DATABASE_URL is not set")
 	}
-	am, err := gateway.New(getenv("ALERTMANAGER_URL"), &http.Client{Timeout: alertmanagerTimeout})
+	am, watched, err := readAlertmanager(getenv)
 	if err != nil {
-		return fmt.Errorf("ALERTMANAGER_URL: %w", err)
+		return err
 	}
 	releaseGate, err := readGate(getenv)
 	if err != nil {
@@ -243,7 +259,9 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	}
 	history := persistence.New(store.Queries())
 	live := app.NewLive(am, history, persistence.NewSilences(store.Queries()), time.Now, logger)
-	go watch(ctx, logger, live, watchEvery)
+	if watched {
+		go watch(ctx, logger, live, watchEvery)
+	}
 	api, err := httpapi.New(logger, gate, app.New(history), live, deliveryapp.New(kube), estateapp.New(repository))
 	if err != nil {
 		return err

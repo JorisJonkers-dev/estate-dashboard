@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -32,6 +33,19 @@ func TestNewTakesOnlyAnHTTPURL(t *testing.T) {
 	}
 	if _, err := gateway.New("https://alertmanager.observability-system.svc:9093", http.DefaultClient); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAbsentAnswersEveryCallWithNoAlertmanager(t *testing.T) {
+	var am gateway.Absent
+	if _, err := am.Alerts(t.Context()); !errors.Is(err, domain.ErrNoAlertmanager) {
+		t.Errorf("Alerts: %v", err)
+	}
+	if _, err := am.Silence(t.Context(), domain.SilenceRequest{}); !errors.Is(err, domain.ErrNoAlertmanager) {
+		t.Errorf("Silence: %v", err)
+	}
+	if err := am.Expire(t.Context(), "s-1"); !errors.Is(err, domain.ErrNoAlertmanager) {
+		t.Errorf("Expire: %v", err)
 	}
 }
 

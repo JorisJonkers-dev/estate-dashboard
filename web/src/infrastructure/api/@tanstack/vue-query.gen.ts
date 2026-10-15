@@ -64,7 +64,7 @@ export const listAlertsQueryKey = (options?: Options<ListAlertsData>) => createQ
 /**
  * List the alerts firing now, newest first
  *
- * Returns every alert Alertmanager holds now, silenced or not, newest first. Read from Alertmanager on every request; nothing here is copied into the dashboard's database. A 503 means Alertmanager did not answer.
+ * Returns every alert Alertmanager holds now, silenced or not, newest first. Read from Alertmanager on every request; nothing here is copied into the dashboard's database. A 503 means Alertmanager did not answer, or that the dashboard runs without one.
  */
 export const listAlertsOptions = (options?: Options<ListAlertsData>) => queryOptions<ListAlertsResponse, ListAlertsError, ListAlertsResponse, ReturnType<typeof listAlertsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -82,7 +82,7 @@ export const listAlertsOptions = (options?: Options<ListAlertsData>) => queryOpt
 /**
  * Silence an alert in Alertmanager
  *
- * Silences one firing alert, matching every one of its labels exactly, for an hour, four hours, a day, or until it resolves. The silence is set in Alertmanager, so Discord goes quiet too; it is the dashboard's only write. A silence until resolved lasts at most seven days in Alertmanager and is ended as soon as the dashboard sees the alert resolve. A 404 means the alert is not firing; a 503 that Alertmanager did not answer.
+ * Silences one firing alert, matching every one of its labels exactly, for an hour, four hours, a day, or until it resolves. The silence is set in Alertmanager, so Discord goes quiet too; it is the dashboard's only write. A silence until resolved lasts at most seven days in Alertmanager and is ended as soon as the dashboard sees the alert resolve. A 404 means the alert is not firing; a 503 that Alertmanager did not answer, or that the dashboard runs without one.
  */
 export const silenceAlertMutation = (options?: Partial<Options<SilenceAlertData>>): UseMutationOptions<SilenceAlertResponse, SilenceAlertError, Options<SilenceAlertData>> => {
     const mutationOptions: UseMutationOptions<SilenceAlertResponse, SilenceAlertError, Options<SilenceAlertData>> = {
