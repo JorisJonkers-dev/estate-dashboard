@@ -39,7 +39,7 @@ template's [`docs/blueprints/`](https://github.com/JorisJonkers-dev/template-go-
 | `Dockerfile` | Builds the web app, embeds it, ships a static binary on `distroless/static:nonroot` |
 | `.github/workflows/ci.yml` | One parallel job per `task check` task, one for `task e2e` and one for `docker build`; `Pipeline Complete`, the one required check, passes when all do |
 | `.github/workflows/release.yml`, `release-please-config.json` | release-please, as in the rest of the estate |
-| `deploy/estate-dashboard.project.yml` | The dashboard's [deploy-kit](https://github.com/JorisJonkers-dev/deploy-kit) Project Intent: one Process, `estate.jorisjonkers.dev`, a Postgres edge, an edge to auth, the sign-in secrets and the database URL; `deploy/env/` is its environment, and `deploy/package.json` pins the deploy-kit release that packs it. Each release publishes the image and this fragment (`.github/workflows/release.yml`) |
+| `deploy/estate-dashboard.project.yml` | The dashboard's [deploy-kit](https://github.com/JorisJonkers-dev/deploy-kit) Project Intent: one Process, `estate.jorisjonkers.dev`, a Postgres edge, an edge to auth, the sign-in secrets and the database URL; `deploy/env/` is its environment. Each release publishes the image and this fragment (`.github/workflows/release.yml`) |
 
 ## State
 

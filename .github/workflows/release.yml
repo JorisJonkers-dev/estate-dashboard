@@ -120,11 +120,10 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@ab37076d4f445f1b7705b4f9d5d9821e2b38c9c0 # v0.21.0
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@8637ee1224dfefd807d9b8be616eeb59f94ba126 # v0.23.0
     with:
       project-file: deploy/estate-dashboard.project.yml
       version: ${{ needs.release-please.outputs.tag_name }}
-      toolkit-directory: deploy
       validate-with: deploy/env
       validate-with-fragments: auth delivery
       images-lock-artifact: images-lock
