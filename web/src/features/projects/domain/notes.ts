@@ -18,7 +18,7 @@ function spans(line: string): Span[] {
   let at = 0
   for (const m of line.matchAll(link)) {
     if (m.index > at) out.push({ text: line.slice(at, m.index) })
-    out.push({ text: m[1] ?? '', href: m[2] ?? '' })
+    out.push({ text: String(m[1]), href: String(m[2]) })
     at = m.index + m[0].length
   }
   if (at < line.length) out.push({ text: line.slice(at) })
@@ -33,8 +33,8 @@ export function readNotes(markdown: string): Block[] {
     if (line === '' || line === '---') continue
     const heading = /^#{1,6}\s+(.*)$/.exec(line)
     const item = /^[*-]\s+(.*)$/.exec(line)
-    if (heading) blocks.push({ kind: 'heading', spans: spans(heading[1] ?? '') })
-    else if (item) blocks.push({ kind: 'item', spans: spans(item[1] ?? '') })
+    if (heading) blocks.push({ kind: 'heading', spans: spans(String(heading[1])) })
+    else if (item) blocks.push({ kind: 'item', spans: spans(String(item[1])) })
     else blocks.push({ kind: 'text', spans: spans(line) })
   }
   return blocks

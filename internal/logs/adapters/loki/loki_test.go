@@ -52,8 +52,7 @@ func TestNewTakesOnlyAnHTTPURL(t *testing.T) {
 	}
 }
 
-// counted is a Loki whose count of lines is counts, and whose one-line reads answer each direction
-// with its own line, or with nothing when lines has no entry for it.
+// counted answers the line count with counts and each one-line read with lines[direction].
 func counted(t *testing.T, counts string, lines map[string]string, asked *[]string) *loki.Loki {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

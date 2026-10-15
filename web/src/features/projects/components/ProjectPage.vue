@@ -49,7 +49,7 @@ const current = computed(() =>
 )
 const runningProcesses = computed(() => current.value.filter((p) => !p.migration && p.running > 0))
 const finishedRuns = computed(() => current.value.filter((p) => p.migration))
-// Pods from before deploy-kit labelled them with their version match no release.
+// Pods without a version label match no release.
 const unlabelled = computed(() => streams.value.length > 0 && streams.value.every((s) => s.version === undefined))
 const containersOf = (version: string) => byProcess(ofRelease(streams.value, version), now.value)
 

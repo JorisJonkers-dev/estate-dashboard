@@ -74,7 +74,14 @@ describe('the Alerts screen', () => {
           application: 'quiet',
           members: [{ process: 'q', phase: 'Succeeded', iterations: 4 }],
         },
-        { namespace: 'new-system', application: 'new', members: [{ process: 'n', phase: 'Waiting', iterations: 0 }] },
+        {
+          namespace: 'new-system',
+          application: 'new',
+          members: [
+            { process: 'n', phase: 'Waiting', iterations: 0 },
+            { process: 'm', iterations: 0 },
+          ],
+        },
       ],
     )
     expect(items.map((i) => [i.class, i.severity, i.title, i.project ?? '', i.silenced])).toEqual([
@@ -88,5 +95,7 @@ describe('the Alerts screen', () => {
       ['Platform', 'Info', 'Cert', '', false],
     ])
     expect(items[1]?.link).toEqual({ href: '/projects/auth/release', label: 'Open release' })
+    // A member the Release Gate has not seen yet says so.
+    expect(items[0]?.labels).toContainEqual(['m', 'not seen, 0 checks'])
   })
 })

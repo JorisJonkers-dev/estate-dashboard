@@ -31,6 +31,10 @@ describe('the containers of a release', () => {
       ['liquibase', true, 0, ['api-migration-up']],
       ['api', false, 2, ['api-2', 'api-1', 'api-old']],
     ])
+    // A container that never said when it started sorts last.
+    expect(
+      byProcess([{ pod: 'unknown', container: 'api' }, s('api-1', 'api')], now)[0]?.streams.map((x) => x.pod),
+    ).toEqual(['api-1', 'unknown'])
     expect(isMigration(s('web', 'web'))).toBe(false)
     expect(isMigration(s('x', 'auth-migrate'))).toBe(true)
   })

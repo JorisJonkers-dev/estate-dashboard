@@ -15,14 +15,14 @@ export function isMigration(s: Stream): boolean {
   return /migrat/.test(s.pod) || /migrat/.test(s.container)
 }
 
-/** A container that wrote a line in the last 15 minutes counts as running; some, like the collector, write once every 10. */
+/** Running: wrote within 15 minutes. The collector writes every 10. */
 export const quietFor = 15 * 60_000
 
 export function isRunning(s: Stream, now: number): boolean {
   return s.last !== undefined && now - Date.parse(s.last) <= quietFor
 }
 
-/** One release's containers: those whose pod carries its version label. A pod without one matches no release. */
+/** One release's containers, by their pods' version label. */
 export function ofRelease(streams: Stream[], version: string): Stream[] {
   return streams.filter((s) => s.version === version)
 }
@@ -60,14 +60,13 @@ export function readLine(text: string): ReadLine {
     const level = plainLevel.exec(text)?.[1]
     return { ...(level ? { level: level.toLowerCase() } : {}), message: text, fields: [] }
   }
-  let parsed: unknown
+  let o: Record<string, unknown>
   try {
-    parsed = JSON.parse(text)
+    // A line that starts with { and parses is an object.
+    o = JSON.parse(text) as Record<string, unknown>
   } catch {
     return { message: text, fields: [] }
   }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return { message: text, fields: [] }
-  const o = parsed as Record<string, unknown>
   const word = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v))
   const level = o.level ?? o.lvl
   const message = o.msg ?? o.message

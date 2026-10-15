@@ -121,6 +121,14 @@ describe('the health strip', () => {
     ])
   })
 
+  it('warns of an open condition while nothing is isolated, and is all composed with none', () => {
+    const reads = base()
+    reads.issues = [condition(73, 'grimoire', 'stale'), condition(74, 'notes', 'paused')]
+    expect(health(reads)[0]).toMatchObject({ status: '1 condition', tone: 'warn', detail: 'nothing isolated' })
+    reads.issues = [condition(74, 'notes', 'paused')]
+    expect(health(reads)[0]).toMatchObject({ status: 'All composed', tone: 'ok' })
+  })
+
   it('says what it could not read rather than calling it healthy', () => {
     expect(health({ deploys: {} }).map((h) => h.status)).toEqual(['Unknown', 'Unknown', 'Unknown', 'Not read'])
   })

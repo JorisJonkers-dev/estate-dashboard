@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { TooltipArrow, TooltipContent, TooltipPortal, TooltipProvider, TooltipRoot, TooltipTrigger } from 'reka-ui'
 
-/**
- * Explains what it wraps, on hover and on keyboard focus. A `term` is plain text, so it gets a
- * dotted underline and a tab stop; anything else is already a button or a link. Without text it
- * renders what it wraps unchanged.
- */
+/** Explains what it wraps on hover and focus; a `term` is plain text, so it gets a tab stop. */
 defineProps<{ text?: string | undefined; term?: boolean }>()
 </script>
 

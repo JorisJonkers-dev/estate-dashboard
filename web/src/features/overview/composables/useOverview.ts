@@ -61,8 +61,6 @@ export function useOverview() {
     projects: computed(() => projectRows(reads.value)),
     health: computed(() => health(reads.value)),
     needs: computed(() => needs(reads.value)),
-    /** Firing alerts not silenced. The nav shows this count. */
-    firing: computed(() => (alerts.data.value?.items ?? []).filter((a) => a.silencedBy.length === 0).length),
     /** What could not be read, and why. */
     unread: computed(() =>
       sources.flatMap(([name, query]) => (query.error.value ? [{ name, why: describeError(query.error.value) }] : [])),

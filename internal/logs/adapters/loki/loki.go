@@ -1,7 +1,4 @@
-// Package loki implements the logs context's Store on Loki's HTTP API: query_range, as a count of
-// lines for which containers wrote logs and as lines for what they wrote. Streams are found by the
-// namespace, pod and container labels Alloy puts on every pod's logs, and the version label where
-// a pod carries one.
+// Package loki implements the logs context's Store on Loki's HTTP API.
 package loki
 
 import (
@@ -28,8 +25,7 @@ const maxBody = 16 << 20
 // spans is how many containers' first and latest lines are read at once.
 const spans = 8
 
-// maxSteps bounds the points in the count of lines that finds the containers: a week is steps of
-// about ten minutes.
+// maxSteps bounds the points of the line count: a week is steps of about ten minutes.
 const maxSteps = 1000
 
 // Loki reads one Loki.
@@ -74,9 +70,7 @@ func (l *Loki) get(ctx context.Context, path string, query url.Values, into any)
 	return json.Unmarshal(raw, into)
 }
 
-// selector is the LogQL stream selector for the labels given. Each value is quoted as a Go string
-// literal, which LogQL reads the same way, so no value can end the string or add a matcher, even one
-// that reached the adapter unchecked.
+// selector is the LogQL stream selector for the labels; each value is quoted so none can escape.
 func selector(labels ...[2]string) string {
 	parts := make([]string, 0, len(labels))
 	for _, l := range labels {
@@ -88,11 +82,7 @@ func selector(labels ...[2]string) string {
 func nanos(t time.Time) string { return strconv.FormatInt(t.UnixNano(), 10) }
 
 // Streams implements domain.Store: one Stream per pod and container, by pod then container.
-//
-// One count of lines per container over the whole window finds every container and the step in
-// which it wrote its first and its latest line. A one-line read inside each of those two steps then
-// says exactly when. Reading a week of one pod's lines from the start is what made the first
-// version of this slow; a step is minutes, not days.
+// One line count finds them, then one-line reads inside two steps each say when they wrote.
 func (l *Loki) Streams(ctx context.Context, namespace string, since time.Time) ([]domain.Stream, error) {
 	end := l.now()
 	step := max(time.Minute, end.Sub(since)/maxSteps).Truncate(time.Second)
@@ -112,8 +102,7 @@ func (l *Loki) Streams(ctx context.Context, namespace string, since time.Time) (
 	return streams, nil
 }
 
-// counted is every container that wrote a line between since and end, with First and Last the
-// ends of the steps in which it wrote its first and its latest.
+// counted is every container that wrote between since and end, First and Last at step ends.
 func (l *Loki) counted(ctx context.Context, namespace string, since, end time.Time, step time.Duration) ([]domain.Stream, error) {
 	var reply struct {
 		Data struct {
@@ -140,15 +129,13 @@ func (l *Loki) counted(ctx context.Context, namespace string, since, end time.Ti
 		if s.Pod == "" || s.Container == "" || !okFirst || !okLast {
 			continue
 		}
-		// A point at t counts the lines in the step that ends at t.
 		s.First, s.Last = first, last
 		streams = append(streams, s)
 	}
 	return streams, nil
 }
 
-// refine reads one line inside each container's first and last step, so First and Last are when
-// it wrote rather than the step's end. A step it wrote nothing in keeps the step's end.
+// refine narrows First and Last from step ends to when each line was written.
 func (l *Loki) refine(ctx context.Context, namespace string, streams []domain.Stream, step time.Duration) error {
 	group, ctx := errgroup.WithContext(ctx)
 	group.SetLimit(spans)
@@ -175,7 +162,7 @@ func (l *Loki) refine(ctx context.Context, namespace string, streams []domain.St
 	return group.Wait()
 }
 
-// stepAt is the time of the i-th point of a metric series, which Loki writes as seconds.
+// stepAt is the time of a series' i-th point.
 func stepAt(values [][2]any, i int) (time.Time, bool) {
 	if i < 0 || i >= len(values) {
 		return time.Time{}, false
@@ -187,8 +174,7 @@ func stepAt(values [][2]any, i int) (time.Time, bool) {
 	return time.Unix(0, int64(seconds*float64(time.Second))).UTC(), true
 }
 
-// oneLine is when the container wrote its first line between from and to, reading forward, or its
-// latest, reading backward; zero when it wrote none there.
+// oneLine is when the first (forward) or latest (backward) line between from and to was written.
 func (l *Loki) oneLine(ctx context.Context, namespace string, s domain.Stream, from, to time.Time, direction string) (time.Time, error) {
 	var reply struct {
 		Data struct {
