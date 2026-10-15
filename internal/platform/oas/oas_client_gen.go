@@ -31,10 +31,10 @@ func trimTrailingSlashes(u *url.URL) {
 type Invoker interface {
 	// GetHandover invokes getHandover operation.
 	//
-	// The handover ledger of the Platform document, platform.intent.yml on the Estate repository's default
-	// branch: the Projects delivered by their pins, and those fleet-infra still delivers. A Platform
-	// document without a ledger has handed every Project over, and lists none as legacy. A 503 means
-	// GitHub did not answer, or the dashboard runs without the Estate repository.
+	// The handover ledger from platform.intent.yml on the Estate repository's default branch. It lists the
+	// Projects their pins deliver, and the ones fleet-infra still delivers. A document with no ledger has
+	// handed every Project over, so nothing is legacy. A 503 means GitHub did not answer, or the dashboard
+	// has no Estate repository.
 	//
 	// GET /api/v1/estate/handover
 	GetHandover(ctx context.Context) (GetHandoverRes, error)
@@ -93,9 +93,9 @@ type Invoker interface {
 	ListReleases(ctx context.Context) (ListReleasesRes, error)
 	// ListRollouts invokes listRollouts operation.
 	//
-	// The GitHub Deployments composition opened for the Project in its own repository, with the stages the
-	// Reporter wrote on each and the run that logged them. A repository outside the estate's owner has
-	// none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+	// The production deployments composition opened for the Project in its repository, with the stages the
+	// Reporter wrote on each. A repository outside the estate's owner has none. A 503 means GitHub did not
+	// answer, or the dashboard has no Estate repository.
 	//
 	// GET /api/v1/estate/projects/{project}/rollouts
 	ListRollouts(ctx context.Context, params ListRolloutsParams) (ListRolloutsRes, error)
@@ -169,10 +169,10 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 
 // GetHandover invokes getHandover operation.
 //
-// The handover ledger of the Platform document, platform.intent.yml on the Estate repository's default
-// branch: the Projects delivered by their pins, and those fleet-infra still delivers. A Platform
-// document without a ledger has handed every Project over, and lists none as legacy. A 503 means
-// GitHub did not answer, or the dashboard runs without the Estate repository.
+// The handover ledger from platform.intent.yml on the Estate repository's default branch. It lists the
+// Projects their pins deliver, and the ones fleet-infra still delivers. A document with no ledger has
+// handed every Project over, so nothing is legacy. A 503 means GitHub did not answer, or the dashboard
+// has no Estate repository.
 //
 // GET /api/v1/estate/handover
 func (c *Client) GetHandover(ctx context.Context) (GetHandoverRes, error) {
@@ -1148,9 +1148,9 @@ func (c *Client) sendListReleases(ctx context.Context) (res ListReleasesRes, err
 
 // ListRollouts invokes listRollouts operation.
 //
-// The GitHub Deployments composition opened for the Project in its own repository, with the stages the
-// Reporter wrote on each and the run that logged them. A repository outside the estate's owner has
-// none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+// The production deployments composition opened for the Project in its repository, with the stages the
+// Reporter wrote on each. A repository outside the estate's owner has none. A 503 means GitHub did not
+// answer, or the dashboard has no Estate repository.
 //
 // GET /api/v1/estate/projects/{project}/rollouts
 func (c *Client) ListRollouts(ctx context.Context, params ListRolloutsParams) (ListRolloutsRes, error) {

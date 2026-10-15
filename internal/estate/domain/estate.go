@@ -40,24 +40,23 @@ type Deploy struct {
 	Message string
 }
 
-// Handover is the Platform document's handover ledger: which delivery path each Project is on
+// Handover is the handover ledger from the Platform document
 // (deploy-kit spec/v1/14-platform-intent.md#handover-ledger).
 type Handover struct {
-	// Estate are the Projects delivered by their pins; Legacy those fleet-infra still delivers.
+	// Estate lists Projects delivered by their pins. Legacy lists those fleet-infra still delivers.
 	Estate []string
 	Legacy []string
 }
 
-// Issue is one open issue of the Estate repository.
+// Issue is one open issue in the Estate repository.
 type Issue struct {
 	Number    int
 	Title     string
 	URL       string
 	Labels    []string
 	UpdatedAt time.Time
-	// Project and Condition are the condition composition keeps the issue for, from the marker
-	// its body ends with (`<!-- estate-condition: <project>/<condition> -->`); empty on an issue
-	// a person opened.
+	// Project and Condition come from the marker at the end of the body,
+	// `<!-- estate-condition: <project>/<condition> -->`. Both are empty if a person opened the issue.
 	Project   string
 	Condition string
 }
@@ -66,13 +65,13 @@ type Issue struct {
 type Stage struct {
 	State       string
 	Description string
-	// Log is the run that did it, where there is one.
+	// Log is the run behind it, when there is one.
 	Log string
 	At  time.Time
 }
 
-// Rollout is one release of a Project reaching production: the GitHub Deployment composition
-// opened in the Project's own repository, and the stages it went through, newest first.
+// Rollout is one release of a Project that reached production. It is the GitHub Deployment
+// composition opened in the Project's repository, with its stages, newest first.
 type Rollout struct {
 	ID       int64
 	Version  string
@@ -83,8 +82,8 @@ type Rollout struct {
 	Stages   []Stage
 }
 
-// ErrForeignRepository is returned for a repository outside the Estate repository's owner: the
-// dashboard reads the estate's own repositories and no others.
+// ErrForeignRepository is returned for a repository outside the estate's owner. The dashboard
+// reads only the estate's own repositories.
 var ErrForeignRepository = errors.New("not one of the estate's repositories")
 
 // ErrNoRepository is returned where the dashboard runs without the Estate repository to read.
@@ -96,11 +95,11 @@ var ErrNoProject = errors.New("no such Project")
 // Repository is the port the Estate repository reader implements. It only ever reads.
 type Repository interface {
 	Pins(ctx context.Context) ([]Pin, error)
-	// Handover returns the Platform document's ledger; none, where it holds no ledger.
+	// Handover returns the ledger, or an empty one if the document has none.
 	Handover(ctx context.Context) (Handover, error)
 	// Deploys returns at most limit commits that moved the Project's pin, newest first.
 	Deploys(ctx context.Context, project string, limit int) ([]Deploy, error)
 	Issues(ctx context.Context) ([]Issue, error)
-	// Rollouts returns at most limit of the Project's rollouts in repository, newest first.
+	// Rollouts returns up to limit rollouts of the Project in repository, newest first.
 	Rollouts(ctx context.Context, repository, project string, limit int) ([]Rollout, error)
 }

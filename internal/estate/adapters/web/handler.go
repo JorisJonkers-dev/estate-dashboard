@@ -1,5 +1,5 @@
-// Package web is the estate context's inbound HTTP adapter: the reads of the Estate
-// repository, mapped from the domain to the contract's types.
+// Package web is the estate context's inbound HTTP adapter. It maps the domain's reads of the
+// Estate repository to the contract's types.
 package web
 
 import (
@@ -70,7 +70,7 @@ func (h *Estate) GetHandover(ctx context.Context) (oas.GetHandoverRes, error) {
 	ledger, err := h.uc.Handover(ctx)
 	if err != nil {
 		down := oas.GetHandoverServiceUnavailable(h.unavailable(ctx, "handover", err))
-		return &down, nil //nolint:nilerr // the cause is logged; the contract's 503 is the answer
+		return &down, nil //nolint:nilerr // already logged; the 503 is the answer
 	}
 	return &oas.Handover{Estate: append([]string{}, ledger.Estate...), Legacy: append([]string{}, ledger.Legacy...)}, nil
 }
@@ -93,8 +93,8 @@ func (h *Estate) ListDeploys(ctx context.Context, params oas.ListDeploysParams) 
 	return &oas.DeployList{Items: items}, nil
 }
 
-// ListRollouts implements listRollouts. A repository outside the estate's owner, like a name that
-// is no Project, has no rollouts the dashboard reads.
+// ListRollouts implements listRollouts. A foreign repository or an unknown Project gets an
+// empty list.
 func (h *Estate) ListRollouts(ctx context.Context, params oas.ListRolloutsParams) (oas.ListRolloutsRes, error) {
 	rollouts, err := h.uc.Rollouts(ctx, params.Repository, params.Project, int(params.Limit.Or(0)))
 	switch {
@@ -125,7 +125,7 @@ func (h *Estate) ListIssues(ctx context.Context) (oas.ListIssuesRes, error) {
 	items := make([]oas.Issue, 0, len(issues))
 	for _, i := range issues {
 		items = append(items, oas.Issue{
-			Number: int32(min(max(i.Number, 1), 1<<31-1)), //nolint:gosec // clamped to the int32 range
+			Number: int32(min(max(i.Number, 1), 1<<31-1)), //nolint:gosec // clamped to int32
 			Title:  i.Title, URL: i.URL, Labels: append([]string{}, i.Labels...), UpdatedAt: i.UpdatedAt,
 			Project: opt(i.Project), Condition: opt(i.Condition),
 		})
@@ -133,7 +133,7 @@ func (h *Estate) ListIssues(ctx context.Context) (oas.ListIssuesRes, error) {
 	return &oas.IssueList{Items: items}, nil
 }
 
-// opt is an optional string of the contract: absent where s is empty.
+// opt returns s as an optional field, absent when s is empty.
 func opt(s string) oas.OptString {
 	if s == "" {
 		return oas.OptString{}

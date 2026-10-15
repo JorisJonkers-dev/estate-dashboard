@@ -37,7 +37,7 @@ func (s *Service) Pins(ctx context.Context) ([]domain.Pin, error) {
 	return pins, nil
 }
 
-// Handover returns which delivery path each Project is on, each list by name.
+// Handover returns each Project's delivery path, with both lists sorted.
 func (s *Service) Handover(ctx context.Context) (domain.Handover, error) {
 	ledger, err := s.repo.Handover(ctx)
 	if err != nil {
@@ -64,11 +64,11 @@ func (s *Service) Deploys(ctx context.Context, project string, limit int) ([]dom
 	return deploys, nil
 }
 
-// DefaultRollouts is how many rollouts a Project's history returns when the caller names no limit.
+// DefaultRollouts is how many rollouts come back when the caller gives no limit.
 const DefaultRollouts = 10
 
-// Rollouts returns up to limit of a Project's rollouts in repository, newest first. A limit below
-// 1 means DefaultRollouts, and one above MaxDeploys is MaxDeploys.
+// Rollouts returns up to limit of a Project's rollouts in repository, newest first. A limit
+// below 1 means DefaultRollouts. A limit above MaxDeploys is capped at MaxDeploys.
 func (s *Service) Rollouts(ctx context.Context, repository, project string, limit int) ([]domain.Rollout, error) {
 	switch {
 	case limit < 1:

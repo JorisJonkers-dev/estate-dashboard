@@ -141,16 +141,16 @@ paths:
   /api/v1/estate/handover:
     get:
       operationId: getHandover
-      summary: Say which delivery path each Project is on
+      summary: Show each Project's delivery path
       description: >-
-        The handover ledger of the Platform document, platform.intent.yml on the Estate repository's
-        default branch: the Projects delivered by their pins, and those fleet-infra still delivers. A
-        Platform document without a ledger has handed every Project over, and lists none as legacy. A
-        503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+        The handover ledger from platform.intent.yml on the Estate repository's default branch. It
+        lists the Projects their pins deliver, and the ones fleet-infra still delivers. A document
+        with no ledger has handed every Project over, so nothing is legacy. A 503 means GitHub did
+        not answer, or the dashboard has no Estate repository.
       tags: [estate]
       responses:
         "200":
-          description: What the Estate repository holds.
+          description: The handover ledger.
           content:
             application/json:
               schema:
@@ -206,10 +206,9 @@ paths:
       operationId: listRollouts
       summary: List a Project's rollouts to production, newest first
       description: >-
-        The GitHub Deployments composition opened for the Project in its own repository, with the
-        stages the Reporter wrote on each and the run that logged them. A repository outside the
-        estate's owner has none. A 503 means GitHub did not answer, or the dashboard runs without
-        the Estate repository.
+        The production deployments composition opened for the Project in its repository, with the
+        stages the Reporter wrote on each and the run that logged them. A repository outside the estate's owner has none. A 503
+        means GitHub did not answer, or the dashboard has no Estate repository.
       tags: [estate]
       parameters:
         - name: project
@@ -224,7 +223,7 @@ paths:
         - name: repository
           in: query
           required: true
-          description: The repository the Project publishes from, owner/name.
+          description: The repository the Project publishes from, as owner/name.
           schema:
             type: string
             minLength: 3
@@ -242,7 +241,7 @@ paths:
             default: 10
       responses:
         "200":
-          description: What GitHub holds.
+          description: The rollouts.
           content:
             application/json:
               schema:
@@ -447,7 +446,7 @@ components:
           items:
             $ref: "#/components/schemas/Pin"
     Handover:
-      description: Which delivery path each Project is on.
+      description: Each Project's delivery path.
       type: object
       additionalProperties: false
       required: [estate, legacy]
@@ -455,14 +454,14 @@ components:
         estate:
           type: array
           maxItems: 1000
-          description: The Projects delivered by their pins, by name.
+          description: Names of the Projects delivered by their pins.
           items:
             type: string
             maxLength: 63
         legacy:
           type: array
           maxItems: 1000
-          description: The Projects fleet-infra still delivers, by name.
+          description: Names of the Projects still delivered by fleet-infra.
           items:
             type: string
             maxLength: 63
@@ -489,7 +488,7 @@ components:
           type: string
           format: date-time
           maxLength: 64
-          description: When.
+          description: When it happened.
     Rollout:
       description: One release of a Project reaching production.
       type: object
@@ -610,13 +609,13 @@ components:
           type: string
           maxLength: 63
           description: >-
-            The Project of the condition composition keeps this issue for, from the marker its body
-            ends with; absent on an issue a person opened.
+            The Project the issue is for, from the marker at the end of its body. Absent if a
+            person opened the issue.
           example: knowledge
         condition:
           type: string
           maxLength: 64
-          description: The condition, likewise.
+          description: The condition, from the same marker.
           example: isolated
     IssueList:
       description: The open issues, most recently updated first.
@@ -720,15 +719,15 @@ components:
           type: string
           maxLength: 128
           description: >-
-            The release the unit's pin names, from the event.toolkit.fluxcd.io/version annotation
-            composition writes on it; absent on a unit no composition wrote.
+            The release the unit's pin names, from the event.toolkit.fluxcd.io/version annotation.
+            Absent if composition wrote none.
           example: 0.6.0
         repository:
           type: string
           maxLength: 256
           description: >-
-            The repository that release was published from, from the
-            event.toolkit.fluxcd.io/repository annotation; absent likewise.
+            The repository the release came from, from the event.toolkit.fluxcd.io/repository
+            annotation. Absent if composition wrote none.
           example: JorisJonkers-dev/delivery
         ready:
           type: boolean

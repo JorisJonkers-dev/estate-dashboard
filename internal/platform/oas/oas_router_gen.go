@@ -801,7 +801,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						switch method {
 						case "GET":
 							r.name = GetHandoverOperation
-							r.summary = "Say which delivery path each Project is on"
+							r.summary = "Delivery path of each Project"
 							r.operationID = "getHandover"
 							r.operationGroup = ""
 							r.pathPattern = "/api/v1/estate/handover"

@@ -282,7 +282,7 @@ func decodeListDeploysParams(args [1]string, argsEscaped bool, r *http.Request) 
 type ListRolloutsParams struct {
 	// The Project.
 	Project string
-	// The repository the Project publishes from, owner/name.
+	// The Project's repository, as owner/name.
 	Repository string
 	// How many rollouts to return.
 	Limit OptInt32 `json:",omitempty,omitzero"`

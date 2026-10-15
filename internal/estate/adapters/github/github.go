@@ -35,9 +35,8 @@ const (
 // project is what a Project's directory may be called: what a pin file's path is built from.
 var project = regexp.MustCompile(`^[a-z0-9_][a-z0-9_-]{0,62}$`)
 
-// conditionMarker is the key composition ends a condition issue's body with: the Project and the
-// condition, each checked as the reporting script checks it
-// (JorisJonkers-dev/estate .github/scripts/report.sh).
+// conditionMarker matches the marker composition ends a condition issue with. The reporting
+// script checks each name the same way (JorisJonkers-dev/estate .github/scripts/report.sh).
 var conditionMarker = regexp.MustCompile(`<!-- estate-condition: ([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)/([a-z]+(?:-[a-z]+)*) -->`)
 
 // Estate reads one Estate repository.
@@ -204,8 +203,8 @@ func pinOf(project, text string) domain.Pin {
 // platformDocument is the Platform document's path in the Estate repository.
 const platformDocument = "platform.intent.yml"
 
-// Handover implements domain.Repository: the `handover` block of the Platform document. A
-// document without one has handed every Project over and names none.
+// Handover implements domain.Repository, reading the `handover` block. A document without one
+// has handed every Project over, so both lists are empty.
 func (e *Estate) Handover(ctx context.Context) (domain.Handover, error) {
 	var file struct {
 		Content  string `json:"content"`
@@ -233,7 +232,7 @@ func (e *Estate) Handover(ctx context.Context) (domain.Handover, error) {
 	return domain.Handover{Estate: named(document.Handover.Estate), Legacy: named(document.Handover.Legacy)}, nil
 }
 
-// named keeps what may name a Project, so a ledger entry never reaches a page as anything else.
+// named keeps only valid Project names, so nothing else reaches a page.
 func named(projects []string) []string {
 	out := []string{}
 	for _, p := range projects {
@@ -305,10 +304,10 @@ func (e *Estate) Issues(ctx context.Context) ([]domain.Issue, error) {
 	return out, nil
 }
 
-// repositoryName is what may name one of the estate's repositories.
+// repositoryName matches an owner/name repository.
 var repositoryName = regexp.MustCompile(`^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$`)
 
-// rolloutsQuery reads a repository's production deployments with their stages in one request.
+// rolloutsQuery reads production deployments and their stages in one request.
 const rolloutsQuery = `query($owner: String!, $name: String!, $first: Int!) {
   repository(owner: $owner, name: $name) {
     deployments(environments: ["production"], first: $first, orderBy: {field: CREATED_AT, direction: DESC}) {
@@ -346,8 +345,8 @@ type rolloutsReply struct {
 	} `json:"errors"`
 }
 
-// Rollouts implements domain.Repository: the production deployments composition opened in
-// repository for the Project, read from the payload it writes on each.
+// Rollouts implements domain.Repository. It returns the production deployments composition
+// opened in the repository for the Project, read from each deployment's payload.
 func (e *Estate) Rollouts(ctx context.Context, repository, name string, limit int) ([]domain.Rollout, error) {
 	if !project.MatchString(name) {
 		return nil, fmt.Errorf("%w: %q", domain.ErrNoProject, name)
@@ -376,13 +375,13 @@ func (e *Estate) Rollouts(ctx context.Context, repository, name string, limit in
 			Run      string `json:"run"`
 			Artifact string `json:"artifact"`
 		}
-		// GraphQL serves the payload as a JSON string holding the JSON the deployment was given.
+		// GraphQL may wrap the payload in a JSON string. Unwrap it if so.
 		raw := d.Payload
 		var inner string
 		if json.Unmarshal([]byte(raw), &inner) == nil {
 			raw = inner
 		}
-		// A deployment composition did not open, or one for another Project, is not this one's.
+		// Skip deployments composition did not open, and those for another Project.
 		if json.Unmarshal([]byte(raw), &payload) != nil || payload.Project != name {
 			continue
 		}

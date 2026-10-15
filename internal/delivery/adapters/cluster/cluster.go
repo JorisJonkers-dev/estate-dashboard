@@ -36,9 +36,8 @@ var (
 const (
 	// rendered selects what the render wrote (deploy-kit spec/v1/10-project-intent.md#the-label-set).
 	rendered = "app.kubernetes.io/managed-by=deploy-kit"
-	// eventAnnotation prefixes what composition writes on a unit for Flux's events: the release
-	// its pin names and where that was published from
-	// (deploy-kit spec/v1/55-delivery.md#what-a-pin-source-holds).
+	// eventAnnotation prefixes the unit annotations composition writes: the pin's release and
+	// where it came from (deploy-kit spec/v1/55-delivery.md#what-a-pin-source-holds).
 	eventAnnotation = "event.toolkit.fluxcd.io/"
 	// releasesPath is where the Release Gate serves what it holds of every gated Application.
 	releasesPath = "/releases"

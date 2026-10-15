@@ -154,7 +154,7 @@ func TestADeployIsACommitThatTouchedThePinFile(t *testing.T) {
 	}
 }
 
-// contents is the contents API's answer for a file holding text.
+// contents is what the contents API returns for a text file.
 func contents(text string) string {
 	raw, _ := json.Marshal(map[string]string{"encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(text))})
 	return string(raw)

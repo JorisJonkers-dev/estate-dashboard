@@ -402,12 +402,12 @@ type GetHandoverUnauthorized ProblemStatusCode
 
 func (*GetHandoverUnauthorized) getHandoverRes() {}
 
-// Which delivery path each Project is on.
+// Each Project's delivery path.
 // Ref: #/components/schemas/Handover
 type Handover struct {
-	// The Projects delivered by their pins, by name.
+	// Projects delivered by their pins.
 	Estate []string `json:"estate"`
-	// The Projects fleet-infra still delivers, by name.
+	// Projects still delivered by fleet-infra.
 	Legacy []string `json:"legacy"`
 }
 
@@ -446,10 +446,10 @@ type Issue struct {
 	Labels []string `json:"labels"`
 	// When it last changed.
 	UpdatedAt time.Time `json:"updatedAt"`
-	// The Project of the condition composition keeps this issue for, from the marker its body ends with;
-	// absent on an issue a person opened.
+	// The Project the issue is for, from the marker at the end of its body. Absent if a person opened the
+	// issue.
 	Project OptString `json:"project"`
-	// The condition, likewise.
+	// The condition the issue is for.
 	Condition OptString `json:"condition"`
 }
 
@@ -1823,7 +1823,7 @@ type Stage struct {
 	Description string `json:"description"`
 	// The run that logged it.
 	Log OptString `json:"log"`
-	// When.
+	// When it happened.
 	At time.Time `json:"at"`
 }
 
@@ -1880,11 +1880,11 @@ type Unit struct {
 	DependsOn []string `json:"dependsOn"`
 	// The source revision Flux last applied, where it applied anything.
 	Applied OptString `json:"applied"`
-	// The release the unit's pin names, from the event.toolkit.fluxcd.io/version annotation composition
-	// writes on it; absent on a unit no composition wrote.
+	// The release the unit's pin names, from the event.toolkit.fluxcd.io/version annotation. Absent if
+	// composition wrote none.
 	Version OptString `json:"version"`
-	// The repository that release was published from, from the event.toolkit.fluxcd.io/repository
-	// annotation; absent likewise.
+	// The repository the release came from, from the event.toolkit.fluxcd.io/repository annotation. Absent
+	// if composition wrote none.
 	Repository OptString `json:"repository"`
 	// Whether Flux reports the object Ready.
 	Ready bool `json:"ready"`
