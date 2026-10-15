@@ -15,6 +15,7 @@ import { useProject } from '../composables/useProject'
 import { byProcess, type ProcessLogs } from '../domain/logs'
 import { estateRepository, links, stageTone } from '../domain/project'
 import { live } from '../domain/releases'
+import DeclarationPanel from './DeclarationPanel.vue'
 import LogView from './LogView.vue'
 import NotesView from './NotesView.vue'
 
@@ -66,7 +67,8 @@ const button =
       <StateTag v-if="row" :tone="row.tone">{{ row.state }}</StateTag>
       <span v-else-if="!isLoading">This project isn't in the estate.</span>
       <template #acts>
-        <ActionLink v-if="repository" :to="links.repository(repository)" primary>Repository</ActionLink>
+        <ActionLink v-if="row?.tone === 'info'" :to="`/projects/${name}/release`" primary>Release in flight</ActionLink>
+        <ActionLink v-if="repository" :to="links.repository(repository)" :primary="row?.tone !== 'info'">Repository</ActionLink>
         <template v-if="!legacy && pin">
           <ActionLink :to="links.workflow(pin.paused ? 'resume' : 'pause')">{{ pin.paused ? 'Resume' : 'Pause' }}</ActionLink>
           <ActionLink :to="links.workflow('rollback')">Roll back</ActionLink>
@@ -163,6 +165,7 @@ const button =
       </div>
 
       <div class="flex flex-col gap-10">
+        <DeclarationPanel :project="name" />
         <section aria-labelledby="cluster-h">
           <h2 id="cluster-h" class="m-0 mb-3 text-xl font-semibold">In the cluster</h2>
           <p v-if="cluster.length === 0" class="text-text-muted">Nothing of {{ name }} runs from its pin yet.</p>
