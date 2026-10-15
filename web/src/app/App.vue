@@ -10,8 +10,9 @@ const route = useRoute()
 /** The pages in the nav. */
 const pages = [
   { to: '/', label: 'Overview', names: ['overview'] },
-  { to: '/projects', label: 'Projects', names: ['projects', 'project'] },
-  { to: '/alerts', label: 'Alerts', names: ['alerts'] },
+  { to: '/projects', label: 'Projects', names: ['projects', 'project', 'release'] },
+  { to: '/alerts', label: 'Alerts', names: ['alerts', 'alert-history'] },
+  { to: '/composition', label: 'Composition', names: ['composition'] },
 ] as const
 const current = (names: readonly string[]) => (names.includes(String(route.name)) ? 'page' : undefined)
 

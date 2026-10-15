@@ -28,7 +28,10 @@ export function createAppRouter(history: RouterHistory = createWebHistory(), sig
       { path: '/', name: 'overview', component: () => import('../features/overview/components/OverviewPage.vue') },
       { path: '/projects', name: 'projects', component: () => import('../features/projects/components/ProjectsPage.vue') },
       { path: '/projects/:name', name: 'project', component: () => import('../features/projects/components/ProjectPage.vue') },
-      { path: '/alerts', name: 'alerts', component: () => import('../features/alerts/components/AlertHistoryPage.vue') },
+      { path: '/projects/:name/release', name: 'release', component: () => import('../features/projects/components/ReleasePage.vue') },
+      { path: '/alerts', name: 'alerts', component: () => import('../features/alerts/components/AlertsPage.vue') },
+      { path: '/alerts/history', name: 'alert-history', component: () => import('../features/alerts/components/AlertHistoryPage.vue') },
+      { path: '/composition', name: 'composition', component: () => import('../features/composition/components/CompositionPage.vue') },
       { path: '/sign-in', name: 'sign-in', meta: { public: true }, component: () => import('../features/session/components/SignInPage.vue') },
       {
         path: '/not-an-admin',
