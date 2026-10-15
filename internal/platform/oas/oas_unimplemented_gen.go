@@ -37,7 +37,7 @@ func (UnimplementedHandler) ListAlertHistory(ctx context.Context, params ListAle
 //
 // Returns every alert Alertmanager holds now, silenced or not, newest first. Read from Alertmanager on
 // every request; nothing here is copied into the dashboard's database. A 503 means Alertmanager did
-// not answer.
+// not answer, or that the dashboard runs without one.
 //
 // GET /api/v1/alerts
 func (UnimplementedHandler) ListAlerts(ctx context.Context) (r ListAlertsRes, _ error) {
@@ -114,7 +114,7 @@ func (UnimplementedHandler) ListUnits(ctx context.Context) (r ListUnitsRes, _ er
 // or until it resolves. The silence is set in Alertmanager, so Discord goes quiet too; it is the
 // dashboard's only write. A silence until resolved lasts at most seven days in Alertmanager and is
 // ended as soon as the dashboard sees the alert resolve. A 404 means the alert is not firing; a 503
-// that Alertmanager did not answer.
+// that Alertmanager did not answer, or that the dashboard runs without one.
 //
 // POST /api/v1/alerts/{fingerprint}/silences
 func (UnimplementedHandler) SilenceAlert(ctx context.Context, req *SilenceRequest, params SilenceAlertParams) (r SilenceAlertRes, _ error) {

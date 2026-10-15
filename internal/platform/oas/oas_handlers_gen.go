@@ -424,7 +424,7 @@ func (s *Server) handleListAlertHistoryRequest(args [0]string, argsEscaped bool,
 //
 // Returns every alert Alertmanager holds now, silenced or not, newest first. Read from Alertmanager on
 // every request; nothing here is copied into the dashboard's database. A 503 means Alertmanager did
-// not answer.
+// not answer, or that the dashboard runs without one.
 //
 // GET /api/v1/alerts
 func (s *Server) handleListAlertsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -1752,7 +1752,7 @@ func (s *Server) handleListUnitsRequest(args [0]string, argsEscaped bool, w http
 // or until it resolves. The silence is set in Alertmanager, so Discord goes quiet too; it is the
 // dashboard's only write. A silence until resolved lasts at most seven days in Alertmanager and is
 // ended as soon as the dashboard sees the alert resolve. A 404 means the alert is not firing; a 503
-// that Alertmanager did not answer.
+// that Alertmanager did not answer, or that the dashboard runs without one.
 //
 // POST /api/v1/alerts/{fingerprint}/silences
 func (s *Server) handleSilenceAlertRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

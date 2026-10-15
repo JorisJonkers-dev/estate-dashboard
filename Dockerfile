@@ -31,5 +31,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/estate-dashboard /estate-dashboard
 EXPOSE 8080
-USER nonroot:nonroot
+# distroless's nonroot, by number: the estate's images lock records the uid and gid an image
+# states, and a name states neither.
+USER 65532:65532
 ENTRYPOINT ["/estate-dashboard"]

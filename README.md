@@ -39,7 +39,7 @@ template's [`docs/blueprints/`](https://github.com/JorisJonkers-dev/template-go-
 | `Dockerfile` | Builds the web app, embeds it, ships a static binary on `distroless/static:nonroot` |
 | `.github/workflows/ci.yml` | One parallel job per `task check` task, one for `task e2e` and one for `docker build`; `Pipeline Complete`, the one required check, passes when all do |
 | `.github/workflows/release.yml`, `release-please-config.json` | release-please, as in the rest of the estate |
-| `deploy/estate-dashboard.project.yml` | The dashboard's [deploy-kit](https://github.com/JorisJonkers-dev/deploy-kit) Project Intent: one Process, `estate.jorisjonkers.dev`, a Postgres edge, an edge to auth and the sign-in secrets; `deploy/env/` is its environment |
+| `deploy/estate-dashboard.project.yml` | The dashboard's [deploy-kit](https://github.com/JorisJonkers-dev/deploy-kit) Project Intent: one Process, `estate.jorisjonkers.dev`, a Postgres edge, an edge to auth, the sign-in secrets and the database URL; `deploy/env/` is its environment, and `deploy/package.json` pins the deploy-kit release that packs it. Each release publishes the image and this fragment (`.github/workflows/release.yml`) |
 
 ## State
 
@@ -101,7 +101,9 @@ Never set `DEV_USER` in a deployment.
 
 ## Alertmanager
 
-`ALERTMANAGER_URL` (required) is Alertmanager's address. The dashboard reads alerts from it on
+`ALERTMANAGER_URL` is Alertmanager's address. Without it the alert reads and a silence answer
+503, "The dashboard runs without an Alertmanager.", and nothing is watched; the deployment sets
+none until a Project declares Alertmanager (#11). The dashboard reads alerts from it on
 every request (`GET /api/v1/alerts`) and copies none into its database. Every 30 seconds it also
 watches it: a firing it has not seen is recorded in `alert_history`, and a recorded firing
 Alertmanager no longer holds is recorded as resolved. That is the history the detail pane reads,

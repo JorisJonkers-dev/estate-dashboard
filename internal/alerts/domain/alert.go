@@ -139,6 +139,9 @@ type SilenceRequest struct {
 // ErrNotFiring is returned when the alert to silence is not one Alertmanager holds now.
 var ErrNotFiring = errors.New("the alert is not firing")
 
+// ErrNoAlertmanager is returned where the dashboard runs without an Alertmanager to read.
+var ErrNoAlertmanager = errors.New("no Alertmanager is configured")
+
 // Alertmanager is the port the Alertmanager gateway implements.
 type Alertmanager interface {
 	// Alerts returns every alert Alertmanager holds now.
