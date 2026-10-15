@@ -22,20 +22,9 @@ export function isRunning(s: Stream, now: number): boolean {
   return s.last !== undefined && now - Date.parse(s.last) <= quietFor
 }
 
-/**
- * One release's containers. Those labelled with its version, or, while pods carry no version label,
- * the unlabelled ones that started between the release and the next one.
- */
-export function ofRelease(streams: Stream[], release: { version: string; at: string }, until?: string): Stream[] {
-  const labelled = streams.filter((s) => s.version === release.version)
-  if (labelled.length > 0) return labelled
-  const from = Date.parse(release.at)
-  const to = until === undefined ? Infinity : Date.parse(until)
-  return streams.filter((s) => {
-    if (s.version !== undefined || s.first === undefined) return false
-    const started = Date.parse(s.first)
-    return started >= from && started < to
-  })
+/** One release's containers: those whose pod carries its version label. A pod without one matches no release. */
+export function ofRelease(streams: Stream[], version: string): Stream[] {
+  return streams.filter((s) => s.version === version)
 }
 
 /** Containers grouped by Process, migrations first. Each Process's containers are newest first. */

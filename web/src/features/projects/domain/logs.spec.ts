@@ -12,20 +12,10 @@ const s = (pod: string, container: string, version?: string, first = 60, last = 
 })
 
 describe('the containers of a release', () => {
-  it('takes the ones labelled with its version', () => {
-    const streams = [s('api-1', 'api', '1.0.0'), s('api-0', 'api', '0.9.0'), s('old', 'api')]
-    expect(ofRelease(streams, { version: '1.0.0', at: at(500) }).map((x) => x.pod)).toEqual(['api-1'])
-  })
-
-  it('takes unlabelled ones that started between this release and the next, until pods carry a version', () => {
-    const streams = [
-      s('before', 'api', undefined, 300),
-      s('during', 'api', undefined, 150),
-      s('after', 'api', undefined, 50),
-      { pod: 'unknown', container: 'api' },
-    ]
-    expect(ofRelease(streams, { version: '1.0.0', at: at(200) }, at(100)).map((x) => x.pod)).toEqual(['during'])
-    expect(ofRelease(streams, { version: '1.1.0', at: at(100) }).map((x) => x.pod)).toEqual(['after'])
+  it('takes only the ones labelled with its version', () => {
+    const streams = [s('api-1', 'api', '1.0.0'), s('api-0', 'api', '0.9.0'), s('unlabelled', 'api')]
+    expect(ofRelease(streams, '1.0.0').map((x) => x.pod)).toEqual(['api-1'])
+    expect(ofRelease([s('unlabelled', 'api')], '1.0.0')).toEqual([])
   })
 
   it('groups by Process, migrations first, and counts only the running ones', () => {

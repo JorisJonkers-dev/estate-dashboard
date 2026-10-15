@@ -16,7 +16,7 @@ import StatusMark from '../../../shared/ui/StatusMark.vue'
 import TermHint from '../../../shared/ui/TermHint.vue'
 import { age, shortDigest } from '../../overview/domain/overview'
 import { useProject } from '../composables/useProject'
-import { byProcess, isRunning, ofRelease, type ProcessLogs } from '../domain/logs'
+import { byProcess, ofRelease, type ProcessLogs } from '../domain/logs'
 import { estateRepository, links, stageTone } from '../domain/project'
 import { serving } from '../domain/releases'
 import DeclarationPanel from './DeclarationPanel.vue'
@@ -43,21 +43,15 @@ const description = computed(
     ),
 )
 const running = computed(() => serving(releases.value))
-// The serving release's containers. Without one, whatever is running.
+// The serving release's containers, matched by their pods' version label.
 const current = computed(() =>
-  byProcess(
-    running.value ? ofRelease(streams.value, running.value) : streams.value.filter((s) => isRunning(s, now.value)),
-    now.value,
-  ),
+  running.value ? byProcess(ofRelease(streams.value, running.value.version), now.value) : [],
 )
 const runningProcesses = computed(() => current.value.filter((p) => !p.migration && p.running > 0))
 const finishedRuns = computed(() => current.value.filter((p) => p.migration))
-const unversioned = computed(() => current.value.some((p) => p.streams.some((s) => s.version === undefined)))
-/** A release's containers, up to the release after it. */
-const containersOf = (i: number) => {
-  const r = releases.value[i]
-  return r ? byProcess(ofRelease(streams.value, r, releases.value[i - 1]?.at), now.value) : []
-}
+// Pods from before deploy-kit labelled them with their version match no release.
+const unlabelled = computed(() => streams.value.length > 0 && streams.value.every((s) => s.version === undefined))
+const containersOf = (version: string) => byProcess(ofRelease(streams.value, version), now.value)
 
 const open = ref<number | null>(null)
 const toggle = (key: number) => (open.value = open.value === key ? null : key)
@@ -173,7 +167,10 @@ const button =
               ><StatusMark state="live" />{{ running.version }}</span
             >
           </h2>
-          <p v-if="runningProcesses.length === 0 && finishedRuns.length === 0" class="m-0 text-text-muted">
+          <p v-if="unlabelled" class="m-0 text-text-muted">
+            Its pods carry no version label yet. They show here after the next deploy.
+          </p>
+          <p v-else-if="runningProcesses.length === 0 && finishedRuns.length === 0" class="m-0 text-text-muted">
             No container of {{ name }} is running.
           </p>
           <ul v-else class="m-0 list-none border-t border-line p-0">
@@ -213,9 +210,6 @@ const button =
               >
             </li>
           </ul>
-          <p v-if="unversioned" class="m-0 mt-2 text-sm text-dim">
-            These pods have no version label yet, so they are matched to a release by when they started.
-          </p>
         </section>
 
         <section aria-labelledby="releases-h">
@@ -225,7 +219,7 @@ const button =
             >The next release shows up here once composition pins it.</EmptyPlate
           >
           <ol v-else class="m-0 list-none border-t border-line p-0">
-            <li v-for="(r, i) in releases" :key="r.key" class="border-b border-line-soft">
+            <li v-for="r in releases" :key="r.key" class="border-b border-line-soft">
               <div class="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
                 <StatusMark :state="r.state" />
                 <span class="text-lg font-semibold">{{ r.version }}</span>
@@ -271,11 +265,11 @@ const button =
                 </ol>
                 <div>
                   <p class="m-0 mb-1.5" :class="label">Containers</p>
-                  <p v-if="containersOf(i).length === 0" class="m-0 text-sm text-text-muted">
+                  <p v-if="containersOf(r.version).length === 0" class="m-0 text-sm text-text-muted">
                     No containers with this version.
                   </p>
                   <ul v-else class="m-0 flex list-none flex-wrap gap-2 p-0">
-                    <li v-for="p in containersOf(i)" :key="p.process">
+                    <li v-for="p in containersOf(r.version)" :key="p.process">
                       <button type="button" :class="button" @click="showLogs(p, r.version)">
                         <span v-if="p.migration" class="mr-1.5 text-xs text-text-muted">migration</span>{{ p.process }}
                       </button>
