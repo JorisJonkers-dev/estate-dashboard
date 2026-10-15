@@ -78,7 +78,7 @@ func (h *Delivery) ListUnits(ctx context.Context) (oas.ListUnitsRes, error) {
 	for _, u := range units.Items {
 		items = append(items, oas.Unit{
 			Name: u.Name, Source: u.Source, Path: u.Path, DependsOn: append([]string{}, u.DependsOn...),
-			Applied: opt(u.Applied), Ready: u.Ready, Reason: opt(u.Reason), Message: opt(u.Message),
+			Applied: opt(u.Applied), Version: opt(u.Version), Repository: opt(u.Repository), Ready: u.Ready, Reason: opt(u.Reason), Message: opt(u.Message),
 		})
 	}
 	return &oas.UnitList{Items: items, Truncated: units.Truncated}, nil

@@ -115,7 +115,7 @@ func TestTheSourcesAreTheRendersOCIRepositoriesWithWhatFluxSaysOfThem(t *testing
 }
 
 func TestTheUnitsAreTheRendersKustomizations(t *testing.T) {
-	k := kube(t, "", object(cluster.Kustomizations, "Kustomization", "flux-system", "apps-auth", rendered,
+	auth := object(cluster.Kustomizations, "Kustomization", "flux-system", "apps-auth", rendered,
 		map[string]any{
 			"sourceRef": map[string]any{"kind": "OCIRepository", "name": "project-auth"}, "path": "./apps/auth",
 			"dependsOn": []any{map[string]any{"name": "apps-data"}, "not a reference", map[string]any{"name": int64(7)}, map[string]any{"name": "estate-vso-secrets"}},
@@ -124,11 +124,17 @@ func TestTheUnitsAreTheRendersKustomizations(t *testing.T) {
 			s := ready("False", "DependencyNotReady", "apps-data is not ready")
 			s["lastAppliedRevision"] = "sha256:1"
 			return s
-		}()))
+		}())
+	auth.SetAnnotations(map[string]string{
+		"event.toolkit.fluxcd.io/version": "3.4.2", "event.toolkit.fluxcd.io/repository": "JorisJonkers-dev/auth-api",
+		"event.toolkit.fluxcd.io/sha": "8c1d40e",
+	})
+	k := kube(t, "", auth)
 	page, err := k.Units(t.Context())
 	got := page.Items
 	want := []domain.Unit{{
 		Name: "apps-auth", Source: "project-auth", Path: "./apps/auth", DependsOn: []string{"apps-data", "estate-vso-secrets"}, Applied: "sha256:1",
+		Version: "3.4.2", Repository: "JorisJonkers-dev/auth-api",
 		Condition: domain.Condition{Reason: "DependencyNotReady", Message: "apps-data is not ready"},
 	}}
 	if err != nil || !reflect.DeepEqual(got, want) {

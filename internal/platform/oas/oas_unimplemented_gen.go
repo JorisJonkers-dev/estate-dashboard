@@ -13,6 +13,40 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// GetDeclaration implements getDeclaration operation.
+//
+// The Applications, Processes, migration, rollback and grants the Project's Intent Fragment declares,
+// at the version its pin was composed from (#31). A 503 means fragments are not read yet, or the
+// registry did not answer.
+//
+// GET /api/v1/estate/projects/{project}/declaration
+func (UnimplementedHandler) GetDeclaration(ctx context.Context, params GetDeclarationParams) (r GetDeclarationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetHandover implements getHandover operation.
+//
+// The handover ledger from platform.intent.yml on the Estate repository's default branch. It lists the
+// Projects their pins deliver, and the ones fleet-infra still delivers. A document with no ledger has
+// handed every Project over, so nothing is legacy. A 503 means GitHub did not answer, or the dashboard
+// has no Estate repository.
+//
+// GET /api/v1/estate/handover
+func (UnimplementedHandler) GetHandover(ctx context.Context) (r GetHandoverRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetReleaseNotes implements getReleaseNotes operation.
+//
+// The body of the GitHub Release a repository of the estate published for a version, as Markdown. A
+// 404 means there is none. A 503 means GitHub did not answer, or the dashboard runs without the Estate
+// repository.
+//
+// GET /api/v1/estate/releases/notes
+func (UnimplementedHandler) GetReleaseNotes(ctx context.Context, params GetReleaseNotesParams) (r GetReleaseNotesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetSession implements getSession operation.
 //
 // Returns the admin the session cookie belongs to. A request without a session, or with one auth no
@@ -44,6 +78,16 @@ func (UnimplementedHandler) ListAlerts(ctx context.Context) (r ListAlertsRes, _ 
 	return r, ht.ErrNotImplemented
 }
 
+// ListCompositionRuns implements listCompositionRuns operation.
+//
+// Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed. Read
+// from each run's artifact (#30). A 503 means the runs are not read yet, or GitHub did not answer.
+//
+// GET /api/v1/estate/composition/runs
+func (UnimplementedHandler) ListCompositionRuns(ctx context.Context) (r ListCompositionRunsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListDeploys implements listDeploys operation.
 //
 // The Estate repository's history of projects//source.yaml: its deploy log. A Project with no pin has
@@ -62,6 +106,27 @@ func (UnimplementedHandler) ListDeploys(ctx context.Context, params ListDeploysP
 //
 // GET /api/v1/estate/issues
 func (UnimplementedHandler) ListIssues(ctx context.Context) (r ListIssuesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListLogLines implements listLogLines operation.
+//
+// The newest lines one container of the Project wrote in the window, from Loki, oldest first. A 503
+// means Loki did not answer, or the dashboard runs without one.
+//
+// GET /api/v1/projects/{project}/logs
+func (UnimplementedHandler) ListLogLines(ctx context.Context, params ListLogLinesParams) (r ListLogLinesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListLogStreams implements listLogStreams operation.
+//
+// Every pod and container in the Project's namespace that wrote logs in the window: running Processes,
+// past ones and migration Jobs, from Loki. A 503 means Loki did not answer, or the dashboard runs
+// without one.
+//
+// GET /api/v1/projects/{project}/logs/streams
+func (UnimplementedHandler) ListLogStreams(ctx context.Context, params ListLogStreamsParams) (r ListLogStreamsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -84,6 +149,17 @@ func (UnimplementedHandler) ListPins(ctx context.Context) (r ListPinsRes, _ erro
 //
 // GET /api/v1/delivery/releases
 func (UnimplementedHandler) ListReleases(ctx context.Context) (r ListReleasesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListRollouts implements listRollouts operation.
+//
+// The production deployments composition opened for the Project in its repository, with the stages the
+// Reporter wrote on each and the run that logged them. A repository outside the estate's owner has
+// none. A 503 means GitHub did not answer, or the dashboard has no Estate repository.
+//
+// GET /api/v1/estate/projects/{project}/rollouts
+func (UnimplementedHandler) ListRollouts(ctx context.Context, params ListRolloutsParams) (r ListRolloutsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

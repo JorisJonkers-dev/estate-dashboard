@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig, type Plugin } from 'vitest/config'
 
@@ -17,8 +18,16 @@ const keepDist: Plugin = {
 }
 
 export default defineConfig({
-  plugins: [vue(), keepDist],
+  plugins: [vue(), tailwindcss(), keepDist],
   server: { proxy },
+  build: {
+    rollupOptions: {
+      output: {
+        // zod and its jitless switch share a chunk, so the switch runs before any schema is built.
+        manualChunks: (id) => (/node_modules\/zod\/|infrastructure\/jitless\.ts$/.test(id) ? 'zod' : undefined),
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     include: ['src/**/*.spec.ts'],
@@ -26,13 +35,19 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.{ts,vue}'],
       // Generated code is the contract's, and main.ts is the composition root E2E covers.
-      exclude: ['src/infrastructure/api/**', 'src/main.ts', 'src/**/*.spec.ts', 'src/env.d.ts'],
+      exclude: [
+        'src/infrastructure/api/**',
+        'src/infrastructure/mock.ts',
+        'src/main.ts',
+        'src/**/*.spec.ts',
+        'src/env.d.ts',
+      ],
       // 90% overall, and 100% on the domain and the composables (template-go-vue, docs/blueprints/vue-ts-spa.md §16).
       thresholds: {
-        lines: 90,
-        branches: 90,
-        functions: 90,
-        statements: 90,
+        'lines': 90,
+        'branches': 90,
+        'functions': 90,
+        'statements': 90,
         'src/features/*/domain/**': { lines: 100, branches: 100, functions: 100, statements: 100 },
         'src/features/*/composables/**': { lines: 100, branches: 100, functions: 100, statements: 100 },
       },

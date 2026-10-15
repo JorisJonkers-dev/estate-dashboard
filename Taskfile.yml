@@ -65,10 +65,11 @@ tasks:
     cmd: squawk db/migrations/*.sql
 
   lint:web:
-    desc: ESLint (type-checked, a11y) and vue-tsc
+    desc: ESLint (type-checked, a11y), the Prettier format check and vue-tsc
     deps: [install]
     cmds:
       - pnpm --filter @{{.APP}}/web lint
+      - pnpm --filter @{{.APP}}/web format:check
       - pnpm --filter @{{.APP}}/web typecheck
 
   lint:actions:
@@ -132,6 +133,7 @@ tasks:
       - golangci-lint fmt ./...
       - golangci-lint run --fix ./...
       - pnpm --filter @{{.APP}}/web exec eslint . --fix
+      - pnpm --filter @{{.APP}}/web format
 
   dev:
     desc: Run Postgres, the API on :8080 as a development admin, and Vite with hot reload on :5173

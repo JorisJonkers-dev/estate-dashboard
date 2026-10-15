@@ -36,6 +36,9 @@ var (
 const (
 	// rendered selects what the render wrote (deploy-kit spec/v1/10-project-intent.md#the-label-set).
 	rendered = "app.kubernetes.io/managed-by=deploy-kit"
+	// eventAnnotation prefixes the unit annotations composition writes: the pin's release and
+	// where it came from (deploy-kit spec/v1/55-delivery.md#what-a-pin-source-holds).
+	eventAnnotation = "event.toolkit.fluxcd.io/"
 	// releasesPath is where the Release Gate serves what it holds of every gated Application.
 	releasesPath = "/releases"
 	// maxGateAnswer bounds what one answer of the gate is read up to: a thousand Applications
@@ -131,12 +134,14 @@ func (k Kube) Units(ctx context.Context) (domain.Page[domain.Unit], error) {
 			}
 		}
 		units = append(units, domain.Unit{
-			Name:      o.GetName(),
-			Source:    str(o, "spec", "sourceRef", "name"),
-			Path:      str(o, "spec", "path"),
-			DependsOn: after,
-			Applied:   str(o, "status", "lastAppliedRevision"),
-			Condition: readyOf(o),
+			Name:       o.GetName(),
+			Source:     str(o, "spec", "sourceRef", "name"),
+			Path:       str(o, "spec", "path"),
+			DependsOn:  after,
+			Applied:    str(o, "status", "lastAppliedRevision"),
+			Version:    o.GetAnnotations()[eventAnnotation+"version"],
+			Repository: o.GetAnnotations()[eventAnnotation+"repository"],
+			Condition:  readyOf(o),
 		})
 	}
 	return domain.Page[domain.Unit]{Items: units, Truncated: more}, nil

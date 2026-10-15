@@ -19,6 +19,8 @@ servers:
 security:
   - sessionCookie: []
 tags:
+  - name: logs
+    description: What a Project's containers wrote, from Loki.
   - name: estate
     description: >-
       What the Estate repository says, read through a token that may read it and nothing else: each
@@ -138,6 +140,29 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/estate/handover:
+    get:
+      operationId: getHandover
+      summary: Show each Project's delivery path
+      description: >-
+        The handover ledger from platform.intent.yml on the Estate repository's default branch. It
+        lists the Projects their pins deliver, and the ones fleet-infra still delivers. A document
+        with no ledger has handed every Project over, so nothing is legacy. A 503 means GitHub did
+        not answer, or the dashboard has no Estate repository.
+      tags: [estate]
+      responses:
+        "200":
+          description: The handover ledger.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Handover"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/estate/projects/{project}/deploys:
     get:
       operationId: listDeploys
@@ -172,6 +197,265 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeployList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/estate/projects/{project}/rollouts:
+    get:
+      operationId: listRollouts
+      summary: List a Project's rollouts to production, newest first
+      description: >-
+        The production deployments composition opened for the Project in its repository, with the
+        stages the Reporter wrote on each and the run that logged them. A repository outside the estate's owner has none. A 503
+        means GitHub did not answer, or the dashboard has no Estate repository.
+      tags: [estate]
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: The Project.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+            pattern: "^[a-z0-9_][a-z0-9_-]{0,62}$"
+        - name: repository
+          in: query
+          required: true
+          description: The repository the Project publishes from, as owner/name.
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 140
+            pattern: "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+        - name: limit
+          in: query
+          required: false
+          description: How many rollouts to return.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        "200":
+          description: The rollouts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RolloutList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/projects/{project}/logs/streams:
+    get:
+      operationId: listLogStreams
+      summary: List the containers of a Project that wrote logs
+      description: >-
+        Every pod and container in the Project's namespace that wrote logs in the window: running
+        Processes, past ones and migration Jobs, from Loki. A 503 means Loki did not answer, or the
+        dashboard runs without one.
+      tags: [logs]
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: The Project.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+            pattern: "^[a-z0-9_][a-z0-9_-]{0,62}$"
+        - name: hours
+          in: query
+          required: false
+          description: How many hours back to look.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 720
+            default: 24
+      responses:
+        "200":
+          description: What Loki holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/projects/{project}/logs:
+    get:
+      operationId: listLogLines
+      summary: Read one container's logs, oldest first
+      description: >-
+        The newest lines one container of the Project wrote in the window, from Loki, oldest first.
+        A 503 means Loki did not answer, or the dashboard runs without one.
+      tags: [logs]
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: The Project.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+            pattern: "^[a-z0-9_][a-z0-9_-]{0,62}$"
+        - name: hours
+          in: query
+          required: false
+          description: How many hours back to look.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 720
+            default: 24
+        - name: pod
+          in: query
+          required: true
+          description: The pod.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+            pattern: "^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$"
+        - name: container
+          in: query
+          required: true
+          description: The container.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+            pattern: "^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$"
+        - name: limit
+          in: query
+          required: false
+          description: How many lines to return.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 5000
+            default: 500
+      responses:
+        "200":
+          description: What Loki holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogLines"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/estate/releases/notes:
+    get:
+      operationId: getReleaseNotes
+      summary: Read a release's notes
+      description: >-
+        The body of the GitHub Release a repository of the estate published for a version, as
+        Markdown. A 404 means there is none. A 503 means GitHub did not answer, or the dashboard
+        runs without the Estate repository.
+      tags: [estate]
+      parameters:
+        - name: repository
+          in: query
+          required: true
+          description: The repository, owner/name.
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 140
+            pattern: "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+        - name: version
+          in: query
+          required: true
+          description: The release.
+          schema:
+            type: string
+            minLength: 5
+            maxLength: 64
+            pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$"
+      responses:
+        "200":
+          description: The notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseNotes"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/estate/composition/runs:
+    get:
+      operationId: listCompositionRuns
+      summary: List the estate's composition runs, newest first
+      description: >-
+        Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed.
+        Read from each run's artifact (#30). A 503 means the runs are not read yet, or GitHub did not
+        answer.
+      tags: [estate]
+      responses:
+        "200":
+          description: The runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompositionRunList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/estate/projects/{project}/declaration:
+    get:
+      operationId: getDeclaration
+      summary: Read what a Project declares at its pinned release
+      description: >-
+        The Applications, Processes, migration, rollback and grants the Project's Intent Fragment
+        declares, at the version its pin was composed from (#31). A 503 means fragments are not read
+        yet, or the registry did not answer.
+      tags: [estate]
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: The Project.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+            pattern: "^[a-z0-9_][a-z0-9_-]{0,62}$"
+      responses:
+        "200":
+          description: The declaration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Declaration"
         "401":
           $ref: "#/components/responses/Problem"
         "503":
@@ -371,6 +655,405 @@ components:
           description: The pins.
           items:
             $ref: "#/components/schemas/Pin"
+    Handover:
+      description: Each Project's delivery path.
+      type: object
+      additionalProperties: false
+      required: [estate, legacy]
+      properties:
+        estate:
+          type: array
+          maxItems: 1000
+          description: Names of the Projects delivered by their pins.
+          items:
+            type: string
+            maxLength: 63
+        legacy:
+          type: array
+          maxItems: 1000
+          description: Names of the Projects still delivered by fleet-infra.
+          items:
+            type: string
+            maxLength: 63
+    Stage:
+      description: One step of a rollout.
+      type: object
+      additionalProperties: false
+      required: [state, description, at]
+      properties:
+        state:
+          type: string
+          maxLength: 32
+          description: GitHub's deployment state, lower case.
+          example: in_progress
+        description:
+          type: string
+          maxLength: 256
+          description: What happened.
+        log:
+          type: string
+          maxLength: 2048
+          description: The run that logged it.
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it happened.
+    Rollout:
+      description: One release of a Project reaching production.
+      type: object
+      additionalProperties: false
+      required: [id, version, commit, at, stages]
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: The GitHub Deployment's id.
+        version:
+          type: string
+          maxLength: 128
+          description: The release.
+          example: 0.2.0
+        commit:
+          type: string
+          maxLength: 64
+          description: The commit the release was built from.
+        run:
+          type: string
+          maxLength: 2048
+          description: The composition run that pinned it.
+        artifact:
+          type: string
+          maxLength: 512
+          description: The rendered artifact its pin names.
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was pinned.
+        stages:
+          type: array
+          maxItems: 20
+          description: Its stages, newest first.
+          items:
+            $ref: "#/components/schemas/Stage"
+    RolloutList:
+      description: A Project's rollouts, newest first.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          description: The rollouts.
+          items:
+            $ref: "#/components/schemas/Rollout"
+    Stream:
+      description: One container of one pod that wrote logs.
+      type: object
+      additionalProperties: false
+      required: [pod, container]
+      properties:
+        pod:
+          type: string
+          maxLength: 253
+          description: The pod.
+        container:
+          type: string
+          maxLength: 253
+          description: The container.
+        version:
+          type: string
+          maxLength: 128
+          description: The release the pod ran, from its app.kubernetes.io/version label; absent without one.
+        first:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it wrote its first line in the window.
+        last:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it wrote its latest line.
+    StreamList:
+      description: The containers that wrote logs, by pod then container.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 1000
+          description: The containers.
+          items:
+            $ref: "#/components/schemas/Stream"
+    LogLine:
+      description: One log line.
+      type: object
+      additionalProperties: false
+      required: [at, text]
+      properties:
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was written.
+        text:
+          type: string
+          maxLength: 65536
+          description: The line.
+    LogLines:
+      description: A container's lines, oldest first.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 5000
+          description: The lines.
+          items:
+            $ref: "#/components/schemas/LogLine"
+    ReleaseNotes:
+      description: A release's notes.
+      type: object
+      additionalProperties: false
+      required: [version, body]
+      properties:
+        version:
+          type: string
+          maxLength: 64
+          description: The release.
+        body:
+          type: string
+          maxLength: 125000
+          description: The notes, as Markdown.
+        url:
+          type: string
+          maxLength: 2048
+          description: The GitHub Release.
+        publishedAt:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was published.
+    CompositionFragment:
+      description: One fragment a run read.
+      type: object
+      additionalProperties: false
+      required: [project, version, outcome, published]
+      properties:
+        project:
+          type: string
+          maxLength: 63
+          description: The Project.
+        version:
+          type: string
+          maxLength: 64
+          description: Its release.
+        outcome:
+          type: string
+          enum: [moved, unchanged, isolated, stale, held]
+          description: What the run did with it.
+        reason:
+          type: string
+          maxLength: 512
+          description: Why, where it was set aside or held.
+        published:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was published.
+    CompositionRun:
+      description: One composition run.
+      type: object
+      additionalProperties: false
+      required: [id, at, trigger, outcome, moved, fragments, url]
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: The workflow run's id.
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it ran.
+        trigger:
+          type: string
+          maxLength: 256
+          description: What started it.
+        outcome:
+          type: string
+          enum: [composed, isolated, failed]
+          description: All composed, some set aside, or the run failed.
+        lock:
+          type: string
+          maxLength: 128
+          description: The composition lock it published.
+        toolkit:
+          type: string
+          maxLength: 64
+          description: The deploy-kit release it composed with.
+        snapshotAt:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When the cluster snapshot it read was taken.
+        moved:
+          type: array
+          maxItems: 1000
+          description: The Projects whose pin it moved.
+          items:
+            type: string
+            maxLength: 63
+        fragments:
+          type: array
+          maxItems: 1000
+          description: Every fragment it read.
+          items:
+            $ref: "#/components/schemas/CompositionFragment"
+        url:
+          type: string
+          maxLength: 2048
+          description: The workflow run.
+    CompositionRunList:
+      description: Composition runs, newest first.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          description: The runs.
+          items:
+            $ref: "#/components/schemas/CompositionRun"
+    DeclaredProcess:
+      description: One Process an Application declares.
+      type: object
+      additionalProperties: false
+      required: [name, switchover, replicas]
+      properties:
+        name:
+          type: string
+          maxLength: 63
+          description: The Process.
+        description:
+          type: string
+          maxLength: 200
+          description: What it does, in one sentence, from the project file.
+        switchover:
+          type: string
+          enum: [blue-green, continuous, interrupted]
+          description: How a new release replaces it.
+        replicas:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+          description: How many run.
+    DeclaredMigration:
+      description: How an Application moves its schema.
+      type: object
+      additionalProperties: false
+      required: [runner, undo]
+      properties:
+        runner:
+          type: string
+          maxLength: 64
+          description: What runs it, liquibase or self.
+        identity:
+          type: string
+          maxLength: 128
+          description: The migration identity.
+        provenAgainst:
+          type: string
+          maxLength: 64
+          description: The release it was proven against.
+        undo:
+          type: string
+          enum: [allowed, blocked]
+          description: Whether a down migration may run.
+        reason:
+          type: string
+          maxLength: 256
+          description: Why, where undo is blocked.
+    DeclaredApplication:
+      description: One Application a Project declares.
+      type: object
+      additionalProperties: false
+      required: [id, processes]
+      properties:
+        id:
+          type: string
+          maxLength: 63
+          description: The Application.
+        description:
+          type: string
+          maxLength: 200
+          description: What it does, in one sentence, from the project file.
+        processes:
+          type: array
+          maxItems: 64
+          description: Its Processes.
+          items:
+            $ref: "#/components/schemas/DeclaredProcess"
+        migration:
+          $ref: "#/components/schemas/DeclaredMigration"
+    Grant:
+      description: One secret a Process may read or use.
+      type: object
+      additionalProperties: false
+      required: [process, path, access]
+      properties:
+        process:
+          type: string
+          maxLength: 63
+          description: The Process.
+        path:
+          type: string
+          maxLength: 512
+          description: The Vault path.
+        access:
+          type: string
+          maxLength: 32
+          description: read, or the transit operations.
+    Declaration:
+      description: What a Project declares at its pinned release.
+      type: object
+      additionalProperties: false
+      required: [version, applications, grants, rollback]
+      properties:
+        version:
+          type: string
+          maxLength: 64
+          description: The release it was read from.
+        applications:
+          type: array
+          maxItems: 64
+          description: Its Applications.
+          items:
+            $ref: "#/components/schemas/DeclaredApplication"
+        grants:
+          type: array
+          maxItems: 512
+          description: Every grant its Processes hold.
+          items:
+            $ref: "#/components/schemas/Grant"
+        rollback:
+          type: array
+          maxItems: 16
+          description: What a Rollback does first, in order.
+          items:
+            type: string
+            maxLength: 256
     Deploy:
       description: One commit that moved a pin.
       type: object
@@ -435,6 +1118,18 @@ components:
           format: date-time
           maxLength: 64
           description: When it last changed.
+        project:
+          type: string
+          maxLength: 63
+          description: >-
+            The Project the issue is for, from the marker at the end of its body. Absent if a
+            person opened the issue.
+          example: knowledge
+        condition:
+          type: string
+          maxLength: 64
+          description: The condition, from the same marker.
+          example: isolated
     IssueList:
       description: The open issues, most recently updated first.
       type: object
@@ -533,6 +1228,20 @@ components:
           type: string
           maxLength: 128
           description: The source revision Flux last applied, where it applied anything.
+        version:
+          type: string
+          maxLength: 128
+          description: >-
+            The release the unit's pin names, from the event.toolkit.fluxcd.io/version annotation.
+            Absent if composition wrote none.
+          example: 0.6.0
+        repository:
+          type: string
+          maxLength: 256
+          description: >-
+            The repository the release came from, from the event.toolkit.fluxcd.io/repository
+            annotation. Absent if composition wrote none.
+          example: JorisJonkers-dev/delivery
         ready:
           type: boolean
           description: Whether Flux reports the object Ready.

@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/vue-query';
 
 import { client } from '../client.gen';
-import { getSession, listAlertHistory, listAlerts, listDeploys, listIssues, listPins, listReleases, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
-import type { GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
+import { getDeclaration, getHandover, getReleaseNotes, getSession, listAlertHistory, listAlerts, listCompositionRuns, listDeploys, listIssues, listLogLines, listLogStreams, listPins, listReleases, listRollouts, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
+import type { GetDeclarationData, GetDeclarationError, GetDeclarationResponse, GetHandoverData, GetHandoverError, GetHandoverResponse, GetReleaseNotesData, GetReleaseNotesError, GetReleaseNotesResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListCompositionRunsData, ListCompositionRunsError, ListCompositionRunsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListLogLinesData, ListLogLinesError, ListLogLinesResponse, ListLogStreamsData, ListLogStreamsError, ListLogStreamsResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -118,6 +118,26 @@ export const listPinsOptions = (options?: Options<ListPinsData>) => queryOptions
     queryKey: listPinsQueryKey(options)
 });
 
+export const getHandoverQueryKey = (options?: Options<GetHandoverData>) => createQueryKey('getHandover', options);
+
+/**
+ * Show each Project's delivery path
+ *
+ * The handover ledger from platform.intent.yml on the Estate repository's default branch. It lists the Projects their pins deliver, and the ones fleet-infra still delivers. A document with no ledger has handed every Project over, so nothing is legacy. A 503 means GitHub did not answer, or the dashboard has no Estate repository.
+ */
+export const getHandoverOptions = (options?: Options<GetHandoverData>) => queryOptions<GetHandoverResponse, GetHandoverError, GetHandoverResponse, ReturnType<typeof getHandoverQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getHandover({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getHandoverQueryKey(options)
+});
+
 export const listDeploysQueryKey = (options: Options<ListDeploysData>) => createQueryKey('listDeploys', options);
 
 /**
@@ -136,6 +156,126 @@ export const listDeploysOptions = (options: Options<ListDeploysData>) => queryOp
         return data;
     },
     queryKey: listDeploysQueryKey(options)
+});
+
+export const listRolloutsQueryKey = (options: Options<ListRolloutsData>) => createQueryKey('listRollouts', options);
+
+/**
+ * List a Project's rollouts to production, newest first
+ *
+ * The production deployments composition opened for the Project in its repository, with the stages the Reporter wrote on each and the run that logged them. A repository outside the estate's owner has none. A 503 means GitHub did not answer, or the dashboard has no Estate repository.
+ */
+export const listRolloutsOptions = (options: Options<ListRolloutsData>) => queryOptions<ListRolloutsResponse, ListRolloutsError, ListRolloutsResponse, ReturnType<typeof listRolloutsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listRollouts({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listRolloutsQueryKey(options)
+});
+
+export const listLogStreamsQueryKey = (options: Options<ListLogStreamsData>) => createQueryKey('listLogStreams', options);
+
+/**
+ * List the containers of a Project that wrote logs
+ *
+ * Every pod and container in the Project's namespace that wrote logs in the window: running Processes, past ones and migration Jobs, from Loki. A 503 means Loki did not answer, or the dashboard runs without one.
+ */
+export const listLogStreamsOptions = (options: Options<ListLogStreamsData>) => queryOptions<ListLogStreamsResponse, ListLogStreamsError, ListLogStreamsResponse, ReturnType<typeof listLogStreamsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listLogStreams({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listLogStreamsQueryKey(options)
+});
+
+export const listLogLinesQueryKey = (options: Options<ListLogLinesData>) => createQueryKey('listLogLines', options);
+
+/**
+ * Read one container's logs, oldest first
+ *
+ * The newest lines one container of the Project wrote in the window, from Loki, oldest first. A 503 means Loki did not answer, or the dashboard runs without one.
+ */
+export const listLogLinesOptions = (options: Options<ListLogLinesData>) => queryOptions<ListLogLinesResponse, ListLogLinesError, ListLogLinesResponse, ReturnType<typeof listLogLinesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listLogLines({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listLogLinesQueryKey(options)
+});
+
+export const getReleaseNotesQueryKey = (options: Options<GetReleaseNotesData>) => createQueryKey('getReleaseNotes', options);
+
+/**
+ * Read a release's notes
+ *
+ * The body of the GitHub Release a repository of the estate published for a version, as Markdown. A 404 means there is none. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
+ */
+export const getReleaseNotesOptions = (options: Options<GetReleaseNotesData>) => queryOptions<GetReleaseNotesResponse, GetReleaseNotesError, GetReleaseNotesResponse, ReturnType<typeof getReleaseNotesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getReleaseNotes({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getReleaseNotesQueryKey(options)
+});
+
+export const listCompositionRunsQueryKey = (options?: Options<ListCompositionRunsData>) => createQueryKey('listCompositionRuns', options);
+
+/**
+ * List the estate's composition runs, newest first
+ *
+ * Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed. Read from each run's artifact (#30). A 503 means the runs are not read yet, or GitHub did not answer.
+ */
+export const listCompositionRunsOptions = (options?: Options<ListCompositionRunsData>) => queryOptions<ListCompositionRunsResponse, ListCompositionRunsError, ListCompositionRunsResponse, ReturnType<typeof listCompositionRunsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listCompositionRuns({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listCompositionRunsQueryKey(options)
+});
+
+export const getDeclarationQueryKey = (options: Options<GetDeclarationData>) => createQueryKey('getDeclaration', options);
+
+/**
+ * Read what a Project declares at its pinned release
+ *
+ * The Applications, Processes, migration, rollback and grants the Project's Intent Fragment declares, at the version its pin was composed from (#31). A 503 means fragments are not read yet, or the registry did not answer.
+ */
+export const getDeclarationOptions = (options: Options<GetDeclarationData>) => queryOptions<GetDeclarationResponse, GetDeclarationError, GetDeclarationResponse, ReturnType<typeof getDeclarationQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getDeclaration({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getDeclarationQueryKey(options)
 });
 
 export const listIssuesQueryKey = (options?: Options<ListIssuesData>) => createQueryKey('listIssues', options);

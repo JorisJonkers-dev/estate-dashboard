@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-// Types a .vue import for tools that read TypeScript alone (ESLint); vue-tsc types the real ones.
+// Types .vue imports for ESLint. vue-tsc has the real types.
 declare module '*.vue' {
   import type { DefineComponent } from 'vue'
   const component: DefineComponent

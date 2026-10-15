@@ -37,6 +37,185 @@ export const zPinList = z.object({
 });
 
 /**
+ * Each Project's delivery path.
+ */
+export const zHandover = z.object({
+    estate: z.array(z.string().max(63)).max(1000),
+    legacy: z.array(z.string().max(63)).max(1000)
+});
+
+/**
+ * One step of a rollout.
+ */
+export const zStage = z.object({
+    state: z.string().max(32),
+    description: z.string().max(256),
+    log: z.string().max(2048).optional(),
+    at: z.iso.datetime({ offset: true }).max(64)
+});
+
+/**
+ * One release of a Project reaching production.
+ */
+export const zRollout = z.object({
+    id: z.coerce.bigint().gte(BigInt(1)).lte(BigInt(9007199254740991)),
+    version: z.string().max(128),
+    commit: z.string().max(64),
+    run: z.string().max(2048).optional(),
+    artifact: z.string().max(512).optional(),
+    at: z.iso.datetime({ offset: true }).max(64),
+    stages: z.array(zStage).max(20)
+});
+
+/**
+ * A Project's rollouts, newest first.
+ */
+export const zRolloutList = z.object({
+    items: z.array(zRollout).max(100)
+});
+
+/**
+ * One container of one pod that wrote logs.
+ */
+export const zStream = z.object({
+    pod: z.string().max(253),
+    container: z.string().max(253),
+    version: z.string().max(128).optional(),
+    first: z.iso.datetime({ offset: true }).max(64).optional(),
+    last: z.iso.datetime({ offset: true }).max(64).optional()
+});
+
+/**
+ * The containers that wrote logs, by pod then container.
+ */
+export const zStreamList = z.object({
+    items: z.array(zStream).max(1000)
+});
+
+/**
+ * One log line.
+ */
+export const zLogLine = z.object({
+    at: z.iso.datetime({ offset: true }).max(64),
+    text: z.string().max(65536)
+});
+
+/**
+ * A container's lines, oldest first.
+ */
+export const zLogLines = z.object({
+    items: z.array(zLogLine).max(5000)
+});
+
+/**
+ * A release's notes.
+ */
+export const zReleaseNotes = z.object({
+    version: z.string().max(64),
+    body: z.string().max(125000),
+    url: z.string().max(2048).optional(),
+    publishedAt: z.iso.datetime({ offset: true }).max(64).optional()
+});
+
+/**
+ * One fragment a run read.
+ */
+export const zCompositionFragment = z.object({
+    project: z.string().max(63),
+    version: z.string().max(64),
+    outcome: z.enum([
+        'moved',
+        'unchanged',
+        'isolated',
+        'stale',
+        'held'
+    ]),
+    reason: z.string().max(512).optional(),
+    published: z.iso.datetime({ offset: true }).max(64)
+});
+
+/**
+ * One composition run.
+ */
+export const zCompositionRun = z.object({
+    id: z.coerce.bigint().gte(BigInt(1)).lte(BigInt(9007199254740991)),
+    at: z.iso.datetime({ offset: true }).max(64),
+    trigger: z.string().max(256),
+    outcome: z.enum([
+        'composed',
+        'isolated',
+        'failed'
+    ]),
+    lock: z.string().max(128).optional(),
+    toolkit: z.string().max(64).optional(),
+    snapshotAt: z.iso.datetime({ offset: true }).max(64).optional(),
+    moved: z.array(z.string().max(63)).max(1000),
+    fragments: z.array(zCompositionFragment).max(1000),
+    url: z.string().max(2048)
+});
+
+/**
+ * Composition runs, newest first.
+ */
+export const zCompositionRunList = z.object({
+    items: z.array(zCompositionRun).max(100)
+});
+
+/**
+ * One Process an Application declares.
+ */
+export const zDeclaredProcess = z.object({
+    name: z.string().max(63),
+    description: z.string().max(200).optional(),
+    switchover: z.enum([
+        'blue-green',
+        'continuous',
+        'interrupted'
+    ]),
+    replicas: z.int().gte(0).lte(1000)
+});
+
+/**
+ * How an Application moves its schema.
+ */
+export const zDeclaredMigration = z.object({
+    runner: z.string().max(64),
+    identity: z.string().max(128).optional(),
+    provenAgainst: z.string().max(64).optional(),
+    undo: z.enum(['allowed', 'blocked']),
+    reason: z.string().max(256).optional()
+});
+
+/**
+ * One Application a Project declares.
+ */
+export const zDeclaredApplication = z.object({
+    id: z.string().max(63),
+    description: z.string().max(200).optional(),
+    processes: z.array(zDeclaredProcess).max(64),
+    migration: zDeclaredMigration.optional()
+});
+
+/**
+ * One secret a Process may read or use.
+ */
+export const zGrant = z.object({
+    process: z.string().max(63),
+    path: z.string().max(512),
+    access: z.string().max(32)
+});
+
+/**
+ * What a Project declares at its pinned release.
+ */
+export const zDeclaration = z.object({
+    version: z.string().max(64),
+    applications: z.array(zDeclaredApplication).max(64),
+    grants: z.array(zGrant).max(512),
+    rollback: z.array(z.string().max(256)).max(16)
+});
+
+/**
  * One commit that moved a pin.
  */
 export const zDeploy = z.object({
@@ -60,7 +239,9 @@ export const zIssue = z.object({
     title: z.string().max(1024),
     url: z.string().max(1024),
     labels: z.array(z.string().max(255)).max(100),
-    updatedAt: z.iso.datetime({ offset: true }).max(64)
+    updatedAt: z.iso.datetime({ offset: true }).max(64),
+    project: z.string().max(63).optional(),
+    condition: z.string().max(64).optional()
 });
 
 /**
@@ -100,6 +281,8 @@ export const zUnit = z.object({
     path: z.string().max(1024),
     dependsOn: z.array(z.string().max(253)).max(256),
     applied: z.string().max(128).optional(),
+    version: z.string().max(128).optional(),
+    repository: z.string().max(256).optional(),
     ready: z.boolean(),
     reason: z.string().max(256).optional(),
     message: z.string().max(4096).optional()
@@ -265,6 +448,11 @@ export const zSilenceAlertResponse = zSilence;
  */
 export const zListPinsResponse = zPinList;
 
+/**
+ * The handover ledger.
+ */
+export const zGetHandoverResponse = zHandover;
+
 export const zListDeploysPath = z.object({
     project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
 });
@@ -277,6 +465,73 @@ export const zListDeploysQuery = z.object({
  * What the Estate repository holds.
  */
 export const zListDeploysResponse = zDeployList;
+
+export const zListRolloutsPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+export const zListRolloutsQuery = z.object({
+    repository: z.string().min(3).max(140).regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/),
+    limit: z.int().gte(1).lte(100).optional().default(10)
+});
+
+/**
+ * The rollouts.
+ */
+export const zListRolloutsResponse = zRolloutList;
+
+export const zListLogStreamsPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+export const zListLogStreamsQuery = z.object({
+    hours: z.int().gte(1).lte(720).optional().default(24)
+});
+
+/**
+ * What Loki holds.
+ */
+export const zListLogStreamsResponse = zStreamList;
+
+export const zListLogLinesPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+export const zListLogLinesQuery = z.object({
+    hours: z.int().gte(1).lte(720).optional().default(24),
+    pod: z.string().min(1).max(253).regex(/^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$/),
+    container: z.string().min(1).max(253).regex(/^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$/),
+    limit: z.int().gte(1).lte(5000).optional().default(500)
+});
+
+/**
+ * What Loki holds.
+ */
+export const zListLogLinesResponse = zLogLines;
+
+export const zGetReleaseNotesQuery = z.object({
+    repository: z.string().min(3).max(140).regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/),
+    version: z.string().min(5).max(64).regex(/^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$/)
+});
+
+/**
+ * The notes.
+ */
+export const zGetReleaseNotesResponse = zReleaseNotes;
+
+/**
+ * The runs.
+ */
+export const zListCompositionRunsResponse = zCompositionRunList;
+
+export const zGetDeclarationPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+/**
+ * The declaration.
+ */
+export const zGetDeclarationResponse = zDeclaration;
 
 /**
  * What the Estate repository holds.

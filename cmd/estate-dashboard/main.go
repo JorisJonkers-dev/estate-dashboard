@@ -2,7 +2,9 @@
 // startup, and drains on SIGTERM.
 //
 // Environment: DATABASE_URL (required), ALERTMANAGER_URL, and ADDR (default :8080). Without
-// ALERTMANAGER_URL the alert reads answer that there is none, and nothing is watched. The
+// ALERTMANAGER_URL the alert reads answer that there is none, and nothing is watched. LOKI_URL
+// names the Loki a Project's logs are read from; without it the log reads answer that there is
+// none. The
 // cluster is the one the dashboard runs in; on a local run KUBECONFIG may name one, and without
 // either the delivery reads answer that there is none. The Estate repository is read with
 // GITHUB_TOKEN, a token that may read it and nothing else, at ESTATE_REPOSITORY (default
@@ -38,6 +40,9 @@ import (
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/estate/adapters/github"
 	estateapp "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/app"
 	estatedomain "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/domain"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/logs/adapters/loki"
+	logsapp "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/app"
+	logsdomain "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpapi"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oidc"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/pg"
@@ -60,6 +65,8 @@ const (
 	watchEvery = 30 * time.Second
 	// alertmanagerTimeout bounds one call to Alertmanager, so a request never waits on it longer.
 	alertmanagerTimeout = 10 * time.Second
+	// lokiTimeout bounds one read of Loki: a day of one container's logs comes back well within it.
+	lokiTimeout = 15 * time.Second
 	// githubTimeout bounds one call to GitHub.
 	githubTimeout = 10 * time.Second
 	// gateTimeout bounds one call to the Release Gate.
@@ -187,6 +194,19 @@ func readGate(getenv func(string) string) (*url.URL, error) {
 	return &url.URL{Scheme: "http", Host: net.JoinHostPort(host, port)}, nil
 }
 
+// readLoki reads the Loki a Project's logs come from: the one at LOKI_URL, or none.
+func readLoki(getenv func(string) string) (logsdomain.Store, error) {
+	base := getenv("LOKI_URL")
+	if base == "" {
+		return loki.Absent{}, nil
+	}
+	store, err := loki.New(base, &http.Client{Timeout: lokiTimeout}, time.Now)
+	if err != nil {
+		return nil, fmt.Errorf("LOKI_URL: %w", err)
+	}
+	return store, nil
+}
+
 // readAlertmanager reads the Alertmanager to read alerts from and silence them in: the one at
 // ALERTMANAGER_URL, which is watched, or none, which is not.
 func readAlertmanager(getenv func(string) string) (domain.Alertmanager, bool, error) {
@@ -228,6 +248,10 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	if err != nil {
 		return err
 	}
+	logStore, err := readLoki(getenv)
+	if err != nil {
+		return err
+	}
 	releaseGate, err := readGate(getenv)
 	if err != nil {
 		return err
@@ -262,7 +286,7 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	if watched {
 		go watch(ctx, logger, live, watchEvery)
 	}
-	api, err := httpapi.New(logger, gate, app.New(history), live, deliveryapp.New(kube), estateapp.New(repository))
+	api, err := httpapi.New(logger, gate, app.New(history), live, deliveryapp.New(kube), estateapp.New(repository), logsapp.New(logStore, time.Now))
 	if err != nil {
 		return err
 	}

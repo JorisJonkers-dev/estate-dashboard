@@ -1,6 +1,7 @@
 package github_test
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -153,14 +154,114 @@ func TestADeployIsACommitThatTouchedThePinFile(t *testing.T) {
 	}
 }
 
+// contents is what the contents API returns for a text file.
+func contents(text string) string {
+	raw, _ := json.Marshal(map[string]string{"encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(text))})
+	return string(raw)
+}
+
+func TestTheHandoverLedgerIsThePlatformDocumentsOwnNamesOnly(t *testing.T) {
+	f := &fake{status: http.StatusOK, rest: contents("apiVersion: intent.jorisjonkers.dev/v1\nhandover:\n  retireBy: 2027-03-31\n  legacy: [data, auth, \"../x\"]\n  estate:\n    - delivery\n    - Not-A-Name\n")}
+	e := f.serve(t)
+	got, err := e.Handover(t.Context())
+	want := domain.Handover{Estate: []string{"delivery"}, Legacy: []string{"data", "auth"}}
+	if err != nil || !reflect.DeepEqual(got, want) || f.seen[0] != "GET /api/repos/JorisJonkers-dev/estate/contents/platform.intent.yml?" {
+		t.Fatalf("handover = %+v, %v, asked %v", got, err, f.seen)
+	}
+	f.rest = contents("apiVersion: intent.jorisjonkers.dev/v1\n")
+	if got, err := e.Handover(t.Context()); err != nil || len(got.Legacy) != 0 || got.Legacy == nil {
+		t.Fatalf("a document without a ledger = %#v, %v", got, err)
+	}
+	for name, reply := range map[string]string{
+		"another encoding": `{"encoding":"none","content":""}`,
+		"not base64":       `{"encoding":"base64","content":"!!"}`,
+		"not YAML":         contents("handover: ["),
+	} {
+		f.rest = reply
+		if _, err := e.Handover(t.Context()); err == nil {
+			t.Errorf("%s read as a ledger", name)
+		}
+	}
+	f.status = http.StatusNotFound
+	if _, err := e.Handover(t.Context()); err == nil {
+		t.Fatal("a refused read was a ledger")
+	}
+}
+
+func TestARolloutIsADeploymentCompositionOpenedForTheProject(t *testing.T) {
+	f := &fake{status: http.StatusOK, graphql: `{"data":{"repository":{"deployments":{"nodes":[
+		{"databaseId":7,"createdAt":"2026-10-15T08:39:50Z","commitOid":"2a44","payload":"{\"project\":\"estate-dashboard\",\"version\":\"0.2.0\",\"run\":\"https://github.com/x/runs/1\",\"artifact\":\"ghcr.io/r@sha256:a\"}",
+		 "statuses":{"nodes":[{"state":"SUCCESS","description":"estate-dashboard 0.2.0 promoted","logUrl":"https://github.com/x/runs/1","createdAt":"2026-10-15T08:42:42Z"}]}},
+		{"databaseId":8,"createdAt":"2026-10-15T08:00:00Z","commitOid":"1","payload":"{\"project\":\"other\"}","statuses":{"nodes":[]}},
+		{"databaseId":9,"createdAt":"2026-10-15T08:00:00Z","commitOid":"1","payload":"not json","statuses":{"nodes":[]}},
+		{"databaseId":10,"createdAt":"2026-10-15T07:00:00Z","commitOid":"0","payload":"\"{\\\"project\\\":\\\"estate-dashboard\\\",\\\"version\\\":\\\"0.1.0\\\"}\"","statuses":{"nodes":[]}}
+	]}}}}`}
+	e := f.serve(t)
+	got, err := e.Rollouts(t.Context(), "JorisJonkers-dev/estate-dashboard", "estate-dashboard", 5)
+	want := []domain.Rollout{{
+		ID: 7, Version: "0.2.0", Commit: "2a44", Run: "https://github.com/x/runs/1", Artifact: "ghcr.io/r@sha256:a", At: time.Date(2026, 10, 15, 8, 39, 50, 0, time.UTC),
+		Stages: []domain.Stage{{State: "success", Description: "estate-dashboard 0.2.0 promoted", Log: "https://github.com/x/runs/1", At: time.Date(2026, 10, 15, 8, 42, 42, 0, time.UTC)}},
+	}, {ID: 10, Version: "0.1.0", Commit: "0", At: time.Date(2026, 10, 15, 7, 0, 0, 0, time.UTC), Stages: []domain.Stage{}}}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("rollouts = %+v, %v", got, err)
+	}
+	for _, repository := range []string{"someone-else/repo", "no-slash", "a/b/c"} {
+		if _, err := e.Rollouts(t.Context(), repository, "estate-dashboard", 5); !errors.Is(err, domain.ErrForeignRepository) {
+			t.Errorf("Rollouts(%q) = %v", repository, err)
+		}
+	}
+	if _, err := e.Rollouts(t.Context(), "JorisJonkers-dev/x", "Not A Name", 5); !errors.Is(err, domain.ErrNoProject) {
+		t.Errorf("a name that is no Project = %v", err)
+	}
+	f.graphql = `{"data":{"repository":null}}`
+	if got, err := e.Rollouts(t.Context(), "JorisJonkers-dev/gone", "x", 5); err != nil || len(got) != 0 || got == nil {
+		t.Fatalf("a repository GitHub does not show = %#v, %v", got, err)
+	}
+	f.graphql = `{"errors":[{"message":"nope"}]}`
+	if _, err := e.Rollouts(t.Context(), "JorisJonkers-dev/x", "x", 5); err == nil {
+		t.Fatal("a refused query read as rollouts")
+	}
+	f.status = http.StatusBadGateway
+	if _, err := e.Rollouts(t.Context(), "JorisJonkers-dev/x", "x", 5); err == nil {
+		t.Fatal("a failed read was rollouts")
+	}
+}
+
+func TestNotesAreTheGitHubReleaseOfTheVersion(t *testing.T) {
+	f := &fake{status: http.StatusOK, rest: `{"body":"## Features","html_url":"https://github.com/x/releases/tag/v1.2.0","published_at":"2026-10-15T08:00:00Z"}`}
+	e := f.serve(t)
+	got, err := e.Notes(t.Context(), "JorisJonkers-dev/auth-api", "1.2.0")
+	if err != nil || got.Body != "## Features" || got.Version != "1.2.0" || f.seen[0] != "GET /api/repos/JorisJonkers-dev/auth-api/releases/tags/v1.2.0?" {
+		t.Fatalf("notes = %+v, %v, asked %v", got, err, f.seen)
+	}
+	if _, err := e.Notes(t.Context(), "someone/else", "1.2.0"); !errors.Is(err, domain.ErrForeignRepository) {
+		t.Errorf("a foreign repository = %v", err)
+	}
+	if _, err := e.Notes(t.Context(), "JorisJonkers-dev/x", "latest"); !errors.Is(err, domain.ErrNoRelease) {
+		t.Errorf("a version that is none = %v", err)
+	}
+	f.status = http.StatusNotFound
+	if _, err := e.Notes(t.Context(), "JorisJonkers-dev/x", "1.2.0"); !errors.Is(err, domain.ErrNoRelease) {
+		t.Errorf("no release = %v", err)
+	}
+	f.status = http.StatusBadGateway
+	if _, err := e.Notes(t.Context(), "JorisJonkers-dev/x", "1.2.0"); err == nil || errors.Is(err, domain.ErrNoRelease) {
+		t.Errorf("a failure = %v", err)
+	}
+}
+
 func TestTheIssuesAreTheOpenOnesWithoutPullRequests(t *testing.T) {
 	f := &fake{status: http.StatusOK, rest: `[
-		{"number":7,"title":"auth is held","html_url":"https://github.com/x/7","updated_at":"2026-10-03T09:00:00+02:00","labels":[{"name":"held"}]},
+		{"number":7,"title":"auth is held","html_url":"https://github.com/x/7","updated_at":"2026-10-03T09:00:00+02:00","labels":[{"name":"held"}],"body":"auth is held.\n\n<!-- estate-condition: auth/held -->"},
+		{"number":9,"title":"a feature","html_url":"https://github.com/x/9","updated_at":"2026-10-03T07:00:00Z","labels":[],"body":"<!-- estate-condition: ../x/held -->"},
 		{"number":8,"title":"a pull request","html_url":"https://github.com/x/8","updated_at":"2026-10-03T07:00:00Z","labels":[],"pull_request":{}}
 	]`}
 	e := f.serve(t)
 	got, err := e.Issues(t.Context())
-	want := []domain.Issue{{Number: 7, Title: "auth is held", URL: "https://github.com/x/7", Labels: []string{"held"}, UpdatedAt: time.Date(2026, 10, 3, 7, 0, 0, 0, time.UTC)}}
+	want := []domain.Issue{
+		{Number: 7, Title: "auth is held", URL: "https://github.com/x/7", Labels: []string{"held"}, UpdatedAt: time.Date(2026, 10, 3, 7, 0, 0, 0, time.UTC), Project: "auth", Condition: "held"},
+		{Number: 9, Title: "a feature", URL: "https://github.com/x/9", Labels: []string{}, UpdatedAt: time.Date(2026, 10, 3, 7, 0, 0, 0, time.UTC)},
+	}
 	if err != nil || !reflect.DeepEqual(got, want) || f.seen[0] != "GET /api/repos/JorisJonkers-dev/estate/issues?per_page=100&state=open" {
 		t.Fatalf("issues = %+v, %v, asked %v", got, err, f.seen)
 	}
@@ -187,7 +288,10 @@ func TestWithoutARepositoryEveryReadSaysSo(t *testing.T) {
 	_, e1 := a.Pins(t.Context())
 	_, e2 := a.Deploys(t.Context(), "auth", 1)
 	_, e3 := a.Issues(t.Context())
-	for _, err := range []error{e1, e2, e3} {
+	_, e4 := a.Handover(t.Context())
+	_, e5 := a.Rollouts(t.Context(), "a/b", "x", 1)
+	_, e6 := a.Notes(t.Context(), "a/b", "1.0.0")
+	for _, err := range []error{e1, e2, e3, e4, e5, e6} {
 		if !errors.Is(err, domain.ErrNoRepository) {
 			t.Fatalf("error = %v", err)
 		}

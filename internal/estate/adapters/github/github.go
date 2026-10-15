@@ -6,6 +6,7 @@ package github
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,10 @@ const (
 
 // project is what a Project's directory may be called: what a pin file's path is built from.
 var project = regexp.MustCompile(`^[a-z0-9_][a-z0-9_-]{0,62}$`)
+
+// conditionMarker matches the marker composition ends a condition issue with. The reporting
+// script checks each name the same way (JorisJonkers-dev/estate .github/scripts/report.sh).
+var conditionMarker = regexp.MustCompile(`<!-- estate-condition: ([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)/([a-z]+(?:-[a-z]+)*) -->`)
 
 // Estate reads one Estate repository.
 type Estate struct {
@@ -195,6 +200,49 @@ func pinOf(project, text string) domain.Pin {
 	return pin
 }
 
+// platformDocument is the Platform document's path in the Estate repository.
+const platformDocument = "platform.intent.yml"
+
+// Handover implements domain.Repository, reading the `handover` block. A document without one
+// has handed every Project over, so both lists are empty.
+func (e *Estate) Handover(ctx context.Context) (domain.Handover, error) {
+	var file struct {
+		Content  string `json:"content"`
+		Encoding string `json:"encoding"`
+	}
+	if err := e.do(ctx, http.MethodGet, "/repos/"+e.repository+"/contents/"+platformDocument, nil, nil, &file); err != nil {
+		return domain.Handover{}, fmt.Errorf("github: read the handover ledger: %w", err)
+	}
+	if file.Encoding != "base64" {
+		return domain.Handover{}, fmt.Errorf("github: read the handover ledger: %s comes %q-encoded", platformDocument, file.Encoding)
+	}
+	text, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(file.Content, "\n", ""))
+	if err != nil {
+		return domain.Handover{}, fmt.Errorf("github: read the handover ledger: %w", err)
+	}
+	var document struct {
+		Handover struct {
+			Estate []string `json:"estate"`
+			Legacy []string `json:"legacy"`
+		} `json:"handover"`
+	}
+	if err := yaml.Unmarshal(text, &document); err != nil {
+		return domain.Handover{}, fmt.Errorf("github: read the handover ledger: %w", err)
+	}
+	return domain.Handover{Estate: named(document.Handover.Estate), Legacy: named(document.Handover.Legacy)}, nil
+}
+
+// named keeps only valid Project names, so nothing else reaches a page.
+func named(projects []string) []string {
+	out := []string{}
+	for _, p := range projects {
+		if project.MatchString(p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // Deploys implements domain.Repository: the commits that touched the Project's pin file.
 func (e *Estate) Deploys(ctx context.Context, name string, limit int) ([]domain.Deploy, error) {
 	if !project.MatchString(name) {
@@ -226,6 +274,7 @@ func (e *Estate) Issues(ctx context.Context) ([]domain.Issue, error) {
 	var issues []struct {
 		Number      int       `json:"number"`
 		Title       string    `json:"title"`
+		Body        string    `json:"body"`
 		HTMLURL     string    `json:"html_url"`
 		UpdatedAt   time.Time `json:"updated_at"`
 		PullRequest *struct{} `json:"pull_request"`
@@ -246,9 +295,133 @@ func (e *Estate) Issues(ctx context.Context) ([]domain.Issue, error) {
 		for _, l := range i.Labels {
 			labels = append(labels, l.Name)
 		}
-		out = append(out, domain.Issue{Number: i.Number, Title: i.Title, URL: i.HTMLURL, Labels: labels, UpdatedAt: i.UpdatedAt.UTC()})
+		issue := domain.Issue{Number: i.Number, Title: i.Title, URL: i.HTMLURL, Labels: labels, UpdatedAt: i.UpdatedAt.UTC()}
+		if key := conditionMarker.FindStringSubmatch(i.Body); key != nil {
+			issue.Project, issue.Condition = key[1], key[2]
+		}
+		out = append(out, issue)
 	}
 	return out, nil
+}
+
+// repositoryName matches an owner/name repository.
+var repositoryName = regexp.MustCompile(`^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$`)
+
+// rolloutsQuery reads production deployments and their stages in one request.
+const rolloutsQuery = `query($owner: String!, $name: String!, $first: Int!) {
+  repository(owner: $owner, name: $name) {
+    deployments(environments: ["production"], first: $first, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes {
+        databaseId createdAt commitOid payload
+        statuses(first: 20) { nodes { state description logUrl createdAt } }
+      }
+    }
+  }
+}`
+
+type rolloutsReply struct {
+	Data struct {
+		Repository *struct {
+			Deployments struct {
+				Nodes []struct {
+					DatabaseID int64     `json:"databaseId"`
+					CreatedAt  time.Time `json:"createdAt"`
+					CommitOid  string    `json:"commitOid"`
+					Payload    string    `json:"payload"`
+					Statuses   struct {
+						Nodes []struct {
+							State       string    `json:"state"`
+							Description string    `json:"description"`
+							LogURL      string    `json:"logUrl"`
+							CreatedAt   time.Time `json:"createdAt"`
+						} `json:"nodes"`
+					} `json:"statuses"`
+				} `json:"nodes"`
+			} `json:"deployments"`
+		} `json:"repository"`
+	} `json:"data"`
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
+// Rollouts implements domain.Repository. It returns the production deployments composition
+// opened in the repository for the Project, read from each deployment's payload.
+func (e *Estate) Rollouts(ctx context.Context, repository, name string, limit int) ([]domain.Rollout, error) {
+	if !project.MatchString(name) {
+		return nil, fmt.Errorf("%w: %q", domain.ErrNoProject, name)
+	}
+	owner, repo, _ := strings.Cut(repository, "/")
+	estateOwner, _, _ := strings.Cut(e.repository, "/")
+	if !repositoryName.MatchString(repository) || !strings.EqualFold(owner, estateOwner) {
+		return nil, fmt.Errorf("%w: %q", domain.ErrForeignRepository, repository)
+	}
+	var reply rolloutsReply
+	body := map[string]any{"query": rolloutsQuery, "variables": map[string]any{"owner": owner, "name": repo, "first": limit}}
+	if err := e.do(ctx, http.MethodPost, "/graphql", nil, body, &reply); err != nil {
+		return nil, fmt.Errorf("github: read the rollouts of %s: %w", name, err)
+	}
+	if len(reply.Errors) > 0 {
+		return nil, fmt.Errorf("github: read the rollouts of %s: %s", name, reply.Errors[0].Message)
+	}
+	rollouts := []domain.Rollout{}
+	if reply.Data.Repository == nil {
+		return rollouts, nil
+	}
+	for _, d := range reply.Data.Repository.Deployments.Nodes {
+		var payload struct {
+			Project  string `json:"project"`
+			Version  string `json:"version"`
+			Run      string `json:"run"`
+			Artifact string `json:"artifact"`
+		}
+		// GraphQL may wrap the payload in a JSON string. Unwrap it if so.
+		raw := d.Payload
+		var inner string
+		if json.Unmarshal([]byte(raw), &inner) == nil {
+			raw = inner
+		}
+		// Skip deployments composition did not open, and those for another Project.
+		if json.Unmarshal([]byte(raw), &payload) != nil || payload.Project != name {
+			continue
+		}
+		r := domain.Rollout{ID: d.DatabaseID, Version: payload.Version, Commit: d.CommitOid, Run: payload.Run, Artifact: payload.Artifact, At: d.CreatedAt.UTC(), Stages: []domain.Stage{}}
+		for _, s := range d.Statuses.Nodes {
+			r.Stages = append(r.Stages, domain.Stage{State: strings.ToLower(s.State), Description: s.Description, Log: s.LogURL, At: s.CreatedAt.UTC()})
+		}
+		rollouts = append(rollouts, r)
+	}
+	return rollouts, nil
+}
+
+// version is what a release may be called: what its tag is built from.
+var version = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$`)
+
+// Notes implements domain.Repository: the body of the GitHub Release tagged vX.Y.Z, or X.Y.Z.
+func (e *Estate) Notes(ctx context.Context, repository, release string) (domain.Notes, error) {
+	owner, _, _ := strings.Cut(repository, "/")
+	estateOwner, _, _ := strings.Cut(e.repository, "/")
+	if !repositoryName.MatchString(repository) || !strings.EqualFold(owner, estateOwner) {
+		return domain.Notes{}, fmt.Errorf("%w: %q", domain.ErrForeignRepository, repository)
+	}
+	if !version.MatchString(release) {
+		return domain.Notes{}, fmt.Errorf("%w: %q", domain.ErrNoRelease, release)
+	}
+	var reply struct {
+		Body        string    `json:"body"`
+		HTMLURL     string    `json:"html_url"`
+		PublishedAt time.Time `json:"published_at"`
+	}
+	for _, tag := range []string{"v" + release, release} {
+		err := e.do(ctx, http.MethodGet, "/repos/"+repository+"/releases/tags/"+tag, nil, nil, &reply)
+		if err == nil {
+			return domain.Notes{Version: release, Body: reply.Body, URL: reply.HTMLURL, PublishedAt: reply.PublishedAt.UTC()}, nil
+		}
+		if !strings.Contains(err.Error(), "answered 404") {
+			return domain.Notes{}, fmt.Errorf("github: read the notes of %s %s: %w", repository, release, err)
+		}
+	}
+	return domain.Notes{}, fmt.Errorf("%w: %s %s", domain.ErrNoRelease, repository, release)
 }
 
 // Absent is the repository of a dashboard that runs without one: every read is ErrNoRepository.
@@ -262,6 +435,21 @@ func (Absent) Pins(context.Context) ([]domain.Pin, error) { return nil, domain.E
 // Deploys implements domain.Repository.
 func (Absent) Deploys(context.Context, string, int) ([]domain.Deploy, error) {
 	return nil, domain.ErrNoRepository
+}
+
+// Handover implements domain.Repository.
+func (Absent) Handover(context.Context) (domain.Handover, error) {
+	return domain.Handover{}, domain.ErrNoRepository
+}
+
+// Rollouts implements domain.Repository.
+func (Absent) Rollouts(context.Context, string, string, int) ([]domain.Rollout, error) {
+	return nil, domain.ErrNoRepository
+}
+
+// Notes implements domain.Repository.
+func (Absent) Notes(context.Context, string, string) (domain.Notes, error) {
+	return domain.Notes{}, domain.ErrNoRepository
 }
 
 // Issues implements domain.Repository.
