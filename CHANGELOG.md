@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.4.0...v0.5.0) (2026-10-16)
+
+
+### Features
+
+* connect with the libpq variables where DATABASE_URL is unset ([#48](https://github.com/JorisJonkers-dev/estate-dashboard/issues/48)) ([e9a10ea](https://github.com/JorisJonkers-dev/estate-dashboard/commit/e9a10eabf5400317b9830204b4ee09d55b940497))
+* sign in to Postgres with the rotating login the edge derives ([#50](https://github.com/JorisJonkers-dev/estate-dashboard/issues/50)) ([96831ec](https://github.com/JorisJonkers-dev/estate-dashboard/commit/96831ece8585aa14f748641ae14f8dd3cadb7e0a))
+
 ## [0.4.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.3.2...v0.4.0) (2026-10-15)
 
 
