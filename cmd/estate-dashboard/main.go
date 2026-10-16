@@ -1,7 +1,8 @@
 // Command estate-dashboard serves the API and the embedded web app, migrates its database at
 // startup, and drains on SIGTERM.
 //
-// Environment: DATABASE_URL (required), ALERTMANAGER_URL, and ADDR (default :8080). Without
+// Environment: DATABASE_URL, or PGHOST with the other libpq variables (required), ALERTMANAGER_URL,
+// and ADDR (default :8080). Without
 // ALERTMANAGER_URL the alert reads answer that there is none, and nothing is watched. LOKI_URL
 // names the Loki a Project's logs are read from; without it the log reads answer that there is
 // none. The
@@ -26,6 +27,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -240,9 +242,9 @@ func watch(ctx context.Context, logger *slog.Logger, live interface{ Watch(conte
 // run is the composition root: it reads the environment and builds the store, the use cases and
 // the server. httpapi assembles the contexts' web adapters into the one generated API.
 func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) error {
-	dbURL := getenv("DATABASE_URL")
-	if dbURL == "" {
-		return errors.New("DATABASE_URL is not set")
+	dbURL, err := databaseOf(getenv)
+	if err != nil {
+		return err
 	}
 	am, watched, err := readAlertmanager(getenv)
 	if err != nil {
@@ -308,4 +310,35 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 		Web:   webui.Handler(web.Dist()),
 		Ready: store.Ping,
 	}).Serve(ctx, ln)
+}
+
+// libpq is each libpq variable the platform hands a Process whose database login rotates, and the
+// keyword it is in a connection string.
+var libpq = []struct{ variable, keyword string }{ //nolint:gochecknoglobals // a constant table
+	{"PGHOST", "host"},
+	{"PGPORT", "port"},
+	{"PGDATABASE", "dbname"},
+	{"PGUSER", "user"},
+	{"PGPASSWORD", "password"},
+	{"PGSSLMODE", "sslmode"},
+}
+
+// quoted is a connection-string value in single quotes, its backslashes and quotes escaped.
+var quoted = strings.NewReplacer(`\`, `\\`, `'`, `\'`) //nolint:gochecknoglobals // a constant
+
+// databaseOf is DATABASE_URL, or a connection string of the libpq variables where it is unset.
+func databaseOf(getenv func(string) string) (string, error) {
+	if url := getenv("DATABASE_URL"); url != "" {
+		return url, nil
+	}
+	if getenv("PGHOST") == "" {
+		return "", errors.New("neither DATABASE_URL nor PGHOST is set")
+	}
+	parts := make([]string, 0, len(libpq))
+	for _, p := range libpq {
+		if value := getenv(p.variable); value != "" {
+			parts = append(parts, p.keyword+"='"+quoted.Replace(value)+"'")
+		}
+	}
+	return strings.Join(parts, " "), nil
 }

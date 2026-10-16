@@ -257,3 +257,22 @@ func TestTheReleaseGateIsTheTwoCoordinatesOfTheEdgeToItOrNone(t *testing.T) {
 		}
 	}
 }
+
+func TestTheDatabaseIsTheURLOrTheLibpqVariables(t *testing.T) {
+	url, err := databaseOf(env(map[string]string{"DATABASE_URL": "postgres://a@b/c", "PGHOST": "ignored"}))
+	if err != nil || url != "postgres://a@b/c" {
+		t.Fatalf("url = %q, %v", url, err)
+	}
+	dsn, err := databaseOf(env(map[string]string{
+		"PGHOST": "postgres.data-system.svc.cluster.local", "PGPORT": "5432", "PGDATABASE": "estate-dashboard_db",
+		"PGUSER": "v-k8s-estate-dashboard-owner-x", "PGPASSWORD": `it's\x`, "PGSSLMODE": "disable",
+	}))
+	want := `host='postgres.data-system.svc.cluster.local' port='5432' dbname='estate-dashboard_db' ` +
+		`user='v-k8s-estate-dashboard-owner-x' password='it\'s\\x' sslmode='disable'`
+	if err != nil || dsn != want {
+		t.Fatalf("dsn = %q, %v", dsn, err)
+	}
+	if _, err := databaseOf(env(map[string]string{"PGUSER": "only"})); err == nil {
+		t.Fatal("a login with no host was accepted")
+	}
+}
