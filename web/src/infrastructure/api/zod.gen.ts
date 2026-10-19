@@ -297,6 +297,102 @@ export const zUnitList = z.object({
 });
 
 /**
+ * Which checks the kubelet runs on a container.
+ */
+export const zProbes = z.object({
+    readiness: z.boolean(),
+    liveness: z.boolean(),
+    startup: z.boolean()
+});
+
+/**
+ * How a container last ended.
+ */
+export const zTermination = z.object({
+    reason: z.string().max(256).optional(),
+    exitCode: z.int().gte(-2147483648).lte(2147483647),
+    at: z.iso.datetime({ offset: true }).max(64).optional()
+});
+
+/**
+ * One container of a pod.
+ */
+export const zPodContainer = z.object({
+    name: z.string().max(253),
+    image: z.string().max(1024),
+    init: z.boolean(),
+    ready: z.boolean(),
+    state: z.enum([
+        'running',
+        'waiting',
+        'terminated'
+    ]).optional(),
+    reason: z.string().max(256).optional(),
+    message: z.string().max(4096).optional(),
+    since: z.iso.datetime({ offset: true }).max(64).optional(),
+    restarts: z.int().gte(0).lte(2147483647),
+    last: zTermination.optional(),
+    probes: zProbes
+});
+
+/**
+ * One pod a Project runs.
+ */
+export const zPod = z.object({
+    name: z.string().max(253),
+    process: z.string().max(63),
+    application: z.string().max(63).optional(),
+    version: z.string().max(128).optional(),
+    owner: z.string().max(63).optional(),
+    node: z.string().max(253).optional(),
+    phase: z.string().max(32).optional(),
+    started: z.iso.datetime({ offset: true }).max(64).optional(),
+    ready: z.boolean(),
+    deleting: z.boolean(),
+    containers: z.array(zPodContainer).max(64)
+});
+
+/**
+ * The pods a Project runs, by Process then name.
+ */
+export const zPodList = z.object({
+    truncated: z.boolean(),
+    items: z.array(zPod).max(1000)
+});
+
+/**
+ * One condition a probe holds an answer to.
+ */
+export const zCheckCondition = z.object({
+    condition: z.string().max(256),
+    success: z.boolean()
+});
+
+/**
+ * One endpoint the uptime monitor probes, and its latest result.
+ */
+export const zCheck = z.object({
+    key: z.string().max(256),
+    name: z.string().max(128),
+    group: z.string().max(128),
+    host: z.string().max(253).optional(),
+    at: z.iso.datetime({ offset: true }).max(64).optional(),
+    up: z.boolean(),
+    status: z.int().gte(0).lte(999).optional(),
+    durationMs: z.coerce.bigint().gte(BigInt(0)).lte(BigInt(86400000)).optional(),
+    error: z.string().max(1024).optional(),
+    conditions: z.array(zCheckCondition).max(32),
+    recent: z.array(z.boolean()).max(20)
+});
+
+/**
+ * The uptime checks, by group then name.
+ */
+export const zCheckList = z.object({
+    items: z.array(zCheck).max(1000)
+});
+
+/**
  * One member of a gated Application, as Flagger switches it.
  */
 export const zMember = z.object({
@@ -552,6 +648,20 @@ export const zListUnitsResponse = zUnitList;
  * What the cluster holds.
  */
 export const zListReleasesResponse = zReleaseList;
+
+export const zListPodsPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+/**
+ * What the cluster holds.
+ */
+export const zListPodsResponse = zPodList;
+
+/**
+ * What the monitor holds.
+ */
+export const zListChecksResponse = zCheckList;
 
 export const zListAlertHistoryQuery = z.object({
     limit: z.int().gte(1).lte(100).optional().default(50)

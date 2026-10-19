@@ -28,7 +28,10 @@ tags:
   - name: delivery
     description: >-
       What the cluster says about delivery, read through a ServiceAccount that may get, list and
-      watch and nothing else: Flux's sources and units, and each gated Application's release.
+      watch and nothing else: Flux's sources and units, each gated Application's release, and the
+      pods a Project runs.
+  - name: checks
+    description: Whether each endpoint the uptime monitor probes answers, from Gatus.
   - name: session
     description: Who is signed in.
   - name: alerts
@@ -536,6 +539,60 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReleaseList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/delivery/projects/{project}/pods:
+    get:
+      operationId: listPods
+      summary: List the pods a Project runs
+      description: >-
+        Every pod the render's workloads run in the Project's namespace, by Process then name: where it
+        runs, the release its label names, and each container's state, restarts and probes, as the
+        kubelet reports them. A 503 means the cluster did not answer, or the dashboard runs without one.
+      tags: [delivery]
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: The Project.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+            pattern: "^[a-z0-9_][a-z0-9_-]{0,62}$"
+      responses:
+        "200":
+          description: What the cluster holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PodList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/checks:
+    get:
+      operationId: listChecks
+      summary: List the uptime checks
+      description: >-
+        Every endpoint the uptime monitor probes, by group then name, with its latest result and whether
+        each recent probe succeeded. A 503 means the monitor did not answer, or the dashboard runs
+        without one.
+      tags: [checks]
+      responses:
+        "200":
+          description: What the monitor holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckList"
         "401":
           $ref: "#/components/responses/Problem"
         "503":
@@ -1270,6 +1327,238 @@ components:
           description: The units.
           items:
             $ref: "#/components/schemas/Unit"
+    Probes:
+      description: Which checks the kubelet runs on a container.
+      type: object
+      additionalProperties: false
+      required: [readiness, liveness, startup]
+      properties:
+        readiness:
+          type: boolean
+          description: Whether it has a readiness probe.
+        liveness:
+          type: boolean
+          description: Whether it has a liveness probe.
+        startup:
+          type: boolean
+          description: Whether it has a startup probe.
+    Termination:
+      description: How a container last ended.
+      type: object
+      additionalProperties: false
+      required: [exitCode]
+      properties:
+        reason:
+          type: string
+          maxLength: 256
+          description: Why, as the kubelet says, OOMKilled or Error.
+        exitCode:
+          type: integer
+          format: int32
+          minimum: -2147483648
+          maximum: 2147483647
+          description: Its exit code.
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it ended.
+    PodContainer:
+      description: One container of a pod.
+      type: object
+      additionalProperties: false
+      required: [name, image, init, ready, restarts, probes]
+      properties:
+        name:
+          type: string
+          maxLength: 253
+          description: The container.
+        image:
+          type: string
+          maxLength: 1024
+          description: The image it runs.
+        init:
+          type: boolean
+          description: Whether it is an init container, which runs to completion before the others start.
+        ready:
+          type: boolean
+          description: Whether the kubelet reports it ready.
+        state:
+          type: string
+          enum: [running, waiting, terminated]
+          description: What it is doing now; absent before the kubelet reports it.
+        reason:
+          type: string
+          maxLength: 256
+          description: Why it waits or ended, where the kubelet says.
+        message:
+          type: string
+          maxLength: 4096
+          description: The kubelet's message, where there is one.
+        since:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it started running, or ended.
+        restarts:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 2147483647
+          description: How often it restarted.
+        last:
+          $ref: "#/components/schemas/Termination"
+        probes:
+          $ref: "#/components/schemas/Probes"
+    Pod:
+      description: One pod a Project runs.
+      type: object
+      additionalProperties: false
+      required: [name, process, ready, deleting, containers]
+      properties:
+        name:
+          type: string
+          maxLength: 253
+          description: The pod.
+        process:
+          type: string
+          maxLength: 63
+          description: The Process, from its app.kubernetes.io/name label.
+        application:
+          type: string
+          maxLength: 63
+          description: The Application, from its app.kubernetes.io/part-of label.
+        version:
+          type: string
+          maxLength: 128
+          description: The release it runs, from its app.kubernetes.io/version label; absent without one.
+        owner:
+          type: string
+          maxLength: 63
+          description: The kind that made it, ReplicaSet, StatefulSet, DaemonSet or Job.
+        node:
+          type: string
+          maxLength: 253
+          description: The node it runs on, once scheduled.
+        phase:
+          type: string
+          maxLength: 32
+          description: Its phase, Pending, Running, Succeeded or Failed.
+        started:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When the kubelet started it.
+        ready:
+          type: boolean
+          description: Whether its Ready condition holds.
+        deleting:
+          type: boolean
+          description: Whether it is shutting down.
+        containers:
+          type: array
+          maxItems: 64
+          description: Its init containers, then its containers.
+          items:
+            $ref: "#/components/schemas/PodContainer"
+    PodList:
+      description: The pods a Project runs, by Process then name.
+      type: object
+      additionalProperties: false
+      required: [items, truncated]
+      properties:
+        truncated:
+          type: boolean
+          description: Whether the namespace holds more than one read returns.
+        items:
+          type: array
+          maxItems: 1000
+          description: The pods.
+          items:
+            $ref: "#/components/schemas/Pod"
+    CheckCondition:
+      description: One condition a probe holds an answer to.
+      type: object
+      additionalProperties: false
+      required: [condition, success]
+      properties:
+        condition:
+          type: string
+          maxLength: 256
+          description: The condition, as the monitor writes it.
+        success:
+          type: boolean
+          description: Whether the answer held it.
+    Check:
+      description: One endpoint the uptime monitor probes, and its latest result.
+      type: object
+      additionalProperties: false
+      required: [key, name, group, up, conditions, recent]
+      properties:
+        key:
+          type: string
+          maxLength: 256
+          description: The monitor's name for the endpoint, unique across groups.
+        name:
+          type: string
+          maxLength: 128
+          description: The endpoint.
+        group:
+          type: string
+          maxLength: 128
+          description: The group it is shown in.
+        host:
+          type: string
+          maxLength: 253
+          description: The host the probe reached.
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it last probed; absent before its first probe.
+        up:
+          type: boolean
+          description: Whether the latest probe succeeded.
+        status:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 999
+          description: The HTTP status the latest probe got, where it got one.
+        durationMs:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 86400000
+          description: How long the latest probe took, in milliseconds.
+        error:
+          type: string
+          maxLength: 1024
+          description: Why the latest probe failed, where the monitor says.
+        conditions:
+          type: array
+          maxItems: 32
+          description: The latest probe's conditions.
+          items:
+            $ref: "#/components/schemas/CheckCondition"
+        recent:
+          type: array
+          maxItems: 20
+          description: Whether each of the latest probes succeeded, oldest first.
+          items:
+            type: boolean
+    CheckList:
+      description: The uptime checks, by group then name.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 1000
+          description: The checks.
+          items:
+            $ref: "#/components/schemas/Check"
     Member:
       description: One member of a gated Application, as Flagger switches it.
       type: object

@@ -21,7 +21,16 @@ export const glossary = {
   'estatePath': 'The new way. Deployed from its pin in the estate repository.',
   'oldPath': 'Still deployed by fleet-infra, the old way.',
   'pinnedTwice': 'Pinned more than once with the same release. The workflow ran again. Nothing new was released.',
-  'runningNow': 'The containers of the version that runs now.',
+  'runningNow': 'The containers that run now, as Kubernetes reports them.',
+  'stackHealth': 'Whether Flux applied the pin, every container is ready, and every uptime check answers.',
+  'Delivery': 'Whether Flux fetched the pinned release and applied it.',
+  'Containers': 'How many pods are ready. A Job that ran to completion is not counted.',
+  'Online': 'Whether the uptime checks that probe this Project answer.',
+  'probes':
+    'The checks Kubernetes runs on a container. Readiness decides if it gets traffic; liveness restarts it when it hangs.',
+  'restarts': 'How often the container restarted. A restart in the last hour counts as a warning.',
+  'releaseLabel': 'The release a pod runs, from its app.kubernetes.io/version label.',
+  'check': 'Gatus probes this endpoint every minute. Each bar is one probe, newest on the right.',
 
   // Health
   'composition': 'Whether each Project’s latest release fits in the estate.',

@@ -16,17 +16,40 @@ import StatusMark from '../../../shared/ui/StatusMark.vue'
 import TermHint from '../../../shared/ui/TermHint.vue'
 import { age, shortDigest } from '../../overview/domain/overview'
 import { useProject } from '../composables/useProject'
+import { stackHealth } from '../domain/health'
 import { byProcess, ofRelease, type ProcessLogs } from '../domain/logs'
 import { estateRepository, links, stageTone } from '../domain/project'
 import { serving } from '../domain/releases'
+import ChecksPanel from './ChecksPanel.vue'
 import DeclarationPanel from './DeclarationPanel.vue'
 import LogView from './LogView.vue'
 import NotesView from './NotesView.vue'
+import RunningNow from './RunningNow.vue'
+import StackHealthPanel from './StackHealthPanel.vue'
 
 const route = useRoute()
 const name = computed(() => String(route.params.name))
-const { isLoading, row, repository, pin, unit, cluster, alerts, deploys, releases, streams, rolloutsLoading } =
-  useProject(name)
+const {
+  isLoading,
+  row,
+  repository,
+  pin,
+  unit,
+  cluster,
+  alerts,
+  deploys,
+  releases,
+  streams,
+  rolloutsLoading,
+  source,
+  units,
+  pods,
+  podsLoading,
+  podsUnreadable,
+  checks,
+  checksUnreadable,
+  checksLoading,
+} = useProject(name)
 const now = useNow()
 
 const legacy = computed(() => row.value?.path === 'legacy')
@@ -43,14 +66,16 @@ const description = computed(
     ),
 )
 const running = computed(() => serving(releases.value))
-// The serving release's containers, matched by their pods' version label.
-const current = computed(() =>
-  running.value ? byProcess(ofRelease(streams.value, running.value.version), now.value) : [],
+const health = computed(() =>
+  stackHealth({
+    source: source.value,
+    units: units.value,
+    pods: pods.value,
+    checks: checks.value,
+    now: now.value,
+    unread: { pods: podsUnreadable.value, checks: checksUnreadable.value },
+  }),
 )
-const runningProcesses = computed(() => current.value.filter((p) => !p.migration && p.running > 0))
-const finishedRuns = computed(() => current.value.filter((p) => p.migration))
-// Pods without a version label match no release.
-const unlabelled = computed(() => streams.value.length > 0 && streams.value.every((s) => s.version === undefined))
 const containersOf = (version: string) => byProcess(ofRelease(streams.value, version), now.value)
 
 const open = ref<number | null>(null)
@@ -74,6 +99,14 @@ function showLogs(p: ProcessLogs, version?: string) {
     title: p.process,
     subtitle: [name.value, version].filter(Boolean).join(' · '),
     streams: p.streams,
+  }
+}
+function showPodLogs(process: string, of: Stream[]) {
+  drawer.value = {
+    kind: 'logs',
+    title: process,
+    subtitle: [name.value, running.value?.version].filter(Boolean).join(' · '),
+    streams: of,
   }
 }
 function showNotes(version: string) {
@@ -160,57 +193,19 @@ const button =
       class="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start lg:gap-12"
     >
       <div class="flex flex-col gap-10">
-        <section aria-labelledby="running-h">
-          <h2 id="running-h" class="m-0 mb-3 flex items-center gap-3 text-xl font-semibold">
-            Running now
-            <span v-if="running" class="flex items-center gap-2 text-base font-normal text-text-muted"
-              ><StatusMark state="live" />{{ running.version }}</span
-            >
-          </h2>
-          <p v-if="unlabelled" class="m-0 text-text-muted">
-            Its pods carry no version label yet. They show here after the next deploy.
-          </p>
-          <p v-else-if="runningProcesses.length === 0 && finishedRuns.length === 0" class="m-0 text-text-muted">
-            No container of {{ name }} is running.
-          </p>
-          <ul v-else class="m-0 list-none border-t border-line p-0">
-            <li
-              v-for="p in runningProcesses"
-              :key="p.process"
-              class="flex items-center gap-3 border-b border-line-soft py-2.5"
-            >
-              <StatusMark state="live" />
-              <span class="min-w-0">
-                <span class="font-medium">{{ p.process }}</span>
-                <span class="ml-2 text-sm text-text-muted">{{ p.running }} running</span>
-                <span v-if="description.get(p.process)" class="block text-sm text-text-muted">{{
-                  description.get(p.process)
-                }}</span>
-              </span>
-              <TermHint :text="glossary.logs"
-                ><button type="button" :class="[button, 'ml-auto shrink-0']" @click="showLogs(p, running?.version)">
-                  Logs
-                </button></TermHint
-              >
-            </li>
-            <li
-              v-for="p in finishedRuns"
-              :key="p.process"
-              class="flex items-center gap-3 border-b border-line-soft py-2.5"
-            >
-              <StatusMark state="past" />
-              <span class="font-medium">{{ p.process }}</span>
-              <span v-if="p.streams[0]?.last" class="text-sm text-text-muted"
-                >finished {{ age(p.streams[0].last, now) }} ago</span
-              >
-              <TermHint :text="glossary.logs"
-                ><button type="button" :class="[button, 'ml-auto shrink-0']" @click="showLogs(p, running?.version)">
-                  Logs
-                </button></TermHint
-              >
-            </li>
-          </ul>
-        </section>
+        <StackHealthPanel :health="health" :loading="podsLoading || checksLoading" />
+
+        <RunningNow
+          :project="name"
+          :version="running?.version"
+          :pods="pods"
+          :streams="streams"
+          :descriptions="description"
+          :loading="podsLoading"
+          :unreadable="podsUnreadable"
+          :now="now"
+          @logs="showPodLogs"
+        />
 
         <section aria-labelledby="releases-h">
           <h2 id="releases-h" class="m-0 mb-3 text-xl font-semibold">Releases</h2>
@@ -287,6 +282,13 @@ const button =
       </div>
 
       <div class="flex flex-col gap-10">
+        <ChecksPanel
+          :project="name"
+          :checks="checks"
+          :loading="checksLoading"
+          :unreadable="checksUnreadable"
+          :now="now"
+        />
         <DeclarationPanel :project="name" />
         <section aria-labelledby="cluster-h">
           <h2 id="cluster-h" class="m-0 mb-3 text-xl font-semibold">In the cluster</h2>
@@ -304,7 +306,13 @@ const button =
                 <span class="font-medium" :class="toneText[c.tone]">{{ c.word }}</span>
               </span>
               <span class="font-mono text-xs text-text-muted">{{ c.name }}</span>
-              <span v-if="c.detail" class="text-sm text-text-muted">{{ c.detail }}</span>
+              <span v-if="c.detail" class="text-sm break-words text-text-muted">{{ c.detail }}</span>
+              <dl v-if="c.facts.length" class="m-0 mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
+                <template v-for="[k, v] in c.facts" :key="k">
+                  <dt class="text-text-muted">{{ k }}</dt>
+                  <dd class="m-0 truncate font-mono text-xs leading-5" :title="v">{{ v }}</dd>
+                </template>
+              </dl>
             </li>
           </ul>
         </section>

@@ -76,6 +76,14 @@ type Invoker interface {
 	//
 	// GET /api/v1/alerts
 	ListAlerts(ctx context.Context) (ListAlertsRes, error)
+	// ListChecks invokes listChecks operation.
+	//
+	// Every endpoint the uptime monitor probes, by group then name, with its latest result and whether
+	// each recent probe succeeded. A 503 means the monitor did not answer, or the dashboard runs without
+	// one.
+	//
+	// GET /api/v1/checks
+	ListChecks(ctx context.Context) (ListChecksRes, error)
 	// ListCompositionRuns invokes listCompositionRuns operation.
 	//
 	// Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed. Read
@@ -121,6 +129,14 @@ type Invoker interface {
 	//
 	// GET /api/v1/estate/pins
 	ListPins(ctx context.Context) (ListPinsRes, error)
+	// ListPods invokes listPods operation.
+	//
+	// Every pod the render's workloads run in the Project's namespace, by Process then name: where it
+	// runs, the release its label names, and each container's state, restarts and probes, as the kubelet
+	// reports them. A 503 means the cluster did not answer, or the dashboard runs without one.
+	//
+	// GET /api/v1/delivery/projects/{project}/pods
+	ListPods(ctx context.Context, params ListPodsParams) (ListPodsRes, error)
 	// ListReleases invokes listReleases operation.
 	//
 	// Every Application whose release-gate inputs the render wrote, by namespace and Application: each
@@ -959,6 +975,121 @@ func (c *Client) sendListAlerts(ctx context.Context) (res ListAlertsRes, err err
 
 	stage = "DecodeResponse"
 	result, err := decodeListAlertsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListChecks invokes listChecks operation.
+//
+// Every endpoint the uptime monitor probes, by group then name, with its latest result and whether
+// each recent probe succeeded. A 503 means the monitor did not answer, or the dashboard runs without
+// one.
+//
+// GET /api/v1/checks
+func (c *Client) ListChecks(ctx context.Context) (ListChecksRes, error) {
+	res, err := c.sendListChecks(ctx)
+	return res, err
+}
+
+func (c *Client) sendListChecks(ctx context.Context) (res ListChecksRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listChecks"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/v1/checks"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListChecksOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/api/v1/checks"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListChecksOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeListChecksResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -1811,6 +1942,140 @@ func (c *Client) sendListPins(ctx context.Context) (res ListPinsRes, err error) 
 
 	stage = "DecodeResponse"
 	result, err := decodeListPinsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListPods invokes listPods operation.
+//
+// Every pod the render's workloads run in the Project's namespace, by Process then name: where it
+// runs, the release its label names, and each container's state, restarts and probes, as the kubelet
+// reports them. A 503 means the cluster did not answer, or the dashboard runs without one.
+//
+// GET /api/v1/delivery/projects/{project}/pods
+func (c *Client) ListPods(ctx context.Context, params ListPodsParams) (ListPodsRes, error) {
+	res, err := c.sendListPods(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListPods(ctx context.Context, params ListPodsParams) (res ListPodsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listPods"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/v1/delivery/projects/{project}/pods"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListPodsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/api/v1/delivery/projects/"
+	{
+		// Encode "project" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.Project))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/pods"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListPodsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeListPodsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

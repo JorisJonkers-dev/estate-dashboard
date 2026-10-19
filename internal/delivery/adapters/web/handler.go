@@ -8,7 +8,9 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"time"
 
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/app"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpx"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oas"
@@ -19,6 +21,7 @@ type UseCases interface {
 	Sources(ctx context.Context) (domain.Page[domain.Source], error)
 	Units(ctx context.Context) (domain.Page[domain.Unit], error)
 	Releases(ctx context.Context) (domain.Page[domain.Release], error)
+	Pods(ctx context.Context, project string) (domain.Page[domain.Pod], error)
 }
 
 // Delivery implements the delivery operations.
@@ -114,4 +117,56 @@ func toRelease(r domain.Release) oas.Release {
 	}
 	out.Unreadable = opt(r.Unreadable)
 	return out
+}
+
+// ListPods implements listPods. A name that cannot be a Project's runs no pods.
+func (h *Delivery) ListPods(ctx context.Context, params oas.ListPodsParams) (oas.ListPodsRes, error) {
+	pods, err := h.uc.Pods(ctx, params.Project)
+	switch {
+	case errors.Is(err, app.ErrNotAProject):
+		return &oas.PodList{Items: []oas.Pod{}}, nil
+	case err != nil:
+		down := oas.ListPodsServiceUnavailable(h.unavailable(ctx, "pods", err))
+		return &down, nil
+	}
+	items := make([]oas.Pod, 0, len(pods.Items))
+	for _, p := range pods.Items {
+		items = append(items, toPod(p))
+	}
+	return &oas.PodList{Items: items, Truncated: pods.Truncated}, nil
+}
+
+func toPod(p domain.Pod) oas.Pod {
+	out := oas.Pod{
+		Name: p.Name, Process: p.Process, Application: opt(p.Application), Version: opt(p.Version), Owner: opt(p.Owner),
+		Node: opt(p.Node), Phase: opt(p.Phase), Started: optTime(p.Started), Ready: p.Ready, Deleting: p.Deleting,
+		Containers: make([]oas.PodContainer, 0, len(p.Containers)),
+	}
+	for _, c := range p.Containers {
+		container := oas.PodContainer{
+			Name: c.Name, Image: c.Image, Init: c.Init, Ready: c.Ready, Reason: opt(c.Reason), Message: opt(c.Message),
+			Since: optTime(c.Since), Restarts: clamp(c.Restarts),
+			Probes: oas.Probes{Readiness: c.Probes.Readiness, Liveness: c.Probes.Liveness, Startup: c.Probes.Startup},
+		}
+		if c.State != "" {
+			container.State = oas.NewOptPodContainerState(oas.PodContainerState(c.State))
+		}
+		if l := c.Last; l != nil {
+			container.Last = oas.NewOptTermination(oas.Termination{Reason: opt(l.Reason), ExitCode: clamp(l.ExitCode), At: optTime(l.At)})
+		}
+		out.Containers = append(out.Containers, container)
+	}
+	return out
+}
+
+func optTime(t *time.Time) oas.OptDateTime {
+	if t == nil {
+		return oas.OptDateTime{}
+	}
+	return oas.NewOptDateTime(*t)
+}
+
+// clamp is n in the int32 range.
+func clamp(n int) int32 {
+	return int32(min(max(n, math.MinInt32), math.MaxInt32)) //nolint:gosec // clamped to the int32 range
 }

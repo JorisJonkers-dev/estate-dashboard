@@ -282,6 +282,74 @@ const streams: Record<string, ReturnType<typeof stream>[]> = {
   ],
 }
 
+// The pods each Project runs: one per container that still writes, and each migration's Job.
+const probes = { readiness: true, liveness: true, startup: false }
+const pods = (project: string) =>
+  (streams[project] ?? [])
+    .filter((s) => s.pod.includes('migration') || Date.now() - Date.parse(s.last) < 15 * 60_000)
+    .map((s) => {
+      const job = s.pod.includes('migration')
+      const looping = s.pod === 'flagger-8e9f0a1b2-m9n0p'
+      return {
+        name: s.pod,
+        process: s.container,
+        application: project,
+        version: s.version,
+        owner: job ? 'Job' : 'ReplicaSet',
+        node: s.pod.length % 2 === 0 ? 'enschede-1' : 'frankfurt-contabo-1',
+        phase: job ? 'Succeeded' : 'Running',
+        started: s.first,
+        ready: !job && !looping,
+        deleting: false,
+        containers: [
+          {
+            name: s.container,
+            image: `ghcr.io/jorisjonkers-dev/${s.container}:${s.version}`,
+            init: false,
+            ready: !job && !looping,
+            restarts: looping ? 14 : 0,
+            probes: job ? { readiness: false, liveness: false, startup: false } : probes,
+            ...(job
+              ? { state: 'terminated', reason: 'Completed', since: s.last }
+              : looping
+                ? {
+                    state: 'waiting',
+                    reason: 'CrashLoopBackOff',
+                    message: 'back-off 5m0s restarting failed container=flagger',
+                    last: { reason: 'Error', exitCode: 1, at: minutesAgo(3) },
+                  }
+                : { state: 'running', since: s.first }),
+          },
+        ],
+      }
+    })
+
+const check = (group: string, name: string, host: string, up: boolean, ms: number, error?: string) => ({
+  key: `${group}_${name}`,
+  name,
+  group,
+  host,
+  at: minutesAgo(0.5),
+  up,
+  status: up ? 200 : 503,
+  durationMs: ms,
+  ...(error ? { error } : {}),
+  conditions: [
+    { condition: '[STATUS] == 200', success: up },
+    { condition: '[RESPONSE_TIME] < 1500', success: ms < 1500 },
+  ],
+  recent: Array.from({ length: 20 }, (_, i) => up || i < 14),
+})
+const checks = {
+  items: [
+    check('public-apps', 'auth-api', 'auth-api.auth-system.svc.cluster.local', true, 41),
+    check('public-apps', 'auth-ui', 'auth.jorisjonkers.dev', true, 188),
+    check('public-apps', 'estate', 'estate-dashboard.estate-dashboard-system.svc.cluster.local', true, 12),
+    check('public-apps', 'notes', 'notes.jorisjonkers.dev', false, 5000, 'context deadline exceeded'),
+    check('internal-platform', 'release-gate', 'release-gate.delivery-system.svc.cluster.local', true, 6),
+  ],
+}
+
 const logLines: Record<string, [number, string][]> = {
   'notes-migration-up-0-10-0-x7k2p/liquibase': [
     [302, 'Liquibase 4.29.2 by Liquibase'],
@@ -508,6 +576,9 @@ export function mockFetch(input: RequestInfo | URL, init?: RequestInit): Promise
     const query = new URL(request.url).searchParams
     return Promise.resolve(json({ items: lines(query.get('pod') ?? '', query.get('container') ?? '') }))
   }
+  const podsOf = /^\/api\/v1\/delivery\/projects\/([^/]+)\/pods$/.exec(pathname)
+  if (podsOf) return Promise.resolve(json({ items: pods(podsOf[1] ?? ''), truncated: false }))
+  if (pathname === '/api/v1/checks') return Promise.resolve(json(checks))
   const ofProject = /^\/api\/v1\/estate\/projects\/([^/]+)\/rollouts$/.exec(pathname)
   if (ofProject) return Promise.resolve(json({ items: rollouts[ofProject[1] ?? ''] ?? [] }))
   if (pathname in answers) return Promise.resolve(json(answers[pathname]))

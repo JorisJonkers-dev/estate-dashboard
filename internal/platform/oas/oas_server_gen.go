@@ -55,6 +55,14 @@ type Handler interface {
 	//
 	// GET /api/v1/alerts
 	ListAlerts(ctx context.Context) (ListAlertsRes, error)
+	// ListChecks implements listChecks operation.
+	//
+	// Every endpoint the uptime monitor probes, by group then name, with its latest result and whether
+	// each recent probe succeeded. A 503 means the monitor did not answer, or the dashboard runs without
+	// one.
+	//
+	// GET /api/v1/checks
+	ListChecks(ctx context.Context) (ListChecksRes, error)
 	// ListCompositionRuns implements listCompositionRuns operation.
 	//
 	// Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed. Read
@@ -100,6 +108,14 @@ type Handler interface {
 	//
 	// GET /api/v1/estate/pins
 	ListPins(ctx context.Context) (ListPinsRes, error)
+	// ListPods implements listPods operation.
+	//
+	// Every pod the render's workloads run in the Project's namespace, by Process then name: where it
+	// runs, the release its label names, and each container's state, restarts and probes, as the kubelet
+	// reports them. A 503 means the cluster did not answer, or the dashboard runs without one.
+	//
+	// GET /api/v1/delivery/projects/{project}/pods
+	ListPods(ctx context.Context, params ListPodsParams) (ListPodsRes, error)
 	// ListReleases implements listReleases operation.
 	//
 	// Every Application whose release-gate inputs the render wrote, by namespace and Application: each

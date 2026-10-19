@@ -78,6 +78,17 @@ func (UnimplementedHandler) ListAlerts(ctx context.Context) (r ListAlertsRes, _ 
 	return r, ht.ErrNotImplemented
 }
 
+// ListChecks implements listChecks operation.
+//
+// Every endpoint the uptime monitor probes, by group then name, with its latest result and whether
+// each recent probe succeeded. A 503 means the monitor did not answer, or the dashboard runs without
+// one.
+//
+// GET /api/v1/checks
+func (UnimplementedHandler) ListChecks(ctx context.Context) (r ListChecksRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListCompositionRuns implements listCompositionRuns operation.
 //
 // Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed. Read
@@ -138,6 +149,17 @@ func (UnimplementedHandler) ListLogStreams(ctx context.Context, params ListLogSt
 //
 // GET /api/v1/estate/pins
 func (UnimplementedHandler) ListPins(ctx context.Context) (r ListPinsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListPods implements listPods operation.
+//
+// Every pod the render's workloads run in the Project's namespace, by Process then name: where it
+// runs, the release its label names, and each container's state, restarts and probes, as the kubelet
+// reports them. A 503 means the cluster did not answer, or the dashboard runs without one.
+//
+// GET /api/v1/delivery/projects/{project}/pods
+func (UnimplementedHandler) ListPods(ctx context.Context, params ListPodsParams) (r ListPodsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

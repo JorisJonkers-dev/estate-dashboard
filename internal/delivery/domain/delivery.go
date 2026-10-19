@@ -75,6 +75,68 @@ type Release struct {
 	Unreadable string
 }
 
+// Probes says which checks the kubelet runs on a container.
+type Probes struct {
+	Readiness bool
+	Liveness  bool
+	Startup   bool
+}
+
+// ContainerState is what the kubelet says a container is doing now.
+type ContainerState string
+
+// The states a container is in.
+const (
+	Running    ContainerState = "running"
+	Waiting    ContainerState = "waiting"
+	Terminated ContainerState = "terminated"
+)
+
+// Termination is how a container last ended.
+type Termination struct {
+	Reason   string
+	ExitCode int
+	At       *time.Time
+}
+
+// Container is one container of a pod, as its spec declares it and the kubelet reports it.
+type Container struct {
+	Name  string
+	Image string
+	// Init is an init container's; it runs to completion before the others start.
+	Init  bool
+	Ready bool
+	State ContainerState
+	// Reason and Message say why it waits or ended, where the kubelet says.
+	Reason   string
+	Message  string
+	Since    *time.Time
+	Restarts int
+	// Last is how it ended before its latest start, where it restarted.
+	Last   *Termination
+	Probes Probes
+}
+
+// Pod is one pod the render's workloads run, with what its labels say of it.
+type Pod struct {
+	Namespace string
+	Name      string
+	// Process and Application are the pod's app.kubernetes.io/name and part-of labels.
+	Process     string
+	Application string
+	// Version is the release it runs, from its app.kubernetes.io/version label; empty without one.
+	Version string
+	// Owner is the kind of the object that made it: ReplicaSet, StatefulSet, Job, DaemonSet.
+	Owner   string
+	Node    string
+	Phase   string
+	Started *time.Time
+	// Ready is the pod's Ready condition; Deleting, that it is shutting down.
+	Ready      bool
+	Deleting   bool
+	Containers []Container
+}
+
 // ErrNoCluster is returned where the dashboard runs without a cluster to read.
 var ErrNoCluster = errors.New("no cluster is configured")
 
@@ -90,4 +152,6 @@ type Cluster interface {
 	Sources(ctx context.Context) (Page[Source], error)
 	Units(ctx context.Context) (Page[Unit], error)
 	Releases(ctx context.Context) (Page[Release], error)
+	// Pods returns every pod the render's workloads run in namespace.
+	Pods(ctx context.Context, namespace string) (Page[Pod], error)
 }

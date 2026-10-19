@@ -11,10 +11,11 @@ import (
 
 // The dashboard's Kubernetes API access is what its project file declares, which deploy-kit
 // renders into its ClusterRole as written (deploy-kit spec/v1/16-dependencies.md). Read-only by
-// design: every verb it holds reads, and it holds the three kinds the adapter reads and no other.
+// design: every verb it holds reads, and it holds the four kinds the adapter reads and no other.
+// Pods are read for what the kubelet reports; the dashboard serves no pod's environment.
 // No ConfigMap above all: a ClusterRole cannot name which, and ConfigMaps hold anything. What it
 // shows of the gate's ConfigMaps it asks the gate for (JorisJonkers-dev/estate-dashboard#15).
-func TestTheDeclaredGrantReadsTheThreeKindsAndWritesNothing(t *testing.T) {
+func TestTheDeclaredGrantReadsTheFourKindsAndWritesNothing(t *testing.T) {
 	raw, err := os.ReadFile("../../../../deploy/estate-dashboard.project.yml")
 	if err != nil {
 		t.Fatal(err)
@@ -60,7 +61,7 @@ func TestTheDeclaredGrantReadsTheThreeKindsAndWritesNothing(t *testing.T) {
 	}
 	granted = slices.DeleteFunc(granted, func(g string) bool { return strings.Contains(g, ":") })
 	slices.Sort(granted)
-	want := []string{"flagger.app/canaries", "kustomize.toolkit.fluxcd.io/kustomizations", "source.toolkit.fluxcd.io/ocirepositories"}
+	want := []string{"core/pods", "flagger.app/canaries", "kustomize.toolkit.fluxcd.io/kustomizations", "source.toolkit.fluxcd.io/ocirepositories"}
 	if !slices.Equal(granted, want) {
 		t.Fatalf("granted %v, want %v", granted, want)
 	}

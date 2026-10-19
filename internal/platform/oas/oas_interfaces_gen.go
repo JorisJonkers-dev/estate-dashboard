@@ -25,6 +25,10 @@ type ListAlertsRes interface {
 	listAlertsRes()
 }
 
+type ListChecksRes interface {
+	listChecksRes()
+}
+
 type ListCompositionRunsRes interface {
 	listCompositionRunsRes()
 }
@@ -47,6 +51,10 @@ type ListLogStreamsRes interface {
 
 type ListPinsRes interface {
 	listPinsRes()
+}
+
+type ListPodsRes interface {
+	listPodsRes()
 }
 
 type ListReleasesRes interface {

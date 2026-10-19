@@ -594,6 +594,224 @@ export type UnitList = {
 };
 
 /**
+ * Which checks the kubelet runs on a container.
+ */
+export type Probes = {
+    /**
+     * Whether it has a readiness probe.
+     */
+    readiness: boolean;
+    /**
+     * Whether it has a liveness probe.
+     */
+    liveness: boolean;
+    /**
+     * Whether it has a startup probe.
+     */
+    startup: boolean;
+};
+
+/**
+ * How a container last ended.
+ */
+export type Termination = {
+    /**
+     * Why, as the kubelet says, OOMKilled or Error.
+     */
+    reason?: string;
+    /**
+     * Its exit code.
+     */
+    exitCode: number;
+    /**
+     * When it ended.
+     */
+    at?: string;
+};
+
+/**
+ * One container of a pod.
+ */
+export type PodContainer = {
+    /**
+     * The container.
+     */
+    name: string;
+    /**
+     * The image it runs.
+     */
+    image: string;
+    /**
+     * Whether it is an init container, which runs to completion before the others start.
+     */
+    init: boolean;
+    /**
+     * Whether the kubelet reports it ready.
+     */
+    ready: boolean;
+    /**
+     * What it is doing now; absent before the kubelet reports it.
+     */
+    state?: 'running' | 'waiting' | 'terminated';
+    /**
+     * Why it waits or ended, where the kubelet says.
+     */
+    reason?: string;
+    /**
+     * The kubelet's message, where there is one.
+     */
+    message?: string;
+    /**
+     * When it started running, or ended.
+     */
+    since?: string;
+    /**
+     * How often it restarted.
+     */
+    restarts: number;
+    last?: Termination;
+    probes: Probes;
+};
+
+/**
+ * One pod a Project runs.
+ */
+export type Pod = {
+    /**
+     * The pod.
+     */
+    name: string;
+    /**
+     * The Process, from its app.kubernetes.io/name label.
+     */
+    process: string;
+    /**
+     * The Application, from its app.kubernetes.io/part-of label.
+     */
+    application?: string;
+    /**
+     * The release it runs, from its app.kubernetes.io/version label; absent without one.
+     */
+    version?: string;
+    /**
+     * The kind that made it, ReplicaSet, StatefulSet, DaemonSet or Job.
+     */
+    owner?: string;
+    /**
+     * The node it runs on, once scheduled.
+     */
+    node?: string;
+    /**
+     * Its phase, Pending, Running, Succeeded or Failed.
+     */
+    phase?: string;
+    /**
+     * When the kubelet started it.
+     */
+    started?: string;
+    /**
+     * Whether its Ready condition holds.
+     */
+    ready: boolean;
+    /**
+     * Whether it is shutting down.
+     */
+    deleting: boolean;
+    /**
+     * Its init containers, then its containers.
+     */
+    containers: Array<PodContainer>;
+};
+
+/**
+ * The pods a Project runs, by Process then name.
+ */
+export type PodList = {
+    /**
+     * Whether the namespace holds more than one read returns.
+     */
+    truncated: boolean;
+    /**
+     * The pods.
+     */
+    items: Array<Pod>;
+};
+
+/**
+ * One condition a probe holds an answer to.
+ */
+export type CheckCondition = {
+    /**
+     * The condition, as the monitor writes it.
+     */
+    condition: string;
+    /**
+     * Whether the answer held it.
+     */
+    success: boolean;
+};
+
+/**
+ * One endpoint the uptime monitor probes, and its latest result.
+ */
+export type Check = {
+    /**
+     * The monitor's name for the endpoint, unique across groups.
+     */
+    key: string;
+    /**
+     * The endpoint.
+     */
+    name: string;
+    /**
+     * The group it is shown in.
+     */
+    group: string;
+    /**
+     * The host the probe reached.
+     */
+    host?: string;
+    /**
+     * When it last probed; absent before its first probe.
+     */
+    at?: string;
+    /**
+     * Whether the latest probe succeeded.
+     */
+    up: boolean;
+    /**
+     * The HTTP status the latest probe got, where it got one.
+     */
+    status?: number;
+    /**
+     * How long the latest probe took, in milliseconds.
+     */
+    durationMs?: number;
+    /**
+     * Why the latest probe failed, where the monitor says.
+     */
+    error?: string;
+    /**
+     * The latest probe's conditions.
+     */
+    conditions: Array<CheckCondition>;
+    /**
+     * Whether each of the latest probes succeeded, oldest first.
+     */
+    recent: Array<boolean>;
+};
+
+/**
+ * The uptime checks, by group then name.
+ */
+export type CheckList = {
+    /**
+     * The checks.
+     */
+    items: Array<Check>;
+};
+
+/**
  * One member of a gated Application, as Flagger switches it.
  */
 export type Member = {
@@ -1450,6 +1668,77 @@ export type ListReleasesResponses = {
 };
 
 export type ListReleasesResponse = ListReleasesResponses[keyof ListReleasesResponses];
+
+export type ListPodsData = {
+    body?: never;
+    path: {
+        /**
+         * The Project.
+         */
+        project: string;
+    };
+    query?: never;
+    url: '/api/v1/delivery/projects/{project}/pods';
+};
+
+export type ListPodsErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListPodsError = ListPodsErrors[keyof ListPodsErrors];
+
+export type ListPodsResponses = {
+    /**
+     * What the cluster holds.
+     */
+    200: PodList;
+};
+
+export type ListPodsResponse = ListPodsResponses[keyof ListPodsResponses];
+
+export type ListChecksData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/checks';
+};
+
+export type ListChecksErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListChecksError = ListChecksErrors[keyof ListChecksErrors];
+
+export type ListChecksResponses = {
+    /**
+     * What the monitor holds.
+     */
+    200: CheckList;
+};
+
+export type ListChecksResponse = ListChecksResponses[keyof ListChecksResponses];
 
 export type ListAlertHistoryData = {
     body?: never;

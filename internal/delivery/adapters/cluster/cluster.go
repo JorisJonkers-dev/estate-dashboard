@@ -1,6 +1,6 @@
 // Package cluster implements the delivery context's Cluster port on the Kubernetes API, through a
-// ServiceAccount that may get, list and watch Flux's OCIRepositories and Kustomizations and
-// Flagger's Canaries, and nothing else. Each gated Application's release-gate inputs and the
+// ServiceAccount that may get, list and watch Flux's OCIRepositories and Kustomizations,
+// Flagger's Canaries and pods, and nothing else. Each gated Application's release-gate inputs and the
 // Release Gate's record of it are the gate's to read: the dashboard asks the gate for both, at
 // GET /releases, and holds no ConfigMap access (JorisJonkers-dev/estate-dashboard#15).
 package cluster
@@ -31,6 +31,8 @@ var (
 	OCIRepositories = schema.GroupVersionResource{Group: "source.toolkit.fluxcd.io", Version: "v1", Resource: "ocirepositories"}
 	Kustomizations  = schema.GroupVersionResource{Group: "kustomize.toolkit.fluxcd.io", Version: "v1", Resource: "kustomizations"}
 	Canaries        = schema.GroupVersionResource{Group: "flagger.app", Version: "v1beta1", Resource: "canaries"}
+	// Pods are the one core kind read, in one Project's namespace at a time.
+	Pods = schema.GroupVersionResource{Version: "v1", Resource: "pods"}
 )
 
 const (
@@ -292,6 +294,113 @@ func release(namespace, application string, served *gateRelease, canaries map[st
 	return release
 }
 
+// Pods implements domain.Cluster: every pod the render's workloads run in namespace.
+func (k Kube) Pods(ctx context.Context, namespace string) (domain.Page[domain.Pod], error) {
+	list, err := k.Dynamic.Resource(Pods).Namespace(namespace).List(ctx, metav1.ListOptions{LabelSelector: rendered, Limit: maxListed})
+	if err != nil {
+		return domain.Page[domain.Pod]{}, fmt.Errorf("list pods: %w", err)
+	}
+	pods := make([]domain.Pod, 0, len(list.Items))
+	for _, o := range list.Items {
+		pods = append(pods, readPod(o))
+	}
+	return domain.Page[domain.Pod]{Items: pods, Truncated: list.GetContinue() != ""}, nil
+}
+
+func readPod(o unstructured.Unstructured) domain.Pod {
+	labels := o.GetLabels()
+	p := domain.Pod{
+		Namespace: o.GetNamespace(), Name: o.GetName(),
+		Process: labels["app.kubernetes.io/name"], Application: labels["app.kubernetes.io/part-of"],
+		Version: labels["app.kubernetes.io/version"],
+		Node:    str(o, "spec", "nodeName"), Phase: str(o, "status", "phase"),
+		Started:  timeAt(o.Object, "status", "startTime"),
+		Deleting: o.GetDeletionTimestamp() != nil,
+	}
+	if owners := o.GetOwnerReferences(); len(owners) > 0 {
+		p.Owner = owners[0].Kind
+	}
+	conditions, _, _ := unstructured.NestedSlice(o.Object, "status", "conditions")
+	for _, c := range conditions {
+		if fields, ok := c.(map[string]any); ok && fields["type"] == "Ready" {
+			p.Ready = fields["status"] == "True"
+		}
+	}
+	p.Containers = append(containers(o, "initContainers", "initContainerStatuses", true), containers(o, "containers", "containerStatuses", false)...)
+	return p
+}
+
+// containers joins each container the spec declares with what the kubelet reports of it.
+func containers(o unstructured.Unstructured, specField, statusField string, init bool) []domain.Container {
+	declared, _, _ := unstructured.NestedSlice(o.Object, "spec", specField)
+	reported, _, _ := unstructured.NestedSlice(o.Object, "status", statusField)
+	statuses := map[string]map[string]any{}
+	for _, r := range reported {
+		if fields, ok := r.(map[string]any); ok {
+			if name, ok := fields["name"].(string); ok {
+				statuses[name] = fields
+			}
+		}
+	}
+	out := make([]domain.Container, 0, len(declared))
+	for _, d := range declared {
+		spec, ok := d.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := spec["name"].(string)
+		image, _ := spec["image"].(string)
+		c := domain.Container{
+			Name: name, Image: image, Init: init,
+			Probes: domain.Probes{Readiness: spec["readinessProbe"] != nil, Liveness: spec["livenessProbe"] != nil, Startup: spec["startupProbe"] != nil},
+		}
+		if status := statuses[name]; status != nil {
+			c.Ready, _ = status["ready"].(bool)
+			restarts, _, _ := unstructured.NestedInt64(status, "restartCount")
+			c.Restarts = int(restarts)
+			c.State, c.Reason, c.Message, c.Since = state(status, "state")
+			if last, found, _ := unstructured.NestedMap(status, "lastState", "terminated"); found {
+				reason, _ := last["reason"].(string)
+				code, _, _ := unstructured.NestedInt64(last, "exitCode")
+				c.Last = &domain.Termination{Reason: reason, ExitCode: int(code), At: timeAt(last, "finishedAt")}
+			}
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+// state reads one of a container status's state fields: running, waiting or terminated.
+func state(status map[string]any, field string) (domain.ContainerState, string, string, *time.Time) {
+	for _, s := range []struct {
+		state domain.ContainerState
+		since string
+	}{{domain.Running, "startedAt"}, {domain.Waiting, ""}, {domain.Terminated, "finishedAt"}} {
+		fields, found, _ := unstructured.NestedMap(status, field, string(s.state))
+		if !found {
+			continue
+		}
+		reason, _ := fields["reason"].(string)
+		message, _ := fields["message"].(string)
+		var since *time.Time
+		if s.since != "" {
+			since = timeAt(fields, s.since)
+		}
+		return s.state, reason, message, since
+	}
+	return "", "", "", nil
+}
+
+func timeAt(o map[string]any, path ...string) *time.Time {
+	v, _, _ := unstructured.NestedString(o, path...)
+	t, err := time.Parse(time.RFC3339, v)
+	if err != nil {
+		return nil
+	}
+	t = t.UTC()
+	return &t
+}
+
 // Absent is the cluster of a dashboard that runs without one: every read is domain.ErrNoCluster.
 type Absent struct{}
 
@@ -310,6 +419,11 @@ func (Absent) Units(context.Context) (domain.Page[domain.Unit], error) {
 // Releases implements domain.Cluster.
 func (Absent) Releases(context.Context) (domain.Page[domain.Release], error) {
 	return domain.Page[domain.Release]{}, domain.ErrNoCluster
+}
+
+// Pods implements domain.Cluster.
+func (Absent) Pods(context.Context, string) (domain.Page[domain.Pod], error) {
+	return domain.Page[domain.Pod]{}, domain.ErrNoCluster
 }
 
 // Connect reads the cluster the dashboard runs in, or the one KUBECONFIG names on a local run,

@@ -5,7 +5,8 @@
 // and ADDR (default :8080). Without
 // ALERTMANAGER_URL the alert reads answer that there is none, and nothing is watched. LOKI_URL
 // names the Loki a Project's logs are read from; without it the log reads answer that there is
-// none. The
+// none. GATUS_URL names the uptime monitor the checks are read from; without it the check reads
+// answer that there is none. The
 // cluster is the one the dashboard runs in; on a local run KUBECONFIG may name one, and without
 // either the delivery reads answer that there is none. The Estate repository is read with
 // GITHUB_TOKEN, a token that may read it and nothing else, at ESTATE_REPOSITORY (default
@@ -37,6 +38,9 @@ import (
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/adapters/persistence"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/app"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/domain"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/checks/adapters/gatus"
+	checksapp "github.com/JorisJonkers-dev/estate-dashboard/internal/checks/app"
+	checksdomain "github.com/JorisJonkers-dev/estate-dashboard/internal/checks/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/adapters/cluster"
 	deliveryapp "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/app"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/estate/adapters/github"
@@ -69,6 +73,8 @@ const (
 	alertmanagerTimeout = 10 * time.Second
 	// lokiTimeout bounds one read of Loki: a day of one container's logs comes back well within it.
 	lokiTimeout = 15 * time.Second
+	// gatusTimeout bounds one read of Gatus, which answers from its own store.
+	gatusTimeout = 10 * time.Second
 	// githubTimeout bounds one call to GitHub.
 	githubTimeout = 10 * time.Second
 	// gateTimeout bounds one call to the Release Gate.
@@ -209,6 +215,19 @@ func readLoki(getenv func(string) string) (logsdomain.Store, error) {
 	return store, nil
 }
 
+// readGatus reads the uptime monitor the checks come from: the Gatus at GATUS_URL, or none.
+func readGatus(getenv func(string) string) (checksdomain.Monitor, error) {
+	base := getenv("GATUS_URL")
+	if base == "" {
+		return gatus.Absent{}, nil
+	}
+	monitor, err := gatus.New(base, &http.Client{Timeout: gatusTimeout})
+	if err != nil {
+		return nil, fmt.Errorf("GATUS_URL: %w", err)
+	}
+	return monitor, nil
+}
+
 // readAlertmanager reads the Alertmanager to read alerts from and silence them in: the one at
 // ALERTMANAGER_URL, which is watched, or none, which is not.
 func readAlertmanager(getenv func(string) string) (domain.Alertmanager, bool, error) {
@@ -254,6 +273,10 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	if err != nil {
 		return err
 	}
+	monitor, err := readGatus(getenv)
+	if err != nil {
+		return err
+	}
 	releaseGate, err := readGate(getenv)
 	if err != nil {
 		return err
@@ -288,7 +311,7 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	if watched {
 		go watch(ctx, logger, live, watchEvery)
 	}
-	api, err := httpapi.New(logger, gate, app.New(history), live, deliveryapp.New(kube), estateapp.New(repository), logsapp.New(logStore, time.Now))
+	api, err := httpapi.New(logger, gate, app.New(history), live, deliveryapp.New(kube), estateapp.New(repository), logsapp.New(logStore, time.Now), checksapp.New(monitor))
 	if err != nil {
 		return err
 	}
