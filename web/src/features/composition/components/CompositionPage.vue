@@ -51,7 +51,7 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
       v-else
       class="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)] lg:items-start lg:gap-12"
     >
-      <ul aria-label="Runs" class="scroll-pane m-0 list-none border-t border-line p-0">
+      <ul aria-label="Runs" class="scroll-pane m-0 min-w-0 list-none border-t border-line p-0">
         <li v-for="r in items" :key="r.id">
           <button
             type="button"
@@ -76,7 +76,7 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
       <section
         v-if="picked"
         aria-labelledby="run-h"
-        class="scroll-pane flex flex-col gap-5 lg:border-l lg:border-line lg:pl-8"
+        class="scroll-pane flex min-w-0 flex-col gap-5 lg:border-l lg:border-line lg:pl-8"
       >
         <div class="flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="run-h" class="m-0 text-xl font-semibold">{{ when.format(new Date(picked.at)) }}</h2>
@@ -91,7 +91,7 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
         <dl class="m-0 grid grid-cols-2 gap-4 md:grid-cols-4">
           <div>
             <dt :class="label">Lock</dt>
-            <dd class="m-0 font-mono text-sm">{{ picked.lock ?? '' }}</dd>
+            <dd class="m-0 font-mono text-sm break-all">{{ picked.lock ?? '' }}</dd>
           </div>
           <div>
             <dt :class="label">Toolkit</dt>
@@ -106,36 +106,39 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
             <dd class="m-0">{{ picked.moved.length ? picked.moved.join(', ') : 'none' }}</dd>
           </div>
         </dl>
-        <table aria-label="Fragments in this run" class="w-full border-collapse">
-          <thead>
-            <tr class="border-b border-line">
-              <th
-                v-for="h in ['Project', 'Version', 'Outcome', 'Published']"
-                :key="h"
-                scope="col"
-                class="py-2 pr-4 text-left"
-                :class="label"
-              >
-                {{ h }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="f in picked.fragments" :key="f.project" class="border-b border-line-soft">
-              <th scope="row" class="py-2.5 pr-4 text-left font-medium">
-                <RouterLink :to="`/projects/${f.project}`" class="no-underline hover:underline">{{
-                  f.project
-                }}</RouterLink>
-              </th>
-              <td class="py-2.5 pr-4">{{ f.version }}</td>
-              <td class="py-2.5 pr-4" :class="toneText[fragment[f.outcome].tone]">
-                {{ fragment[f.outcome].word
-                }}<span v-if="f.reason" class="block text-sm text-text-muted">{{ f.reason }}</span>
-              </td>
-              <td class="py-2.5 text-text-muted">{{ age(f.published, now) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <!-- A phone is narrower than the table: it scrolls in its own box, never the page. -->
+        <div class="-mx-6 overflow-x-auto px-6 md:mx-0 md:px-0">
+          <table aria-label="Fragments in this run" class="w-full min-w-[34rem] border-collapse md:min-w-0">
+            <thead>
+              <tr class="border-b border-line">
+                <th
+                  v-for="h in ['Project', 'Version', 'Outcome', 'Published']"
+                  :key="h"
+                  scope="col"
+                  class="py-2 pr-4 text-left"
+                  :class="label"
+                >
+                  {{ h }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="f in picked.fragments" :key="f.project" class="border-b border-line-soft">
+                <th scope="row" class="py-2.5 pr-4 text-left font-medium">
+                  <RouterLink :to="`/projects/${f.project}`" class="no-underline hover:underline">{{
+                    f.project
+                  }}</RouterLink>
+                </th>
+                <td class="py-2.5 pr-4">{{ f.version }}</td>
+                <td class="py-2.5 pr-4" :class="toneText[fragment[f.outcome].tone]">
+                  {{ fragment[f.outcome].word
+                  }}<span v-if="f.reason" class="block text-sm text-text-muted">{{ f.reason }}</span>
+                </td>
+                <td class="py-2.5 text-text-muted">{{ age(f.published, now) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   </div>
