@@ -66,7 +66,7 @@ const answers: Record<string, unknown> = {
         'JorisJonkers-dev/knowledge',
         false,
         'HealthCheckFailed',
-        'Deployment knowledge-system/knowledge-api is not ready: 0 of 2 replicas',
+        'Deployment knowledge-system/api is not ready: 0 of 2 replicas',
       ),
       unit('notes', '0.9.1', 'JorisJonkers-dev/notes'),
     ],
