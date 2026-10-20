@@ -41,6 +41,7 @@ var operationRolesSessionCookie = map[string][]string{
 	GetHandoverOperation:          []string{},
 	GetHealthOperation:            []string{},
 	GetReleaseNotesOperation:      []string{},
+	GetRolloutWindowOperation:     []string{},
 	GetSessionOperation:           []string{},
 	ListAlertHistoryOperation:     []string{},
 	ListAlertsOperation:           []string{},

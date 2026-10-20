@@ -335,6 +335,47 @@ func (s *AlertList) SetItems(val []Alert) {
 
 func (*AlertList) listAlertsRes() {}
 
+// The share of traffic Flagger sent a Process's canary at one moment.
+// Ref: #/components/schemas/CanaryWeight
+type CanaryWeight struct {
+	// The Process.
+	Process string `json:"process"`
+	// When.
+	At time.Time `json:"at"`
+	// The canary's share, in percent.
+	Weight int32 `json:"weight"`
+}
+
+// GetProcess returns the value of Process.
+func (s *CanaryWeight) GetProcess() string {
+	return s.Process
+}
+
+// GetAt returns the value of At.
+func (s *CanaryWeight) GetAt() time.Time {
+	return s.At
+}
+
+// GetWeight returns the value of Weight.
+func (s *CanaryWeight) GetWeight() int32 {
+	return s.Weight
+}
+
+// SetProcess sets the value of Process.
+func (s *CanaryWeight) SetProcess(val string) {
+	s.Process = val
+}
+
+// SetAt sets the value of At.
+func (s *CanaryWeight) SetAt(val time.Time) {
+	s.At = val
+}
+
+// SetWeight sets the value of Weight.
+func (s *CanaryWeight) SetWeight(val int32) {
+	s.Weight = val
+}
+
 // One endpoint the uptime monitor probes, and its latest result.
 // Ref: #/components/schemas/Check
 type Check struct {
@@ -1591,6 +1632,18 @@ func (*GetReleaseNotesServiceUnavailable) getReleaseNotesRes() {}
 type GetReleaseNotesUnauthorized ProblemStatusCode
 
 func (*GetReleaseNotesUnauthorized) getReleaseNotesRes() {}
+
+type GetRolloutWindowBadRequest ProblemStatusCode
+
+func (*GetRolloutWindowBadRequest) getRolloutWindowRes() {}
+
+type GetRolloutWindowServiceUnavailable ProblemStatusCode
+
+func (*GetRolloutWindowServiceUnavailable) getRolloutWindowRes() {}
+
+type GetRolloutWindowUnauthorized ProblemStatusCode
+
+func (*GetRolloutWindowUnauthorized) getRolloutWindowRes() {}
 
 // One secret a Process may read or use.
 // Ref: #/components/schemas/Grant
@@ -3192,6 +3245,83 @@ func (s *PodList) SetItems(val []Pod) {
 
 func (*PodList) listPodsRes() {}
 
+// One pod over a release's window.
+// Ref: #/components/schemas/PodSpan
+type PodSpan struct {
+	// The pod.
+	Pod string `json:"pod"`
+	// The Process, from the pod's name, Flagger's -primary taken off.
+	Process string `json:"process"`
+	// When it was first seen in the window.
+	Start OptDateTime `json:"start"`
+	// When it first turned ready in the window.
+	Ready OptDateTime `json:"ready"`
+	// When it was last seen, where it was gone before the window ended.
+	End OptDateTime `json:"end"`
+	// Its readiness every five seconds, oldest first.
+	Checks []ReadinessCheck `json:"checks"`
+}
+
+// GetPod returns the value of Pod.
+func (s *PodSpan) GetPod() string {
+	return s.Pod
+}
+
+// GetProcess returns the value of Process.
+func (s *PodSpan) GetProcess() string {
+	return s.Process
+}
+
+// GetStart returns the value of Start.
+func (s *PodSpan) GetStart() OptDateTime {
+	return s.Start
+}
+
+// GetReady returns the value of Ready.
+func (s *PodSpan) GetReady() OptDateTime {
+	return s.Ready
+}
+
+// GetEnd returns the value of End.
+func (s *PodSpan) GetEnd() OptDateTime {
+	return s.End
+}
+
+// GetChecks returns the value of Checks.
+func (s *PodSpan) GetChecks() []ReadinessCheck {
+	return s.Checks
+}
+
+// SetPod sets the value of Pod.
+func (s *PodSpan) SetPod(val string) {
+	s.Pod = val
+}
+
+// SetProcess sets the value of Process.
+func (s *PodSpan) SetProcess(val string) {
+	s.Process = val
+}
+
+// SetStart sets the value of Start.
+func (s *PodSpan) SetStart(val OptDateTime) {
+	s.Start = val
+}
+
+// SetReady sets the value of Ready.
+func (s *PodSpan) SetReady(val OptDateTime) {
+	s.Ready = val
+}
+
+// SetEnd sets the value of End.
+func (s *PodSpan) SetEnd(val OptDateTime) {
+	s.End = val
+}
+
+// SetChecks sets the value of Checks.
+func (s *PodSpan) SetChecks(val []ReadinessCheck) {
+	s.Checks = val
+}
+
 // Which checks the kubelet runs on a container.
 // Ref: #/components/schemas/Probes
 type Probes struct {
@@ -3314,6 +3444,35 @@ func (s *ProblemStatusCode) SetResponse(val Problem) {
 
 func (*ProblemStatusCode) getSessionRes()       {}
 func (*ProblemStatusCode) listAlertHistoryRes() {}
+
+// Whether a pod was ready at one moment.
+// Ref: #/components/schemas/ReadinessCheck
+type ReadinessCheck struct {
+	// When.
+	At time.Time `json:"at"`
+	// Whether it was ready.
+	Ready bool `json:"ready"`
+}
+
+// GetAt returns the value of At.
+func (s *ReadinessCheck) GetAt() time.Time {
+	return s.At
+}
+
+// GetReady returns the value of Ready.
+func (s *ReadinessCheck) GetReady() bool {
+	return s.Ready
+}
+
+// SetAt sets the value of At.
+func (s *ReadinessCheck) SetAt(val time.Time) {
+	s.At = val
+}
+
+// SetReady sets the value of Ready.
+func (s *ReadinessCheck) SetReady(val bool) {
+	s.Ready = val
+}
 
 // One gated Application.
 // Ref: #/components/schemas/Release
@@ -3680,6 +3839,37 @@ func (s *RolloutList) SetItems(val []Rollout) {
 }
 
 func (*RolloutList) listRolloutsRes() {}
+
+// What a Project's pods and canaries did over a window.
+// Ref: #/components/schemas/RolloutWindow
+type RolloutWindow struct {
+	// The pods, by Process then start.
+	Pods []PodSpan `json:"pods"`
+	// Each change of a canary's weight, oldest first.
+	Weights []CanaryWeight `json:"weights"`
+}
+
+// GetPods returns the value of Pods.
+func (s *RolloutWindow) GetPods() []PodSpan {
+	return s.Pods
+}
+
+// GetWeights returns the value of Weights.
+func (s *RolloutWindow) GetWeights() []CanaryWeight {
+	return s.Weights
+}
+
+// SetPods sets the value of Pods.
+func (s *RolloutWindow) SetPods(val []PodSpan) {
+	s.Pods = val
+}
+
+// SetWeights sets the value of Weights.
+func (s *RolloutWindow) SetWeights(val []CanaryWeight) {
+	s.Weights = val
+}
+
+func (*RolloutWindow) getRolloutWindowRes() {}
 
 // The signed-in admin.
 // Ref: #/components/schemas/Session

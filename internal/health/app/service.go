@@ -53,3 +53,28 @@ func (s *Service) Timeline(ctx context.Context, proj string, checks []string) ([
 	}
 	return blocks, nil
 }
+
+const (
+	// RolloutStep is how often a pod's readiness is read over a release's window.
+	RolloutStep = 5 * time.Second
+	// MaxRollout is the longest window one read covers.
+	MaxRollout = 2 * time.Hour
+)
+
+// ErrBadWindow is returned for a window that ends before it starts, or lasts too long.
+var ErrBadWindow = errors.New("not a window")
+
+// Rollout returns what a Project's pods and canaries did from start to end.
+func (s *Service) Rollout(ctx context.Context, proj string, start, end time.Time) (domain.Window, error) {
+	if !project.MatchString(proj) {
+		return domain.Window{}, fmt.Errorf("%w: %q", ErrNotAProject, proj)
+	}
+	if !end.After(start) || end.Sub(start) > MaxRollout {
+		return domain.Window{}, fmt.Errorf("%w: %s to %s", ErrBadWindow, start, end)
+	}
+	readiness, weights, err := s.metrics.Rollout(ctx, proj, start, end, RolloutStep)
+	if err != nil {
+		return domain.Window{}, fmt.Errorf("read the rollout of %s: %w", proj, err)
+	}
+	return domain.WindowOf(readiness, weights, end, RolloutStep), nil
+}

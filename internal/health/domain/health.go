@@ -63,17 +63,10 @@ func BlockOf(at time.Time, s Sample) Block {
 	return b
 }
 
-func rank(s State) int {
-	switch s {
-	case Crit:
-		return 2
-	case Warn:
-		return 1
-	case OK, Empty:
-		return 0
-	}
-	return 0
-}
+// ranks orders the states a block can be worse in; any other ranks as healthy.
+var ranks = map[State]int{Warn: 1, Crit: 2} //nolint:gochecknoglobals // a constant table
+
+func rank(s State) int { return ranks[s] }
 
 // ErrNoMetrics is returned where the dashboard runs without metrics to read.
 var ErrNoMetrics = errors.New("no metrics are configured")
@@ -82,4 +75,7 @@ var ErrNoMetrics = errors.New("no metrics are configured")
 // Project, by the step's start. It only ever reads.
 type Metrics interface {
 	Samples(ctx context.Context, project string, checks []string, start, end time.Time, step time.Duration) (map[time.Time]Sample, error)
+	// Rollout returns each pod's readiness by pod, and each canary's weight by Process, from start
+	// to end.
+	Rollout(ctx context.Context, project string, start, end time.Time, step time.Duration) (readiness, weights Series, err error)
 }

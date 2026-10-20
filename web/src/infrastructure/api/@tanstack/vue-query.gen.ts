@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/vue-query';
 
 import { client } from '../client.gen';
-import { getDeclaration, getHandover, getHealth, getReleaseNotes, getSession, listAlertHistory, listAlerts, listChecks, listCompositionRuns, listContainerHistory, listContainers, listDeploys, listIssues, listLogLines, listLogStreams, listPins, listPods, listReleases, listRollouts, listSources, listUnits, listUpdates, type Options, silenceAlert } from '../sdk.gen';
-import type { GetDeclarationData, GetDeclarationError, GetDeclarationResponse, GetHandoverData, GetHandoverError, GetHandoverResponse, GetHealthData, GetHealthError, GetHealthResponse, GetReleaseNotesData, GetReleaseNotesError, GetReleaseNotesResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListChecksData, ListChecksError, ListChecksResponse, ListCompositionRunsData, ListCompositionRunsError, ListCompositionRunsResponse, ListContainerHistoryData, ListContainerHistoryError, ListContainerHistoryResponse, ListContainersData, ListContainersError, ListContainersResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListLogLinesData, ListLogLinesError, ListLogLinesResponse, ListLogStreamsData, ListLogStreamsError, ListLogStreamsResponse, ListPinsData, ListPinsError, ListPinsResponse, ListPodsData, ListPodsError, ListPodsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, ListUpdatesData, ListUpdatesError, ListUpdatesResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
+import { getDeclaration, getHandover, getHealth, getReleaseNotes, getRolloutWindow, getSession, listAlertHistory, listAlerts, listChecks, listCompositionRuns, listContainerHistory, listContainers, listDeploys, listIssues, listLogLines, listLogStreams, listPins, listPods, listReleases, listRollouts, listSources, listUnits, listUpdates, type Options, silenceAlert } from '../sdk.gen';
+import type { GetDeclarationData, GetDeclarationError, GetDeclarationResponse, GetHandoverData, GetHandoverError, GetHandoverResponse, GetHealthData, GetHealthError, GetHealthResponse, GetReleaseNotesData, GetReleaseNotesError, GetReleaseNotesResponse, GetRolloutWindowData, GetRolloutWindowError, GetRolloutWindowResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListChecksData, ListChecksError, ListChecksResponse, ListCompositionRunsData, ListCompositionRunsError, ListCompositionRunsResponse, ListContainerHistoryData, ListContainerHistoryError, ListContainerHistoryResponse, ListContainersData, ListContainersError, ListContainersResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListLogLinesData, ListLogLinesError, ListLogLinesResponse, ListLogStreamsData, ListLogStreamsError, ListLogStreamsResponse, ListPinsData, ListPinsError, ListPinsResponse, ListPodsData, ListPodsError, ListPodsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, ListUpdatesData, ListUpdatesError, ListUpdatesResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -456,6 +456,26 @@ export const getHealthOptions = (options: Options<GetHealthData>) => queryOption
         return data;
     },
     queryKey: getHealthQueryKey(options)
+});
+
+export const getRolloutWindowQueryKey = (options: Options<GetRolloutWindowData>) => createQueryKey('getRolloutWindow', options);
+
+/**
+ * What a Project's pods and canaries did over a release's window
+ *
+ * Every pod of the Project Prometheus saw from `from` to `to`: when it started, when it first turned ready, when it was last seen, and its readiness every five seconds; and each Process's canary weight as Flagger moved it. The dashboard joins this with the release's stages and the Release Gate's record to show how the release rolled out. A 503 means Prometheus did not answer, or the dashboard runs without one.
+ */
+export const getRolloutWindowOptions = (options: Options<GetRolloutWindowData>) => queryOptions<GetRolloutWindowResponse, GetRolloutWindowError, GetRolloutWindowResponse, ReturnType<typeof getRolloutWindowQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getRolloutWindow({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getRolloutWindowQueryKey(options)
 });
 
 export const listChecksQueryKey = (options?: Options<ListChecksData>) => createQueryKey('listChecks', options);

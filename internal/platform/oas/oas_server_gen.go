@@ -42,6 +42,16 @@ type Handler interface {
 	//
 	// GET /api/v1/estate/releases/notes
 	GetReleaseNotes(ctx context.Context, params GetReleaseNotesParams) (GetReleaseNotesRes, error)
+	// GetRolloutWindow implements getRolloutWindow operation.
+	//
+	// Every pod of the Project Prometheus saw from `from` to `to`: when it started, when it first turned
+	// ready, when it was last seen, and its readiness every five seconds; and each Process's canary weight
+	// as Flagger moved it. The dashboard joins this with the release's stages and the Release Gate's
+	// record to show how the release rolled out. A 503 means Prometheus did not answer, or the dashboard
+	// runs without one.
+	//
+	// GET /api/v1/health/projects/{project}/rollout
+	GetRolloutWindow(ctx context.Context, params GetRolloutWindowParams) (GetRolloutWindowRes, error)
 	// GetSession implements getSession operation.
 	//
 	// Returns the admin the session cookie belongs to. A request without a session, or with one auth no

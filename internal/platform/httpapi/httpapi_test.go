@@ -790,6 +790,11 @@ func (m metrics) Samples(_ context.Context, _ string, _ []string, start, end tim
 	return out, m.err
 }
 
+func (m metrics) Rollout(_ context.Context, _ string, start, _ time.Time, _ time.Duration) (healthdomain.Series, healthdomain.Series, error) {
+	return healthdomain.Series{"auth-api-7f8c9d6b5-kq2lm": {start: 0, start.Add(5 * time.Second): 1}},
+		healthdomain.Series{"auth-api": {start: 20}}, m.err
+}
+
 func serveMetrics(t *testing.T, m healthdomain.Metrics) *httptest.Server {
 	t.Helper()
 	return serveHealth(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(github.Absent{}), logsapp.New(loki.Absent{}, time.Now),
@@ -812,5 +817,35 @@ func TestAPrometheusThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 		if got := call(t, serveMetrics(t, m), http.MethodGet, "/api/v1/health/projects/arr", "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
 			t.Fatalf("health = %d %v", got.code, got.body)
 		}
+	}
+}
+
+func TestAReleasesWindowIsServedAsItsPodsAndCanaries(t *testing.T) {
+	got := call(t, serveMetrics(t, metrics{}), http.MethodGet, "/api/v1/health/projects/auth/rollout?from=2026-10-20T09:00:00Z&to=2026-10-20T09:10:00Z", "", true)
+	pods, _ := got.body["pods"].([]any)
+	weights, _ := got.body["weights"].([]any)
+	if got.code != http.StatusOK || len(pods) != 1 || len(weights) != 1 {
+		t.Fatalf("window = %d %v", got.code, got.body)
+	}
+	pod := pods[0].(map[string]any)
+	if pod["process"] != "auth-api" || pod["start"] != "2026-10-20T09:00:00Z" || pod["ready"] != "2026-10-20T09:00:05Z" || pod["end"] != "2026-10-20T09:00:05Z" || len(pod["checks"].([]any)) != 2 {
+		t.Fatalf("pod = %v", pod)
+	}
+	if w := weights[0].(map[string]any); w["process"] != "auth-api" || w["weight"] != float64(20) {
+		t.Fatalf("weight = %v", w)
+	}
+}
+
+func TestAWindowThatIsNotOneIsA400(t *testing.T) {
+	got := call(t, serveMetrics(t, metrics{}), http.MethodGet, "/api/v1/health/projects/auth/rollout?from=2026-10-20T09:00:00Z&to=2026-10-20T08:00:00Z", "", true)
+	if got.code != http.StatusBadRequest {
+		t.Fatalf("window = %d %v", got.code, got.body)
+	}
+}
+
+func TestAWindowPrometheusDoesNotAnswerForIsA503(t *testing.T) {
+	got := call(t, serveMetrics(t, metrics{err: errors.New("timeout")}), http.MethodGet, "/api/v1/health/projects/auth/rollout?from=2026-10-20T09:00:00Z&to=2026-10-20T09:10:00Z", "", true)
+	if got.code != http.StatusServiceUnavailable {
+		t.Fatalf("window = %d %v", got.code, got.body)
 	}
 }

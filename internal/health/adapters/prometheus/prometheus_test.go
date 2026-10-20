@@ -141,3 +141,33 @@ func TestWithoutAPrometheusEveryReadSaysSo(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestARolloutIsEachPodsReadinessAndEachCanarysWeight(t *testing.T) {
+	f := &fake{status: http.StatusOK, answers: map[string]string{
+		"kube_pod_status_ready": `{"status":"success","data":{"result":[{"metric":{"pod":"auth-api-1"},"values":[[1760961600,"1"]]},{"metric":{"pod":"auth-api-2"},"values":[[1760961630,"0"]]}]}}`,
+		"flagger_canary_weight": `{"status":"success","data":{"result":[{"metric":{"name":"auth-api"},"values":[[1760961600,"20"]]}]}}`,
+	}}
+	readiness, weights, err := f.serve(t).Rollout(t.Context(), "auth", start, end, 30*time.Second)
+	if err != nil || readiness["auth-api-1"][start] != 1 || readiness["auth-api-2"][end] != 0 || weights["auth-api"][start] != 20 {
+		t.Fatalf("readiness %v, weights %v, %v", readiness, weights, err)
+	}
+	if !strings.Contains(strings.Join(f.queries, "\n"), `namespace="auth-system"`) {
+		t.Fatalf("queries = %v", f.queries)
+	}
+}
+
+func TestARolloutPrometheusRefusesIsAnError(t *testing.T) {
+	for name, f := range map[string]*fake{
+		"the readiness": {status: http.StatusOK, answers: map[string]string{"kube_pod": `{"status":"error"}`}},
+		"the weights":   {status: http.StatusOK, answers: map[string]string{"flagger": `{"status":"error"}`}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, _, err := f.serve(t).Rollout(t.Context(), "auth", start, end, 30*time.Second); err == nil {
+				t.Fatal("an answer that is not one read as a rollout")
+			}
+		})
+	}
+	if _, _, err := (prometheus.Absent{}).Rollout(t.Context(), "auth", start, end, time.Second); !errors.Is(err, domain.ErrNoMetrics) {
+		t.Fatalf("error = %v", err)
+	}
+}

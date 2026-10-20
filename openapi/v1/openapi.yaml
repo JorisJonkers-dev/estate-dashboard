@@ -703,6 +703,58 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/health/projects/{project}/rollout:
+    get:
+      operationId: getRolloutWindow
+      summary: What a Project's pods and canaries did over a release's window
+      description: >-
+        Every pod of the Project Prometheus saw from `from` to `to`: when it started, when it first
+        turned ready, when it was last seen, and its readiness every five seconds; and each
+        Process's canary weight as Flagger moved it. The dashboard joins this with the release's
+        stages and the Release Gate's record to show how the release rolled out. A 503 means
+        Prometheus did not answer, or the dashboard runs without one.
+      tags: [health]
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: The Project.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+            pattern: "^[a-z0-9_][a-z0-9_-]{0,62}$"
+        - name: from
+          in: query
+          required: true
+          description: When the window starts.
+          schema:
+            type: string
+            format: date-time
+            maxLength: 64
+        - name: to
+          in: query
+          required: true
+          description: When the window ends; at most two hours after it starts.
+          schema:
+            type: string
+            format: date-time
+            maxLength: 64
+      responses:
+        "200":
+          description: The window.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RolloutWindow"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/checks:
     get:
       operationId: listChecks
@@ -1866,6 +1918,94 @@ components:
           description: The blocks.
           items:
             $ref: "#/components/schemas/HealthBlock"
+    ReadinessCheck:
+      description: Whether a pod was ready at one moment.
+      type: object
+      additionalProperties: false
+      required: [at, ready]
+      properties:
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When.
+        ready:
+          type: boolean
+          description: Whether it was ready.
+    PodSpan:
+      description: One pod over a release's window.
+      type: object
+      additionalProperties: false
+      required: [pod, process, checks]
+      properties:
+        pod:
+          type: string
+          maxLength: 253
+          description: The pod.
+        process:
+          type: string
+          maxLength: 63
+          description: The Process, from the pod's name, Flagger's -primary taken off.
+        start:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was first seen in the window.
+        ready:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it first turned ready in the window.
+        end:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it was last seen, where it was gone before the window ended.
+        checks:
+          type: array
+          maxItems: 1440
+          description: Its readiness every five seconds, oldest first.
+          items:
+            $ref: "#/components/schemas/ReadinessCheck"
+    CanaryWeight:
+      description: The share of traffic Flagger sent a Process's canary at one moment.
+      type: object
+      additionalProperties: false
+      required: [process, at, weight]
+      properties:
+        process:
+          type: string
+          maxLength: 63
+          description: The Process.
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When.
+        weight:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+          description: The canary's share, in percent.
+    RolloutWindow:
+      description: What a Project's pods and canaries did over a window.
+      type: object
+      additionalProperties: false
+      required: [pods, weights]
+      properties:
+        pods:
+          type: array
+          maxItems: 200
+          description: The pods, by Process then start.
+          items:
+            $ref: "#/components/schemas/PodSpan"
+        weights:
+          type: array
+          maxItems: 10000
+          description: Each change of a canary's weight, oldest first.
+          items:
+            $ref: "#/components/schemas/CanaryWeight"
     CheckCondition:
       description: One condition a probe holds an answer to.
       type: object

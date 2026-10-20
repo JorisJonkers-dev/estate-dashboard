@@ -17,6 +17,10 @@ type GetReleaseNotesRes interface {
 	getReleaseNotesRes()
 }
 
+type GetRolloutWindowRes interface {
+	getRolloutWindowRes()
+}
+
 type GetSessionRes interface {
 	getSessionRes()
 }

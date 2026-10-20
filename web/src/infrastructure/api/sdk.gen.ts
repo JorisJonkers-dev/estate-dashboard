@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetDeclarationData, GetDeclarationErrors, GetDeclarationResponses, GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetReleaseNotesData, GetReleaseNotesErrors, GetReleaseNotesResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListChecksData, ListChecksErrors, ListChecksResponses, ListCompositionRunsData, ListCompositionRunsErrors, ListCompositionRunsResponses, ListContainerHistoryData, ListContainerHistoryErrors, ListContainerHistoryResponses, ListContainersData, ListContainersErrors, ListContainersResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListLogLinesData, ListLogLinesErrors, ListLogLinesResponses, ListLogStreamsData, ListLogStreamsErrors, ListLogStreamsResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListPodsData, ListPodsErrors, ListPodsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, ListUpdatesData, ListUpdatesErrors, ListUpdatesResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
-import { zGetDeclarationPath, zGetDeclarationResponse, zGetHandoverResponse, zGetHealthPath, zGetHealthQuery, zGetHealthResponse, zGetReleaseNotesQuery, zGetReleaseNotesResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListChecksResponse, zListCompositionRunsResponse, zListContainerHistoryQuery, zListContainerHistoryResponse, zListContainersResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListLogLinesPath, zListLogLinesQuery, zListLogLinesResponse, zListLogStreamsPath, zListLogStreamsQuery, zListLogStreamsResponse, zListPinsResponse, zListPodsPath, zListPodsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zListUpdatesResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
+import type { GetDeclarationData, GetDeclarationErrors, GetDeclarationResponses, GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetReleaseNotesData, GetReleaseNotesErrors, GetReleaseNotesResponses, GetRolloutWindowData, GetRolloutWindowErrors, GetRolloutWindowResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListChecksData, ListChecksErrors, ListChecksResponses, ListCompositionRunsData, ListCompositionRunsErrors, ListCompositionRunsResponses, ListContainerHistoryData, ListContainerHistoryErrors, ListContainerHistoryResponses, ListContainersData, ListContainersErrors, ListContainersResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListLogLinesData, ListLogLinesErrors, ListLogLinesResponses, ListLogStreamsData, ListLogStreamsErrors, ListLogStreamsResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListPodsData, ListPodsErrors, ListPodsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, ListUpdatesData, ListUpdatesErrors, ListUpdatesResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
+import { zGetDeclarationPath, zGetDeclarationResponse, zGetHandoverResponse, zGetHealthPath, zGetHealthQuery, zGetHealthResponse, zGetReleaseNotesQuery, zGetReleaseNotesResponse, zGetRolloutWindowPath, zGetRolloutWindowQuery, zGetRolloutWindowResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListChecksResponse, zListCompositionRunsResponse, zListContainerHistoryQuery, zListContainerHistoryResponse, zListContainersResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListLogLinesPath, zListLogLinesQuery, zListLogLinesResponse, zListLogStreamsPath, zListLogStreamsQuery, zListLogStreamsResponse, zListPinsResponse, zListPodsPath, zListPodsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zListUpdatesResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -463,6 +463,27 @@ export const getHealth = <ThrowOnError extends boolean = false>(options: Options
             type: 'apiKey'
         }],
     url: '/api/v1/health/projects/{project}',
+    ...options
+});
+
+/**
+ * What a Project's pods and canaries did over a release's window
+ *
+ * Every pod of the Project Prometheus saw from `from` to `to`: when it started, when it first turned ready, when it was last seen, and its readiness every five seconds; and each Process's canary weight as Flagger moved it. The dashboard joins this with the release's stages and the Release Gate's record to show how the release rolled out. A 503 means Prometheus did not answer, or the dashboard runs without one.
+ */
+export const getRolloutWindow = <ThrowOnError extends boolean = false>(options: Options<GetRolloutWindowData, ThrowOnError>): RequestResult<GetRolloutWindowResponses, GetRolloutWindowErrors, ThrowOnError> => (options.client ?? client).get<GetRolloutWindowResponses, GetRolloutWindowErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetRolloutWindowPath,
+        query: zGetRolloutWindowQuery
+    }).parseAsync(data),
+    responseValidator: async (data) => await zGetRolloutWindowResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/health/projects/{project}/rollout',
     ...options
 });
 

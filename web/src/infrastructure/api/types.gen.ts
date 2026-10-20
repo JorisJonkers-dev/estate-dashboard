@@ -988,6 +988,82 @@ export type HealthTimeline = {
 };
 
 /**
+ * Whether a pod was ready at one moment.
+ */
+export type ReadinessCheck = {
+    /**
+     * When.
+     */
+    at: string;
+    /**
+     * Whether it was ready.
+     */
+    ready: boolean;
+};
+
+/**
+ * One pod over a release's window.
+ */
+export type PodSpan = {
+    /**
+     * The pod.
+     */
+    pod: string;
+    /**
+     * The Process, from the pod's name, Flagger's -primary taken off.
+     */
+    process: string;
+    /**
+     * When it was first seen in the window.
+     */
+    start?: string;
+    /**
+     * When it first turned ready in the window.
+     */
+    ready?: string;
+    /**
+     * When it was last seen, where it was gone before the window ended.
+     */
+    end?: string;
+    /**
+     * Its readiness every five seconds, oldest first.
+     */
+    checks: Array<ReadinessCheck>;
+};
+
+/**
+ * The share of traffic Flagger sent a Process's canary at one moment.
+ */
+export type CanaryWeight = {
+    /**
+     * The Process.
+     */
+    process: string;
+    /**
+     * When.
+     */
+    at: string;
+    /**
+     * The canary's share, in percent.
+     */
+    weight: number;
+};
+
+/**
+ * What a Project's pods and canaries did over a window.
+ */
+export type RolloutWindow = {
+    /**
+     * The pods, by Process then start.
+     */
+    pods: Array<PodSpan>;
+    /**
+     * Each change of a canary's weight, oldest first.
+     */
+    weights: Array<CanaryWeight>;
+};
+
+/**
  * One condition a probe holds an answer to.
  */
 export type CheckCondition = {
@@ -2103,6 +2179,57 @@ export type GetHealthResponses = {
 };
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
+
+export type GetRolloutWindowData = {
+    body?: never;
+    path: {
+        /**
+         * The Project.
+         */
+        project: string;
+    };
+    query: {
+        /**
+         * When the window starts.
+         */
+        from: string;
+        /**
+         * When the window ends; at most two hours after it starts.
+         */
+        to: string;
+    };
+    url: '/api/v1/health/projects/{project}/rollout';
+};
+
+export type GetRolloutWindowErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    400: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type GetRolloutWindowError = GetRolloutWindowErrors[keyof GetRolloutWindowErrors];
+
+export type GetRolloutWindowResponses = {
+    /**
+     * The window.
+     */
+    200: RolloutWindow;
+};
+
+export type GetRolloutWindowResponse = GetRolloutWindowResponses[keyof GetRolloutWindowResponses];
 
 export type ListChecksData = {
     body?: never;

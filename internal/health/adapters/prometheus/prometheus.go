@@ -90,13 +90,38 @@ type rangeAnswer struct {
 	Status string `json:"status"`
 	Data   struct {
 		Result []struct {
-			Values [][2]any `json:"values"`
+			Metric map[string]string `json:"metric"`
+			Values [][2]any          `json:"values"`
 		} `json:"result"`
 	} `json:"data"`
 }
 
 // series runs one range query whose answer is one series, by the second each value is at.
 func (p *Prometheus) series(ctx context.Context, query string, start, end time.Time, step time.Duration) (map[time.Time]float64, error) {
+	all, err := p.matrix(ctx, query, "", start, end, step)
+	if err != nil {
+		return nil, err
+	}
+	return all[""], nil
+}
+
+// Rollout implements domain.Metrics: each pod's readiness and each canary's weight in the
+// Project's namespace.
+func (p *Prometheus) Rollout(ctx context.Context, project string, start, end time.Time, step time.Duration) (domain.Series, domain.Series, error) {
+	namespace := project + "-system"
+	readiness, err := p.matrix(ctx, fmt.Sprintf(`kube_pod_status_ready{namespace=%q,condition="true"}`, namespace), "pod", start, end, step)
+	if err != nil {
+		return nil, nil, err
+	}
+	weights, err := p.matrix(ctx, fmt.Sprintf(`flagger_canary_weight{namespace=%q}`, namespace), "name", start, end, step)
+	if err != nil {
+		return nil, nil, err
+	}
+	return readiness, weights, nil
+}
+
+// matrix runs one range query, its series by the value of label; every series under "" without one.
+func (p *Prometheus) matrix(ctx context.Context, query, label string, start, end time.Time, step time.Duration) (domain.Series, error) {
 	u := p.base.JoinPath("/api/v1/query_range")
 	u.RawQuery = url.Values{
 		"query": {query},
@@ -120,8 +145,12 @@ func (p *Prometheus) series(ctx context.Context, query string, start, end time.T
 	if err := json.NewDecoder(io.LimitReader(res.Body, maxBody)).Decode(&answer); err != nil || answer.Status != "success" {
 		return nil, fmt.Errorf("prometheus: read the answer: %w", errors.Join(err, errStatus))
 	}
-	out := map[time.Time]float64{}
+	out := domain.Series{}
 	for _, r := range answer.Data.Result {
+		key := r.Metric[label]
+		if out[key] == nil {
+			out[key] = map[time.Time]float64{}
+		}
 		for _, pair := range r.Values {
 			at, okAt := pair[0].(float64)
 			text, okValue := pair[1].(string)
@@ -129,7 +158,7 @@ func (p *Prometheus) series(ctx context.Context, query string, start, end time.T
 			if !okAt || !okValue || err != nil {
 				continue
 			}
-			out[time.Unix(int64(at), 0).UTC()] = v
+			out[key][time.Unix(int64(at), 0).UTC()] = v
 		}
 	}
 	return out, nil
@@ -140,6 +169,11 @@ func (p *Prometheus) series(ctx context.Context, query string, start, end time.T
 type Absent struct{}
 
 var _ domain.Metrics = Absent{}
+
+// Rollout implements domain.Metrics.
+func (Absent) Rollout(context.Context, string, time.Time, time.Time, time.Duration) (domain.Series, domain.Series, error) {
+	return nil, nil, domain.ErrNoMetrics
+}
 
 // Samples implements domain.Metrics.
 func (Absent) Samples(context.Context, string, []string, time.Time, time.Time, time.Duration) (map[time.Time]domain.Sample, error) {

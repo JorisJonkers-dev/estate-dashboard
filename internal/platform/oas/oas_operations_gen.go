@@ -10,6 +10,7 @@ const (
 	GetHandoverOperation          OperationName = "GetHandover"
 	GetHealthOperation            OperationName = "GetHealth"
 	GetReleaseNotesOperation      OperationName = "GetReleaseNotes"
+	GetRolloutWindowOperation     OperationName = "GetRolloutWindow"
 	GetSessionOperation           OperationName = "GetSession"
 	ListAlertHistoryOperation     OperationName = "ListAlertHistory"
 	ListAlertsOperation           OperationName = "ListAlerts"

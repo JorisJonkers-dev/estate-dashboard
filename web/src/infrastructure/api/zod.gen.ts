@@ -479,6 +479,43 @@ export const zHealthTimeline = z.object({
 });
 
 /**
+ * Whether a pod was ready at one moment.
+ */
+export const zReadinessCheck = z.object({
+    at: z.iso.datetime({ offset: true }).max(64),
+    ready: z.boolean()
+});
+
+/**
+ * One pod over a release's window.
+ */
+export const zPodSpan = z.object({
+    pod: z.string().max(253),
+    process: z.string().max(63),
+    start: z.iso.datetime({ offset: true }).max(64).optional(),
+    ready: z.iso.datetime({ offset: true }).max(64).optional(),
+    end: z.iso.datetime({ offset: true }).max(64).optional(),
+    checks: z.array(zReadinessCheck).max(1440)
+});
+
+/**
+ * The share of traffic Flagger sent a Process's canary at one moment.
+ */
+export const zCanaryWeight = z.object({
+    process: z.string().max(63),
+    at: z.iso.datetime({ offset: true }).max(64),
+    weight: z.int().gte(0).lte(100)
+});
+
+/**
+ * What a Project's pods and canaries did over a window.
+ */
+export const zRolloutWindow = z.object({
+    pods: z.array(zPodSpan).max(200),
+    weights: z.array(zCanaryWeight).max(10000)
+});
+
+/**
  * One condition a probe holds an answer to.
  */
 export const zCheckCondition = z.object({
@@ -807,6 +844,20 @@ export const zGetHealthQuery = z.object({
  * The timeline.
  */
 export const zGetHealthResponse = zHealthTimeline;
+
+export const zGetRolloutWindowPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+export const zGetRolloutWindowQuery = z.object({
+    from: z.iso.datetime({ offset: true }).max(64),
+    to: z.iso.datetime({ offset: true }).max(64)
+});
+
+/**
+ * The window.
+ */
+export const zGetRolloutWindowResponse = zRolloutWindow;
 
 /**
  * What the monitor holds.
