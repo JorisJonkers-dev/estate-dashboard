@@ -90,6 +90,71 @@ describe('what the cluster holds for a Project', () => {
     ])
   })
 
+  it('says what the source pins and what Flux fetched, and what each unit applies', () => {
+    const [source, unit] = clusterRows(
+      'arr',
+      [
+        {
+          name: 'project-arr',
+          url: 'oci://ghcr.io/jorisjonkers-dev/render/arr',
+          digest: 'sha256:234dca054d57e22d',
+          revision: 'sha256:234dca054d57e22d',
+          ready: true,
+        },
+      ],
+      [
+        {
+          name: 'apps-arr',
+          source: 'project-arr',
+          path: './apps/arr',
+          dependsOn: ['estate-vso-secrets'],
+          applied: 'sha256:234dca054d57e22d',
+          version: '1.0.4',
+          repository: 'JorisJonkers-dev/arr',
+          ready: true,
+        },
+      ],
+      [],
+    )
+    expect(source?.facts).toEqual([
+      ['Artifact', 'ghcr.io/jorisjonkers-dev/render/arr'],
+      ['Pinned', '234dca054d57'],
+      ['Fetched', '234dca054d57'],
+    ])
+    expect(unit?.facts).toEqual([
+      ['Release', '1.0.4 from JorisJonkers-dev/arr'],
+      ['Path', './apps/arr'],
+      ['Applied', '234dca054d57'],
+      ['After', 'estate-vso-secrets'],
+    ])
+  })
+
+  it('names a release without its repository, and a source or unit Flux has not touched', () => {
+    const [source, unit] = clusterRows(
+      'arr',
+      [{ name: 'project-arr', url: 'oci://r', digest: 'sha256:a', ready: false }],
+      [{ name: 'apps-arr', source: 'project-arr', path: './', dependsOn: [], version: '1.0.4', ready: false }],
+      [],
+    )
+    expect(source?.facts).toContainEqual(['Fetched', 'nothing yet'])
+    expect(unit?.facts).toEqual([
+      ['Release', '1.0.4'],
+      ['Path', './'],
+      ['Applied', 'nothing yet'],
+    ])
+  })
+
+  it('says when Flux has not fetched or applied the pin yet', () => {
+    const [source, unit] = clusterRows(
+      'arr',
+      [{ name: 'project-arr', url: 'oci://r', digest: 'sha256:new', revision: 'sha256:old', ready: true }],
+      [{ name: 'apps-arr', source: 'project-arr', path: './', dependsOn: [], applied: 'sha256:old', ready: true }],
+      [],
+    )
+    expect(source).toMatchObject({ word: 'Fetching', tone: 'info' })
+    expect(unit).toMatchObject({ word: 'Applying', tone: 'info' })
+  })
+
   it('names a source that is not ready, and why', () => {
     const [row] = clusterRows(
       'a',

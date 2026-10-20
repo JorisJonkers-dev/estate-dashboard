@@ -14,8 +14,13 @@ type cluster struct {
 	sources   []domain.Source
 	units     []domain.Unit
 	releases  []domain.Release
+	pods      map[string][]domain.Pod
 	truncated bool
 	err       error
+}
+
+func (c cluster) Pods(_ context.Context, namespace string) (domain.Page[domain.Pod], error) {
+	return domain.Page[domain.Pod]{Items: c.pods[namespace]}, c.err
 }
 
 func (c cluster) Sources(context.Context) (domain.Page[domain.Source], error) {
@@ -78,5 +83,32 @@ func TestEveryReadReportsTheClustersFailure(t *testing.T) {
 		if !errors.Is(err, domain.ErrNoCluster) {
 			t.Fatalf("error = %v", err)
 		}
+	}
+}
+
+func TestAProjectsPodsAreReadFromItsNamespaceByProcessThenName(t *testing.T) {
+	s := app.New(cluster{pods: map[string][]domain.Pod{
+		"arr-system":      {{Name: "sonarr-1", Process: "sonarr"}, {Name: "radarr-2", Process: "radarr"}, {Name: "radarr-1", Process: "radarr"}},
+		"grimoire-system": {{Name: "grimoire-1", Process: "grimoire"}},
+	}})
+	pods, err := s.Pods(t.Context(), "arr")
+	var names []string
+	for _, p := range pods.Items {
+		names = append(names, p.Name)
+	}
+	if err != nil || !slices.Equal(names, []string{"radarr-1", "radarr-2", "sonarr-1"}) {
+		t.Fatalf("pods %v, %v", names, err)
+	}
+}
+
+func TestAProjectThatCannotBeOneReadsNoPods(t *testing.T) {
+	if _, err := app.New(cluster{}).Pods(t.Context(), "Not/A-Project"); !errors.Is(err, app.ErrNotAProject) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestReadingPodsReportsTheClustersFailure(t *testing.T) {
+	if _, err := app.New(cluster{err: domain.ErrNoCluster}).Pods(t.Context(), "arr"); !errors.Is(err, domain.ErrNoCluster) {
+		t.Fatalf("error = %v", err)
 	}
 }

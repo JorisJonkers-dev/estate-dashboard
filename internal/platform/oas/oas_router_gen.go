@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	rn29AllowedHeaders = map[string]string{
+	rn33AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
 )
@@ -161,7 +161,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn29AllowedHeaders,
+									allowedHeaders: rn33AllowedHeaders,
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -172,6 +172,31 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 					}
 
+				}
+
+			case 'c': // Prefix: "checks"
+
+				if l := len("checks"); len(elem) >= l && elem[0:l] == "checks" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					// Leaf node.
+					switch r.Method {
+					case "GET":
+						s.handleListChecksRequest([0]string{}, elemIsEscaped, w, r)
+					default:
+						s.notAllowed(w, r, notAllowedParams{
+							allowedMethods: "GET",
+							allowedHeaders: nil,
+							acceptPost:     "",
+							acceptPatch:    "",
+						})
+					}
+
+					return
 				}
 
 			case 'd': // Prefix: "delivery/"
@@ -186,6 +211,56 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 				switch elem[0] {
+				case 'p': // Prefix: "projects/"
+
+					if l := len("projects/"); len(elem) >= l && elem[0:l] == "projects/" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					// Param: "project"
+					// Match until "/"
+					idx := strings.IndexByte(elem, '/')
+					if idx < 0 {
+						idx = len(elem)
+					}
+					args[0] = elem[:idx]
+					elem = elem[idx:]
+
+					if len(elem) == 0 {
+						break
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/pods"
+
+						if l := len("/pods"); len(elem) >= l && elem[0:l] == "/pods" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleListPodsRequest([1]string{
+									args[0],
+								}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: nil,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
+					}
+
 				case 'r': // Prefix: "releases"
 
 					if l := len("releases"); len(elem) >= l && elem[0:l] == "releases" {
@@ -856,6 +931,31 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 
 				}
 
+			case 'c': // Prefix: "checks"
+
+				if l := len("checks"); len(elem) >= l && elem[0:l] == "checks" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					// Leaf node.
+					switch method {
+					case "GET":
+						r.name = ListChecksOperation
+						r.summary = "List the uptime checks"
+						r.operationID = "listChecks"
+						r.operationGroup = ""
+						r.pathPattern = "/api/v1/checks"
+						r.args = args
+						r.count = 0
+						return r, true
+					default:
+						return
+					}
+				}
+
 			case 'd': // Prefix: "delivery/"
 
 				if l := len("delivery/"); len(elem) >= l && elem[0:l] == "delivery/" {
@@ -868,6 +968,54 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					break
 				}
 				switch elem[0] {
+				case 'p': // Prefix: "projects/"
+
+					if l := len("projects/"); len(elem) >= l && elem[0:l] == "projects/" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					// Param: "project"
+					// Match until "/"
+					idx := strings.IndexByte(elem, '/')
+					if idx < 0 {
+						idx = len(elem)
+					}
+					args[0] = elem[:idx]
+					elem = elem[idx:]
+
+					if len(elem) == 0 {
+						break
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/pods"
+
+						if l := len("/pods"); len(elem) >= l && elem[0:l] == "/pods" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = ListPodsOperation
+								r.summary = "List the pods a Project runs"
+								r.operationID = "listPods"
+								r.operationGroup = ""
+								r.pathPattern = "/api/v1/delivery/projects/{project}/pods"
+								r.args = args
+								r.count = 1
+								return r, true
+							default:
+								return
+							}
+						}
+
+					}
+
 				case 'r': // Prefix: "releases"
 
 					if l := len("releases"); len(elem) >= l && elem[0:l] == "releases" {

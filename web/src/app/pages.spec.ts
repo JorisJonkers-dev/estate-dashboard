@@ -101,9 +101,11 @@ describe('a project', () => {
     const { wrapper } = await visit('/projects/auth')
     const running = wrapper.get('#running-h').element.parentElement?.textContent ?? ''
     expect(running).toContain('3.4.2')
-    expect(running).toMatch(/auth-api\s*2 running/)
+    expect(running).toMatch(/auth-api\s*3 of 3 ready/)
     expect(running).toContain('Signs users in and issues their tokens.')
-    expect(running).toMatch(/liquibase\s*finished/)
+    expect(running).toMatch(/liquibase\s*Finished/)
+    expect(running).toContain('primary')
+    expect(running).toMatch(/probes\s*readiness liveness/)
     expect(wrapper.findAll('#releases-h ~ ol > li')).toHaveLength(3)
     expect(wrapper.get('#alerts-h').element.parentElement?.parentElement?.textContent).toContain(
       'auth switching to 3.5.0',
@@ -152,6 +154,42 @@ describe('a project', () => {
   it('says when no container runs', async () => {
     const { wrapper } = await visit('/projects/knowledge')
     expect(wrapper.text()).toContain('No container of knowledge is running.')
+    expect(wrapper.get('#health-h').text()).toContain('Down')
+  })
+
+  it('shows a crash-looping container, and the stack as down', async () => {
+    const { wrapper } = await visit('/projects/delivery')
+    const running = wrapper.get('#running-h').element.parentElement?.textContent ?? ''
+    expect(running).toContain('CrashLoopBackOff')
+    expect(running).toMatch(/flagger\s*0 of 1 ready/)
+    const health = wrapper.get('#health-h').element.parentElement?.textContent ?? ''
+    expect(health).toContain('Down')
+    expect(health).toMatch(/Containers\s*4 of 5 ready/)
+  })
+
+  it('shows the uptime checks that probe it, and the stack as down when one fails', async () => {
+    const { wrapper } = await visit('/projects/notes')
+    const online = wrapper.get('#online-h').element.parentElement?.textContent ?? ''
+    expect(online).toContain('notes.jorisjonkers.dev')
+    expect(online).toContain('context deadline exceeded')
+    expect(wrapper.get('#health-h').element.parentElement?.textContent).toMatch(/Online\s*1 of 1 down/)
+  })
+
+  it('says when the pods or the checks cannot be read', async () => {
+    const { wrapper } = await visit('/projects/auth', (r) =>
+      /\/pods$|\/checks$/.test(new URL(r.url).pathname) ? unavailable('down') : undefined,
+    )
+    expect(wrapper.get('#running-h').element.parentElement?.textContent).toContain('The cluster did not answer.')
+    expect(wrapper.get('#online-h').element.parentElement?.textContent).toContain('Gatus did not answer.')
+    expect(wrapper.get('#health-h').element.parentElement?.textContent).toMatch(/Containers\s*Not read/)
+  })
+
+  it('says what its source pins and what its unit applied', async () => {
+    const { wrapper } = await visit('/projects/auth')
+    const cluster = wrapper.get('#cluster-h').element.parentElement?.textContent ?? ''
+    expect(cluster).toContain('ghcr.io/jorisjonkers-dev/render/auth')
+    expect(cluster).toMatch(/Release\s*3\.4\.2 from JorisJonkers-dev\/auth-api/)
+    expect(cluster).toContain('./apps/auth')
   })
 })
 

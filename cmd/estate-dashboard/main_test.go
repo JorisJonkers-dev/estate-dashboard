@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/adapters/gateway"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/checks/adapters/gatus"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/pg/pgtest"
 )
 
@@ -71,6 +72,7 @@ func TestStartRefusesABadEnvironment(t *testing.T) {
 		"a short session key":  signedInThrough(anywhere, map[string]string{"DATABASE_URL": unreachable, "SESSION_KEY": "short"}),
 		"no Alertmanager URL":  {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": "alertmanager:9093"},
 		"half a gate address":  {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": "http://alertmanager:9093", "RELEASE_GATE_HOST": "release-gate"},
+		"no Gatus URL":         {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": "http://alertmanager:9093", "GATUS_URL": "gatus:80"},
 	}
 	for name, vars := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -92,6 +94,17 @@ func TestTheEnvironmentSaysWhichAlertmanagerToRead(t *testing.T) {
 	}
 	if _, _, err := readAlertmanager(env(map[string]string{"ALERTMANAGER_URL": "alertmanager:9093"})); err == nil {
 		t.Fatal("an Alertmanager that is no http(s) URL was read")
+	}
+}
+
+func TestTheEnvironmentSaysWhichUptimeMonitorToRead(t *testing.T) {
+	m, err := readGatus(env(map[string]string{}))
+	if _, absent := m.(gatus.Absent); err != nil || !absent {
+		t.Fatalf("without one: %T, %v", m, err)
+	}
+	m, err = readGatus(env(map[string]string{"GATUS_URL": "http://gatus.observability.svc.cluster.local"}))
+	if _, reads := m.(*gatus.Gatus); err != nil || !reads {
+		t.Fatalf("with one: %T, %v", m, err)
 	}
 }
 

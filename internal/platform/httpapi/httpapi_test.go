@@ -16,6 +16,10 @@ import (
 
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/app"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/domain"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/checks/adapters/gatus"
+	checksweb "github.com/JorisJonkers-dev/estate-dashboard/internal/checks/adapters/web"
+	checksapp "github.com/JorisJonkers-dev/estate-dashboard/internal/checks/app"
+	checksdomain "github.com/JorisJonkers-dev/estate-dashboard/internal/checks/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/adapters/cluster"
 	deliveryweb "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/adapters/web"
 	deliveryapp "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/app"
@@ -96,7 +100,12 @@ func serveEstate(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCa
 
 func serveLogs(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases, estate estateweb.UseCases, logs logsweb.UseCases) *httptest.Server {
 	t.Helper()
-	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l, delivery, estate, logs)
+	return serveChecks(t, repo, l, delivery, estate, logs, checksapp.New(gatus.Absent{}))
+}
+
+func serveChecks(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases, estate estateweb.UseCases, logs logsweb.UseCases, checks checksweb.UseCases) *httptest.Server {
+	t.Helper()
+	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l, delivery, estate, logs, checks)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +280,18 @@ type estate struct {
 	sources  []delivery.Source
 	units    []delivery.Unit
 	releases []delivery.Release
+	pods     []delivery.Pod
 	err      error
+}
+
+func (e estate) Pods(_ context.Context, namespace string) (delivery.Page[delivery.Pod], error) {
+	var in []delivery.Pod
+	for _, p := range e.pods {
+		if p.Namespace == namespace {
+			in = append(in, p)
+		}
+	}
+	return delivery.Page[delivery.Pod]{Items: in}, e.err
 }
 
 func (e estate) Sources(context.Context) (delivery.Page[delivery.Source], error) {
@@ -328,13 +348,96 @@ func TestTheClusterIsServedInTheContractsShape(t *testing.T) {
 	}
 }
 
+func TestAProjectsPodsAreServedInTheContractsShape(t *testing.T) {
+	started := time.Date(2026, 10, 19, 20, 0, 0, 0, time.UTC)
+	srv := serveAll(t, &memory{}, &live{}, deliveryapp.New(estate{pods: []delivery.Pod{
+		{
+			Namespace: "arr-system", Name: "radarr-1", Process: "radarr", Application: "arr", Version: "1.0.4", Owner: "ReplicaSet",
+			Node: "enschede-1", Phase: "Running", Started: &started, Ready: true,
+			Containers: []delivery.Container{{
+				Name: "radarr", Image: "radarr:5", Ready: true, State: delivery.Running, Since: &started, Restarts: 2,
+				Last:   &delivery.Termination{Reason: "OOMKilled", ExitCode: 137, At: &started},
+				Probes: delivery.Probes{Readiness: true, Liveness: true},
+			}},
+		},
+		{Namespace: "grimoire-system", Name: "grimoire-1", Process: "grimoire"},
+	}}))
+
+	got := call(t, srv, http.MethodGet, "/api/v1/delivery/projects/arr/pods", "", true)
+	items, _ := got.body["items"].([]any)
+	if got.code != http.StatusOK || len(items) != 1 {
+		t.Fatalf("pods = %d %v", got.code, got.body)
+	}
+	pod := items[0].(map[string]any)
+	container := pod["containers"].([]any)[0].(map[string]any)
+	if pod["version"] != "1.0.4" || pod["node"] != "enschede-1" || pod["ready"] != true || pod["started"] != "2026-10-19T20:00:00Z" {
+		t.Fatalf("pod = %v", pod)
+	}
+	if container["state"] != "running" || container["restarts"] != float64(2) || container["last"].(map[string]any)["reason"] != "OOMKilled" ||
+		container["probes"].(map[string]any)["liveness"] != true || container["probes"].(map[string]any)["startup"] != false {
+		t.Fatalf("container = %v", container)
+	}
+}
+
+func TestANameThatCannotBeAProjectRunsNoPods(t *testing.T) {
+	srv := serveAll(t, &memory{}, &live{}, deliveryapp.New(estate{}))
+	if got := call(t, srv, http.MethodGet, "/api/v1/delivery/projects/_x--/pods", "", true); got.code != http.StatusOK || len(got.body["items"].([]any)) != 0 {
+		t.Fatalf("pods = %d %v", got.code, got.body)
+	}
+}
+
+// monitor is an uptime monitor read in memory.
+type monitor struct {
+	checks []checksdomain.Check
+	err    error
+}
+
+func (m monitor) Checks(context.Context) ([]checksdomain.Check, error) { return m.checks, m.err }
+
+func TestTheChecksAreServedInTheContractsShape(t *testing.T) {
+	at := time.Date(2026, 10, 19, 21, 11, 18, 0, time.UTC)
+	srv := serveChecks(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(github.Absent{}), logsapp.New(loki.Absent{}, time.Now),
+		checksapp.New(monitor{checks: []checksdomain.Check{
+			{
+				Key: "home-media_radarr", Name: "radarr", Group: "home-media", Host: "radarr.arr-system.svc.cluster.local", At: &at, Up: true, Status: 200,
+				Duration: 206 * time.Millisecond, Conditions: []checksdomain.Condition{{Condition: "[STATUS] == 200", Success: true}}, Recent: []bool{false, true},
+			},
+			{Key: "g_new", Name: "new", Group: "g", Recent: []bool{}},
+		}}))
+	got := call(t, srv, http.MethodGet, "/api/v1/checks", "", true)
+	items, _ := got.body["items"].([]any)
+	if got.code != http.StatusOK || len(items) != 2 {
+		t.Fatalf("checks = %d %v", got.code, got.body)
+	}
+	if fresh := items[0].(map[string]any); fresh["name"] != "new" || fresh["up"] != false || fresh["at"] != nil || fresh["durationMs"] != nil {
+		t.Fatalf("an endpoint not yet probed = %v", fresh)
+	}
+	radarr := items[1].(map[string]any)
+	if radarr["up"] != true || radarr["status"] != float64(200) || radarr["durationMs"] != float64(206) || radarr["host"] != "radarr.arr-system.svc.cluster.local" ||
+		len(radarr["recent"].([]any)) != 2 || radarr["conditions"].([]any)[0].(map[string]any)["success"] != true {
+		t.Fatalf("radarr = %v", radarr)
+	}
+}
+
+func TestAMonitorThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
+	for want, uc := range map[string]checksweb.UseCases{
+		"The uptime monitor did not answer.":            checksapp.New(monitor{err: errors.New("timeout")}),
+		"The dashboard runs without an uptime monitor.": checksapp.New(gatus.Absent{}),
+	} {
+		srv := serveChecks(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(github.Absent{}), logsapp.New(loki.Absent{}, time.Now), uc)
+		if got := call(t, srv, http.MethodGet, "/api/v1/checks", "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
+			t.Fatalf("checks = %d %v", got.code, got.body)
+		}
+	}
+}
+
 func TestAClusterThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 	for want, uc := range map[string]deliveryweb.UseCases{
 		"The cluster did not answer.":                   deliveryapp.New(estate{err: errors.New("forbidden")}),
 		"The dashboard runs without a cluster to read.": deliveryapp.New(cluster.Absent{}),
 	} {
 		srv := serveAll(t, &memory{}, &live{}, uc)
-		for _, path := range []string{"/api/v1/delivery/sources", "/api/v1/delivery/units", "/api/v1/delivery/releases"} {
+		for _, path := range []string{"/api/v1/delivery/sources", "/api/v1/delivery/units", "/api/v1/delivery/releases", "/api/v1/delivery/projects/arr/pods"} {
 			if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
 				t.Fatalf("%s = %d %v", path, got.code, got.body)
 			}

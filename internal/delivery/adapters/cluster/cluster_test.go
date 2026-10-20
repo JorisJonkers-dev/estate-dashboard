@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -79,6 +80,7 @@ func kube(t *testing.T, releases string, custom ...runtime.Object) cluster.Kube 
 func kubeAsking(g *gate, custom ...runtime.Object) cluster.Kube {
 	kinds := map[schema.GroupVersionResource]string{
 		cluster.OCIRepositories: "OCIRepositoryList", cluster.Kustomizations: "KustomizationList", cluster.Canaries: "CanaryList",
+		cluster.Pods: "PodList",
 	}
 	address, _ := url.Parse(g.URL)
 	return cluster.Kube{
@@ -315,5 +317,123 @@ func TestWithoutAClusterEveryReadSaysSo(t *testing.T) {
 	in, err := cluster.Connect(func() (*rest.Config, error) { return &rest.Config{Host: "https://kubernetes.default.svc"}, nil }, "", nil, http.DefaultClient)
 	if _, isKube := in.(cluster.Kube); err != nil || !isKube {
 		t.Fatalf("in a cluster = %T, %v", in, err)
+	}
+}
+
+// pod is a pod as the API serves it: the render's labels, a spec of containers and a status.
+func pod(namespace, name string, labels map[string]string, spec, status map[string]any) *unstructured.Unstructured {
+	o := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1", "kind": "Pod",
+		"metadata": map[string]any{"name": name, "namespace": namespace},
+		"spec":     spec, "status": status,
+	}}
+	o.SetLabels(labels)
+	return o
+}
+
+func at(s string) *time.Time {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		panic(err)
+	}
+	return &t
+}
+
+var radarrLabels = map[string]string{
+	"app.kubernetes.io/managed-by": "deploy-kit", "app.kubernetes.io/name": "radarr",
+	"app.kubernetes.io/part-of": "arr", "app.kubernetes.io/version": "1.0.4",
+}
+
+func radarr() *unstructured.Unstructured {
+	p := pod("arr-system", "radarr-566dd79995-jc5mr", radarrLabels,
+		map[string]any{
+			"nodeName":       "enschede-1",
+			"initContainers": []any{map[string]any{"name": "config-restore", "image": "restic:1"}},
+			"containers": []any{map[string]any{
+				"name": "radarr", "image": "ghcr.io/x/radarr:5",
+				"readinessProbe": map[string]any{"httpGet": map[string]any{"path": "/ping"}},
+				"livenessProbe":  map[string]any{"httpGet": map[string]any{"path": "/ping"}},
+			}},
+		},
+		map[string]any{
+			"phase": "Running", "startTime": "2026-10-19T20:00:00Z",
+			"conditions": []any{
+				map[string]any{"type": "PodScheduled", "status": "True"},
+				map[string]any{"type": "Ready", "status": "True"},
+			},
+			"initContainerStatuses": []any{map[string]any{
+				"name": "config-restore", "ready": true, "restartCount": int64(0),
+				"state": map[string]any{"terminated": map[string]any{"reason": "Completed", "exitCode": int64(0), "finishedAt": "2026-10-19T20:00:05Z"}},
+			}},
+			"containerStatuses": []any{map[string]any{
+				"name": "radarr", "ready": true, "restartCount": int64(2),
+				"state":     map[string]any{"running": map[string]any{"startedAt": "2026-10-19T20:01:00Z"}},
+				"lastState": map[string]any{"terminated": map[string]any{"reason": "OOMKilled", "exitCode": int64(137), "finishedAt": "2026-10-19T20:00:50Z"}},
+			}},
+		})
+	p.SetOwnerReferences([]metav1.OwnerReference{{Kind: "ReplicaSet", Name: "radarr-566dd79995", APIVersion: "apps/v1"}})
+	return p
+}
+
+func TestAPodIsWhatItsSpecDeclaresAndWhatTheKubeletSaysOfIt(t *testing.T) {
+	k := kube(t, "", radarr())
+	page, err := k.Pods(t.Context(), "arr-system")
+	want := []domain.Pod{{
+		Namespace: "arr-system", Name: "radarr-566dd79995-jc5mr", Process: "radarr", Application: "arr", Version: "1.0.4",
+		Owner: "ReplicaSet", Node: "enschede-1", Phase: "Running", Started: at("2026-10-19T20:00:00Z"), Ready: true,
+		Containers: []domain.Container{
+			{Name: "config-restore", Image: "restic:1", Init: true, Ready: true, State: domain.Terminated, Reason: "Completed", Since: at("2026-10-19T20:00:05Z")},
+			{
+				Name: "radarr", Image: "ghcr.io/x/radarr:5", Ready: true, State: domain.Running, Since: at("2026-10-19T20:01:00Z"), Restarts: 2,
+				Last:   &domain.Termination{Reason: "OOMKilled", ExitCode: 137, At: at("2026-10-19T20:00:50Z")},
+				Probes: domain.Probes{Readiness: true, Liveness: true},
+			},
+		},
+	}}
+	if err != nil || !reflect.DeepEqual(page.Items, want) {
+		t.Fatalf("pods = %+v, %v", page.Items, err)
+	}
+}
+
+func TestAContainerThatWaitsSaysWhy(t *testing.T) {
+	waiting := pod("arr-system", "sonarr-1", radarrLabels,
+		map[string]any{"containers": []any{map[string]any{"name": "sonarr", "image": "s:1"}}},
+		map[string]any{
+			"phase": "Running",
+			"containerStatuses": []any{map[string]any{
+				"name": "sonarr", "ready": false, "restartCount": int64(9),
+				"state": map[string]any{"waiting": map[string]any{"reason": "CrashLoopBackOff", "message": "back-off 5m0s restarting failed container"}},
+			}},
+		})
+	k := kube(t, "", waiting)
+	page, err := k.Pods(t.Context(), "arr-system")
+	if err != nil || len(page.Items) != 1 || len(page.Items[0].Containers) != 1 {
+		t.Fatalf("pods = %+v, %v", page.Items, err)
+	}
+	got := page.Items[0].Containers[0]
+	want := domain.Container{Name: "sonarr", Image: "s:1", State: domain.Waiting, Reason: "CrashLoopBackOff", Message: "back-off 5m0s restarting failed container", Restarts: 9}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("container = %+v, want %+v", got, want)
+	}
+}
+
+func TestOnlyTheRendersPodsInTheNamespaceAreRead(t *testing.T) {
+	other := pod("grimoire-system", "grimoire-1", radarrLabels, map[string]any{}, map[string]any{})
+	unrendered := pod("arr-system", "debug", map[string]string{"run": "debug"}, map[string]any{}, map[string]any{})
+	k := kube(t, "", radarr(), other, unrendered)
+	page, err := k.Pods(t.Context(), "arr-system")
+	if err != nil || len(page.Items) != 1 || page.Items[0].Name != "radarr-566dd79995-jc5mr" {
+		t.Fatalf("pods = %+v, %v", page.Items, err)
+	}
+}
+
+func TestAPodShuttingDownSaysSo(t *testing.T) {
+	leaving := radarr()
+	now := metav1.Now()
+	leaving.SetDeletionTimestamp(&now)
+	k := kube(t, "", leaving)
+	page, err := k.Pods(t.Context(), "arr-system")
+	if err != nil || len(page.Items) != 1 || !page.Items[0].Deleting {
+		t.Fatalf("pods = %+v, %v", page.Items, err)
 	}
 }

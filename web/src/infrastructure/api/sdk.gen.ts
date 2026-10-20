@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetDeclarationData, GetDeclarationErrors, GetDeclarationResponses, GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetReleaseNotesData, GetReleaseNotesErrors, GetReleaseNotesResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListCompositionRunsData, ListCompositionRunsErrors, ListCompositionRunsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListLogLinesData, ListLogLinesErrors, ListLogLinesResponses, ListLogStreamsData, ListLogStreamsErrors, ListLogStreamsResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
-import { zGetDeclarationPath, zGetDeclarationResponse, zGetHandoverResponse, zGetReleaseNotesQuery, zGetReleaseNotesResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListCompositionRunsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListLogLinesPath, zListLogLinesQuery, zListLogLinesResponse, zListLogStreamsPath, zListLogStreamsQuery, zListLogStreamsResponse, zListPinsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
+import type { GetDeclarationData, GetDeclarationErrors, GetDeclarationResponses, GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetReleaseNotesData, GetReleaseNotesErrors, GetReleaseNotesResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListChecksData, ListChecksErrors, ListChecksResponses, ListCompositionRunsData, ListCompositionRunsErrors, ListCompositionRunsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListLogLinesData, ListLogLinesErrors, ListLogLinesResponses, ListLogStreamsData, ListLogStreamsErrors, ListLogStreamsResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListPodsData, ListPodsErrors, ListPodsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
+import { zGetDeclarationPath, zGetDeclarationResponse, zGetHandoverResponse, zGetReleaseNotesQuery, zGetReleaseNotesResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListChecksResponse, zListCompositionRunsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListLogLinesPath, zListLogLinesQuery, zListLogLinesResponse, zListLogStreamsPath, zListLogStreamsQuery, zListLogStreamsResponse, zListPinsResponse, zListPodsPath, zListPodsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -358,6 +358,48 @@ export const listReleases = <ThrowOnError extends boolean = false>(options?: Opt
             type: 'apiKey'
         }],
     url: '/api/v1/delivery/releases',
+    ...options
+});
+
+/**
+ * List the pods a Project runs
+ *
+ * Every pod the render's workloads run in the Project's namespace, by Process then name: where it runs, the release its label names, and each container's state, restarts and probes, as the kubelet reports them. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listPods = <ThrowOnError extends boolean = false>(options: Options<ListPodsData, ThrowOnError>): RequestResult<ListPodsResponses, ListPodsErrors, ThrowOnError> => (options.client ?? client).get<ListPodsResponses, ListPodsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zListPodsPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListPodsResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/delivery/projects/{project}/pods',
+    ...options
+});
+
+/**
+ * List the uptime checks
+ *
+ * Every endpoint the uptime monitor probes, by group then name, with its latest result and whether each recent probe succeeded. A 503 means the monitor did not answer, or the dashboard runs without one.
+ */
+export const listChecks = <ThrowOnError extends boolean = false>(options?: Options<ListChecksData, ThrowOnError>): RequestResult<ListChecksResponses, ListChecksErrors, ThrowOnError> => (options?.client ?? client).get<ListChecksResponses, ListChecksErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListChecksResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/checks',
     ...options
 });
 

@@ -66,9 +66,12 @@ applications:
         # anywhere is an Alertmanager silence, over HTTP, which no Kubernetes verb grants.
         api:
           reason: >-
-            the dashboard shows each Project's Flux source and unit and each member's Canary, so it
-            gets, lists and watches those, and nothing else
+            the dashboard shows each Project's Flux source and unit, each member's Canary and the
+            pods each Project runs, so it gets, lists and watches those, and nothing else
           rules:
+            - group: core
+              objects: [pods]
+              verbs: [get, list, watch]
             - group: source.toolkit.fluxcd.io
               objects: [ocirepositories]
               verbs: [get, list, watch]

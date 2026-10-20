@@ -334,6 +334,191 @@ func (s *AlertList) SetItems(val []Alert) {
 
 func (*AlertList) listAlertsRes() {}
 
+// One endpoint the uptime monitor probes, and its latest result.
+// Ref: #/components/schemas/Check
+type Check struct {
+	// The monitor's name for the endpoint, unique across groups.
+	Key string `json:"key"`
+	// The endpoint.
+	Name string `json:"name"`
+	// The group it is shown in.
+	Group string `json:"group"`
+	// The host the probe reached.
+	Host OptString `json:"host"`
+	// When it last probed; absent before its first probe.
+	At OptDateTime `json:"at"`
+	// Whether the latest probe succeeded.
+	Up bool `json:"up"`
+	// The HTTP status the latest probe got, where it got one.
+	Status OptInt32 `json:"status"`
+	// How long the latest probe took, in milliseconds.
+	DurationMs OptInt64 `json:"durationMs"`
+	// Why the latest probe failed, where the monitor says.
+	Error OptString `json:"error"`
+	// The latest probe's conditions.
+	Conditions []CheckCondition `json:"conditions"`
+	// Whether each of the latest probes succeeded, oldest first.
+	Recent []bool `json:"recent"`
+}
+
+// GetKey returns the value of Key.
+func (s *Check) GetKey() string {
+	return s.Key
+}
+
+// GetName returns the value of Name.
+func (s *Check) GetName() string {
+	return s.Name
+}
+
+// GetGroup returns the value of Group.
+func (s *Check) GetGroup() string {
+	return s.Group
+}
+
+// GetHost returns the value of Host.
+func (s *Check) GetHost() OptString {
+	return s.Host
+}
+
+// GetAt returns the value of At.
+func (s *Check) GetAt() OptDateTime {
+	return s.At
+}
+
+// GetUp returns the value of Up.
+func (s *Check) GetUp() bool {
+	return s.Up
+}
+
+// GetStatus returns the value of Status.
+func (s *Check) GetStatus() OptInt32 {
+	return s.Status
+}
+
+// GetDurationMs returns the value of DurationMs.
+func (s *Check) GetDurationMs() OptInt64 {
+	return s.DurationMs
+}
+
+// GetError returns the value of Error.
+func (s *Check) GetError() OptString {
+	return s.Error
+}
+
+// GetConditions returns the value of Conditions.
+func (s *Check) GetConditions() []CheckCondition {
+	return s.Conditions
+}
+
+// GetRecent returns the value of Recent.
+func (s *Check) GetRecent() []bool {
+	return s.Recent
+}
+
+// SetKey sets the value of Key.
+func (s *Check) SetKey(val string) {
+	s.Key = val
+}
+
+// SetName sets the value of Name.
+func (s *Check) SetName(val string) {
+	s.Name = val
+}
+
+// SetGroup sets the value of Group.
+func (s *Check) SetGroup(val string) {
+	s.Group = val
+}
+
+// SetHost sets the value of Host.
+func (s *Check) SetHost(val OptString) {
+	s.Host = val
+}
+
+// SetAt sets the value of At.
+func (s *Check) SetAt(val OptDateTime) {
+	s.At = val
+}
+
+// SetUp sets the value of Up.
+func (s *Check) SetUp(val bool) {
+	s.Up = val
+}
+
+// SetStatus sets the value of Status.
+func (s *Check) SetStatus(val OptInt32) {
+	s.Status = val
+}
+
+// SetDurationMs sets the value of DurationMs.
+func (s *Check) SetDurationMs(val OptInt64) {
+	s.DurationMs = val
+}
+
+// SetError sets the value of Error.
+func (s *Check) SetError(val OptString) {
+	s.Error = val
+}
+
+// SetConditions sets the value of Conditions.
+func (s *Check) SetConditions(val []CheckCondition) {
+	s.Conditions = val
+}
+
+// SetRecent sets the value of Recent.
+func (s *Check) SetRecent(val []bool) {
+	s.Recent = val
+}
+
+// One condition a probe holds an answer to.
+// Ref: #/components/schemas/CheckCondition
+type CheckCondition struct {
+	// The condition, as the monitor writes it.
+	Condition string `json:"condition"`
+	// Whether the answer held it.
+	Success bool `json:"success"`
+}
+
+// GetCondition returns the value of Condition.
+func (s *CheckCondition) GetCondition() string {
+	return s.Condition
+}
+
+// GetSuccess returns the value of Success.
+func (s *CheckCondition) GetSuccess() bool {
+	return s.Success
+}
+
+// SetCondition sets the value of Condition.
+func (s *CheckCondition) SetCondition(val string) {
+	s.Condition = val
+}
+
+// SetSuccess sets the value of Success.
+func (s *CheckCondition) SetSuccess(val bool) {
+	s.Success = val
+}
+
+// The uptime checks, by group then name.
+// Ref: #/components/schemas/CheckList
+type CheckList struct {
+	// The checks.
+	Items []Check `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *CheckList) GetItems() []Check {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *CheckList) SetItems(val []Check) {
+	s.Items = val
+}
+
+func (*CheckList) listChecksRes() {}
+
 // One fragment a run read.
 // Ref: #/components/schemas/CompositionFragment
 type CompositionFragment struct {
@@ -1248,6 +1433,14 @@ type ListAlertsUnauthorized ProblemStatusCode
 
 func (*ListAlertsUnauthorized) listAlertsRes() {}
 
+type ListChecksServiceUnavailable ProblemStatusCode
+
+func (*ListChecksServiceUnavailable) listChecksRes() {}
+
+type ListChecksUnauthorized ProblemStatusCode
+
+func (*ListChecksUnauthorized) listChecksRes() {}
+
 type ListCompositionRunsServiceUnavailable ProblemStatusCode
 
 func (*ListCompositionRunsServiceUnavailable) listCompositionRunsRes() {}
@@ -1295,6 +1488,14 @@ func (*ListPinsServiceUnavailable) listPinsRes() {}
 type ListPinsUnauthorized ProblemStatusCode
 
 func (*ListPinsUnauthorized) listPinsRes() {}
+
+type ListPodsServiceUnavailable ProblemStatusCode
+
+func (*ListPodsServiceUnavailable) listPodsRes() {}
+
+type ListPodsUnauthorized ProblemStatusCode
+
+func (*ListPodsUnauthorized) listPodsRes() {}
 
 type ListReleasesServiceUnavailable ProblemStatusCode
 
@@ -1613,6 +1814,52 @@ func (o OptInt32) Or(d int32) int32 {
 	return d
 }
 
+// NewOptInt64 returns new OptInt64 with value set to v.
+func NewOptInt64(v int64) OptInt64 {
+	return OptInt64{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInt64 is optional int64.
+type OptInt64 struct {
+	Value int64
+	Set   bool
+}
+
+// IsSet returns true if OptInt64 was set.
+func (o OptInt64) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInt64) Reset() {
+	var v int64
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInt64) SetTo(v int64) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInt64) Get() (v int64, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInt64) Or(d int64) int64 {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPause returns new OptPause with value set to v.
 func NewOptPause(v Pause) OptPause {
 	return OptPause{
@@ -1653,6 +1900,52 @@ func (o OptPause) Get() (v Pause, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptPause) Or(d Pause) Pause {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPodContainerState returns new OptPodContainerState with value set to v.
+func NewOptPodContainerState(v PodContainerState) OptPodContainerState {
+	return OptPodContainerState{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPodContainerState is optional PodContainerState.
+type OptPodContainerState struct {
+	Value PodContainerState
+	Set   bool
+}
+
+// IsSet returns true if OptPodContainerState was set.
+func (o OptPodContainerState) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPodContainerState) Reset() {
+	var v PodContainerState
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPodContainerState) SetTo(v PodContainerState) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPodContainerState) Get() (v PodContainerState, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPodContainerState) Or(d PodContainerState) PodContainerState {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -1797,6 +2090,52 @@ func (o OptString) Or(d string) string {
 	return d
 }
 
+// NewOptTermination returns new OptTermination with value set to v.
+func NewOptTermination(v Termination) OptTermination {
+	return OptTermination{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTermination is optional Termination.
+type OptTermination struct {
+	Value Termination
+	Set   bool
+}
+
+// IsSet returns true if OptTermination was set.
+func (o OptTermination) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTermination) Reset() {
+	var v Termination
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTermination) SetTo(v Termination) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTermination) Get() (v Termination, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTermination) Or(d Termination) Termination {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // What a Pause or a Rollback recorded on a pin.
 // Ref: #/components/schemas/Pause
 type Pause struct {
@@ -1907,6 +2246,399 @@ func (s *PinList) SetItems(val []Pin) {
 }
 
 func (*PinList) listPinsRes() {}
+
+// One pod a Project runs.
+// Ref: #/components/schemas/Pod
+type Pod struct {
+	// The pod.
+	Name string `json:"name"`
+	// The Process, from its app.kubernetes.io/name label.
+	Process string `json:"process"`
+	// The Application, from its app.kubernetes.io/part-of label.
+	Application OptString `json:"application"`
+	// The release it runs, from its app.kubernetes.io/version label; absent without one.
+	Version OptString `json:"version"`
+	// The kind that made it, ReplicaSet, StatefulSet, DaemonSet or Job.
+	Owner OptString `json:"owner"`
+	// The node it runs on, once scheduled.
+	Node OptString `json:"node"`
+	// Its phase, Pending, Running, Succeeded or Failed.
+	Phase OptString `json:"phase"`
+	// When the kubelet started it.
+	Started OptDateTime `json:"started"`
+	// Whether its Ready condition holds.
+	Ready bool `json:"ready"`
+	// Whether it is shutting down.
+	Deleting bool `json:"deleting"`
+	// Its init containers, then its containers.
+	Containers []PodContainer `json:"containers"`
+}
+
+// GetName returns the value of Name.
+func (s *Pod) GetName() string {
+	return s.Name
+}
+
+// GetProcess returns the value of Process.
+func (s *Pod) GetProcess() string {
+	return s.Process
+}
+
+// GetApplication returns the value of Application.
+func (s *Pod) GetApplication() OptString {
+	return s.Application
+}
+
+// GetVersion returns the value of Version.
+func (s *Pod) GetVersion() OptString {
+	return s.Version
+}
+
+// GetOwner returns the value of Owner.
+func (s *Pod) GetOwner() OptString {
+	return s.Owner
+}
+
+// GetNode returns the value of Node.
+func (s *Pod) GetNode() OptString {
+	return s.Node
+}
+
+// GetPhase returns the value of Phase.
+func (s *Pod) GetPhase() OptString {
+	return s.Phase
+}
+
+// GetStarted returns the value of Started.
+func (s *Pod) GetStarted() OptDateTime {
+	return s.Started
+}
+
+// GetReady returns the value of Ready.
+func (s *Pod) GetReady() bool {
+	return s.Ready
+}
+
+// GetDeleting returns the value of Deleting.
+func (s *Pod) GetDeleting() bool {
+	return s.Deleting
+}
+
+// GetContainers returns the value of Containers.
+func (s *Pod) GetContainers() []PodContainer {
+	return s.Containers
+}
+
+// SetName sets the value of Name.
+func (s *Pod) SetName(val string) {
+	s.Name = val
+}
+
+// SetProcess sets the value of Process.
+func (s *Pod) SetProcess(val string) {
+	s.Process = val
+}
+
+// SetApplication sets the value of Application.
+func (s *Pod) SetApplication(val OptString) {
+	s.Application = val
+}
+
+// SetVersion sets the value of Version.
+func (s *Pod) SetVersion(val OptString) {
+	s.Version = val
+}
+
+// SetOwner sets the value of Owner.
+func (s *Pod) SetOwner(val OptString) {
+	s.Owner = val
+}
+
+// SetNode sets the value of Node.
+func (s *Pod) SetNode(val OptString) {
+	s.Node = val
+}
+
+// SetPhase sets the value of Phase.
+func (s *Pod) SetPhase(val OptString) {
+	s.Phase = val
+}
+
+// SetStarted sets the value of Started.
+func (s *Pod) SetStarted(val OptDateTime) {
+	s.Started = val
+}
+
+// SetReady sets the value of Ready.
+func (s *Pod) SetReady(val bool) {
+	s.Ready = val
+}
+
+// SetDeleting sets the value of Deleting.
+func (s *Pod) SetDeleting(val bool) {
+	s.Deleting = val
+}
+
+// SetContainers sets the value of Containers.
+func (s *Pod) SetContainers(val []PodContainer) {
+	s.Containers = val
+}
+
+// One container of a pod.
+// Ref: #/components/schemas/PodContainer
+type PodContainer struct {
+	// The container.
+	Name string `json:"name"`
+	// The image it runs.
+	Image string `json:"image"`
+	// Whether it is an init container, which runs to completion before the others start.
+	Init bool `json:"init"`
+	// Whether the kubelet reports it ready.
+	Ready bool `json:"ready"`
+	// What it is doing now; absent before the kubelet reports it.
+	State OptPodContainerState `json:"state"`
+	// Why it waits or ended, where the kubelet says.
+	Reason OptString `json:"reason"`
+	// The kubelet's message, where there is one.
+	Message OptString `json:"message"`
+	// When it started running, or ended.
+	Since OptDateTime `json:"since"`
+	// How often it restarted.
+	Restarts int32          `json:"restarts"`
+	Last     OptTermination `json:"last"`
+	Probes   Probes         `json:"probes"`
+}
+
+// GetName returns the value of Name.
+func (s *PodContainer) GetName() string {
+	return s.Name
+}
+
+// GetImage returns the value of Image.
+func (s *PodContainer) GetImage() string {
+	return s.Image
+}
+
+// GetInit returns the value of Init.
+func (s *PodContainer) GetInit() bool {
+	return s.Init
+}
+
+// GetReady returns the value of Ready.
+func (s *PodContainer) GetReady() bool {
+	return s.Ready
+}
+
+// GetState returns the value of State.
+func (s *PodContainer) GetState() OptPodContainerState {
+	return s.State
+}
+
+// GetReason returns the value of Reason.
+func (s *PodContainer) GetReason() OptString {
+	return s.Reason
+}
+
+// GetMessage returns the value of Message.
+func (s *PodContainer) GetMessage() OptString {
+	return s.Message
+}
+
+// GetSince returns the value of Since.
+func (s *PodContainer) GetSince() OptDateTime {
+	return s.Since
+}
+
+// GetRestarts returns the value of Restarts.
+func (s *PodContainer) GetRestarts() int32 {
+	return s.Restarts
+}
+
+// GetLast returns the value of Last.
+func (s *PodContainer) GetLast() OptTermination {
+	return s.Last
+}
+
+// GetProbes returns the value of Probes.
+func (s *PodContainer) GetProbes() Probes {
+	return s.Probes
+}
+
+// SetName sets the value of Name.
+func (s *PodContainer) SetName(val string) {
+	s.Name = val
+}
+
+// SetImage sets the value of Image.
+func (s *PodContainer) SetImage(val string) {
+	s.Image = val
+}
+
+// SetInit sets the value of Init.
+func (s *PodContainer) SetInit(val bool) {
+	s.Init = val
+}
+
+// SetReady sets the value of Ready.
+func (s *PodContainer) SetReady(val bool) {
+	s.Ready = val
+}
+
+// SetState sets the value of State.
+func (s *PodContainer) SetState(val OptPodContainerState) {
+	s.State = val
+}
+
+// SetReason sets the value of Reason.
+func (s *PodContainer) SetReason(val OptString) {
+	s.Reason = val
+}
+
+// SetMessage sets the value of Message.
+func (s *PodContainer) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetSince sets the value of Since.
+func (s *PodContainer) SetSince(val OptDateTime) {
+	s.Since = val
+}
+
+// SetRestarts sets the value of Restarts.
+func (s *PodContainer) SetRestarts(val int32) {
+	s.Restarts = val
+}
+
+// SetLast sets the value of Last.
+func (s *PodContainer) SetLast(val OptTermination) {
+	s.Last = val
+}
+
+// SetProbes sets the value of Probes.
+func (s *PodContainer) SetProbes(val Probes) {
+	s.Probes = val
+}
+
+// What it is doing now; absent before the kubelet reports it.
+type PodContainerState string
+
+const (
+	PodContainerStateRunning    PodContainerState = "running"
+	PodContainerStateWaiting    PodContainerState = "waiting"
+	PodContainerStateTerminated PodContainerState = "terminated"
+)
+
+// AllValues returns all PodContainerState values.
+func (PodContainerState) AllValues() []PodContainerState {
+	return []PodContainerState{
+		PodContainerStateRunning,
+		PodContainerStateWaiting,
+		PodContainerStateTerminated,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PodContainerState) MarshalText() ([]byte, error) {
+	switch s {
+	case PodContainerStateRunning:
+		return []byte(s), nil
+	case PodContainerStateWaiting:
+		return []byte(s), nil
+	case PodContainerStateTerminated:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PodContainerState) UnmarshalText(data []byte) error {
+	switch PodContainerState(data) {
+	case PodContainerStateRunning:
+		*s = PodContainerStateRunning
+		return nil
+	case PodContainerStateWaiting:
+		*s = PodContainerStateWaiting
+		return nil
+	case PodContainerStateTerminated:
+		*s = PodContainerStateTerminated
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The pods a Project runs, by Process then name.
+// Ref: #/components/schemas/PodList
+type PodList struct {
+	// Whether the namespace holds more than one read returns.
+	Truncated bool `json:"truncated"`
+	// The pods.
+	Items []Pod `json:"items"`
+}
+
+// GetTruncated returns the value of Truncated.
+func (s *PodList) GetTruncated() bool {
+	return s.Truncated
+}
+
+// GetItems returns the value of Items.
+func (s *PodList) GetItems() []Pod {
+	return s.Items
+}
+
+// SetTruncated sets the value of Truncated.
+func (s *PodList) SetTruncated(val bool) {
+	s.Truncated = val
+}
+
+// SetItems sets the value of Items.
+func (s *PodList) SetItems(val []Pod) {
+	s.Items = val
+}
+
+func (*PodList) listPodsRes() {}
+
+// Which checks the kubelet runs on a container.
+// Ref: #/components/schemas/Probes
+type Probes struct {
+	// Whether it has a readiness probe.
+	Readiness bool `json:"readiness"`
+	// Whether it has a liveness probe.
+	Liveness bool `json:"liveness"`
+	// Whether it has a startup probe.
+	Startup bool `json:"startup"`
+}
+
+// GetReadiness returns the value of Readiness.
+func (s *Probes) GetReadiness() bool {
+	return s.Readiness
+}
+
+// GetLiveness returns the value of Liveness.
+func (s *Probes) GetLiveness() bool {
+	return s.Liveness
+}
+
+// GetStartup returns the value of Startup.
+func (s *Probes) GetStartup() bool {
+	return s.Startup
+}
+
+// SetReadiness sets the value of Readiness.
+func (s *Probes) SetReadiness(val bool) {
+	s.Readiness = val
+}
+
+// SetLiveness sets the value of Liveness.
+func (s *Probes) SetLiveness(val bool) {
+	s.Liveness = val
+}
+
+// SetStartup sets the value of Startup.
+func (s *Probes) SetStartup(val bool) {
+	s.Startup = val
+}
 
 // An RFC 9457 problem detail.
 // Ref: #/components/schemas/Problem
@@ -2821,6 +3553,47 @@ func (s *StreamList) SetItems(val []Stream) {
 }
 
 func (*StreamList) listLogStreamsRes() {}
+
+// How a container last ended.
+// Ref: #/components/schemas/Termination
+type Termination struct {
+	// Why, as the kubelet says, OOMKilled or Error.
+	Reason OptString `json:"reason"`
+	// Its exit code.
+	ExitCode int32 `json:"exitCode"`
+	// When it ended.
+	At OptDateTime `json:"at"`
+}
+
+// GetReason returns the value of Reason.
+func (s *Termination) GetReason() OptString {
+	return s.Reason
+}
+
+// GetExitCode returns the value of ExitCode.
+func (s *Termination) GetExitCode() int32 {
+	return s.ExitCode
+}
+
+// GetAt returns the value of At.
+func (s *Termination) GetAt() OptDateTime {
+	return s.At
+}
+
+// SetReason sets the value of Reason.
+func (s *Termination) SetReason(val OptString) {
+	s.Reason = val
+}
+
+// SetExitCode sets the value of ExitCode.
+func (s *Termination) SetExitCode(val int32) {
+	s.ExitCode = val
+}
+
+// SetAt sets the value of At.
+func (s *Termination) SetAt(val OptDateTime) {
+	s.At = val
+}
 
 // One Flux Kustomization, one Reconcile Unit.
 // Ref: #/components/schemas/Unit

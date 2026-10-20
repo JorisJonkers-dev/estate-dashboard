@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/vue-query';
 
 import { client } from '../client.gen';
-import { getDeclaration, getHandover, getReleaseNotes, getSession, listAlertHistory, listAlerts, listCompositionRuns, listDeploys, listIssues, listLogLines, listLogStreams, listPins, listReleases, listRollouts, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
-import type { GetDeclarationData, GetDeclarationError, GetDeclarationResponse, GetHandoverData, GetHandoverError, GetHandoverResponse, GetReleaseNotesData, GetReleaseNotesError, GetReleaseNotesResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListCompositionRunsData, ListCompositionRunsError, ListCompositionRunsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListLogLinesData, ListLogLinesError, ListLogLinesResponse, ListLogStreamsData, ListLogStreamsError, ListLogStreamsResponse, ListPinsData, ListPinsError, ListPinsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
+import { getDeclaration, getHandover, getReleaseNotes, getSession, listAlertHistory, listAlerts, listChecks, listCompositionRuns, listDeploys, listIssues, listLogLines, listLogStreams, listPins, listPods, listReleases, listRollouts, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
+import type { GetDeclarationData, GetDeclarationError, GetDeclarationResponse, GetHandoverData, GetHandoverError, GetHandoverResponse, GetReleaseNotesData, GetReleaseNotesError, GetReleaseNotesResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListChecksData, ListChecksError, ListChecksResponse, ListCompositionRunsData, ListCompositionRunsError, ListCompositionRunsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListLogLinesData, ListLogLinesError, ListLogLinesResponse, ListLogStreamsData, ListLogStreamsError, ListLogStreamsResponse, ListPinsData, ListPinsError, ListPinsResponse, ListPodsData, ListPodsError, ListPodsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -356,6 +356,46 @@ export const listReleasesOptions = (options?: Options<ListReleasesData>) => quer
         return data;
     },
     queryKey: listReleasesQueryKey(options)
+});
+
+export const listPodsQueryKey = (options: Options<ListPodsData>) => createQueryKey('listPods', options);
+
+/**
+ * List the pods a Project runs
+ *
+ * Every pod the render's workloads run in the Project's namespace, by Process then name: where it runs, the release its label names, and each container's state, restarts and probes, as the kubelet reports them. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listPodsOptions = (options: Options<ListPodsData>) => queryOptions<ListPodsResponse, ListPodsError, ListPodsResponse, ReturnType<typeof listPodsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listPods({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listPodsQueryKey(options)
+});
+
+export const listChecksQueryKey = (options?: Options<ListChecksData>) => createQueryKey('listChecks', options);
+
+/**
+ * List the uptime checks
+ *
+ * Every endpoint the uptime monitor probes, by group then name, with its latest result and whether each recent probe succeeded. A 503 means the monitor did not answer, or the dashboard runs without one.
+ */
+export const listChecksOptions = (options?: Options<ListChecksData>) => queryOptions<ListChecksResponse, ListChecksError, ListChecksResponse, ReturnType<typeof listChecksQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listChecks({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listChecksQueryKey(options)
 });
 
 export const listAlertHistoryQueryKey = (options?: Options<ListAlertHistoryData>) => createQueryKey('listAlertHistory', options);
