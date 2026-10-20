@@ -178,8 +178,13 @@ func Group(pods []Pod) []Images {
 				g = &Images{Repository: img.Repository, Name: img.Name()}
 				byRepository[img.Repository] = g
 			}
+			process := p.Process
+			if process == "" {
+				// A pod of the platform that names no Process is known by its container.
+				process = c.Name
+			}
 			g.Instances = append(g.Instances, Instance{
-				Project: ProjectOf(p.Namespace), Process: p.Process, Pod: p.Name, Namespace: p.Namespace, Node: p.Node,
+				Project: ProjectOf(p.Namespace), Process: process, Pod: p.Name, Namespace: p.Namespace, Node: p.Node,
 				Started: p.Started, Release: p.Version, Managed: p.Managed, Deleting: p.Deleting, Container: c,
 			})
 		}

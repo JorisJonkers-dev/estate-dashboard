@@ -257,13 +257,14 @@ export function rolloutState(view: ReleaseView): { word: string; tone: Tone } {
   return { word: 'Done', tone: 'ok' }
 }
 
-/** A release's window: from its first stage to its last, or to now while it runs, at most two hours. */
+/** A release's window: a minute before its first stage to two after its last, or to now while it runs, two hours at most. */
 export function windowOf(view: ReleaseView, now: number): { from: string; to: string; t0: number; end: number } {
   const times = view.stages.map((s) => Date.parse(s.at))
   const t0 = Math.min(Date.parse(view.at), ...times)
   const rolling = view.state === 'rolling'
   const finish = rolling ? now : Math.max(t0, ...times)
-  const to = Math.min(finish + (rolling ? 0 : 120_000), t0 + 2 * 3600_000, now)
+  // The read covers two hours at most, and the window opens a minute before the release.
+  const to = Math.min(finish + (rolling ? 0 : 120_000), t0 + 2 * 3600_000 - 60_000, now)
   return {
     from: new Date(t0 - 60_000).toISOString(),
     to: new Date(Math.max(to, t0 + 1000)).toISOString(),

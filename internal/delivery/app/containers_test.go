@@ -230,3 +230,10 @@ func TestADigestIsWhatAnImageIDNamesAfterItsAt(t *testing.T) {
 		t.Fatal("digest misread")
 	}
 }
+
+func TestAPodThatNamesNoProcessIsKnownByItsContainer(t *testing.T) {
+	got := images(t, []domain.Pod{{Namespace: "observability", Containers: []domain.Container{container("gatus", "twinproduction/gatus:v5.36.0", "", "")}}})
+	if got[0].Instances[0].Process != "gatus" {
+		t.Fatalf("images = %+v", got)
+	}
+}

@@ -351,7 +351,7 @@ describe('a release’s window', () => {
 
   it('follows a release in flight up to now, at most two hours', () => {
     expect(windowOf(view({ state: 'rolling' }), t0 + 200_000)).toMatchObject({ to: at(200), end: 200 })
-    expect(windowOf(view({ state: 'rolling' }), t0 + 3 * 3600_000).to).toBe(at(7200))
+    expect(windowOf(view({ state: 'rolling' }), t0 + 3 * 3600_000).to).toBe(at(7140))
   })
 
   it('lasts a second at least', () => {
