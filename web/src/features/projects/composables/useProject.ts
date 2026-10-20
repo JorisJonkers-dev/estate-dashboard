@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/vue-query'
 import { computed, type Ref } from 'vue'
 import {
   getHandoverOptions,
+  getHealthOptions,
   listAlertsOptions,
   listChecksOptions,
   listDeploysOptions,
@@ -13,12 +14,13 @@ import {
   listRolloutsOptions,
   listSourcesOptions,
   listUnitsOptions,
+  listUpdatesOptions,
 } from '../../../infrastructure/api/@tanstack/vue-query.gen'
 import { inbox } from '../../alerts/domain/inbox'
 import { projectRows } from '../../overview/domain/overview'
 import { window } from '../domain/logs'
 import { checksOf } from '../domain/health'
-import { clusterRows } from '../domain/project'
+import { deliveryFacts } from '../domain/delivery'
 import { releases as releaseViews } from '../domain/releases'
 
 const live = { refetchInterval: 30_000 }
@@ -62,6 +64,23 @@ export function useProject(name: Ref<string>) {
     computed(() => ({ ...listPodsOptions({ path: { project: name.value } }), refetchInterval: 10_000 })),
   )
   const checks = useQuery({ ...listChecksOptions(), refetchInterval: 30_000 })
+  const updates = useQuery({ ...listUpdatesOptions(), refetchInterval: 300_000 })
+  const probing = computed(() =>
+    checksOf(
+      name.value,
+      [...new Set((pods.data.value?.items ?? []).map((p) => p.process).filter(Boolean))],
+      checks.data.value?.items ?? [],
+    ),
+  )
+  // The last hour, once the checks that probe it are known.
+  const health = useQuery(
+    computed(() => ({
+      ...getHealthOptions({ path: { project: name.value }, query: { check: probing.value.map((c) => c.key) } }),
+      enabled: !checks.isPending.value,
+      refetchInterval: 30_000,
+      retry: false,
+    })),
+  )
   const unitOf = computed(() => (units.data.value?.items ?? []).find((u) => u.source === `project-${name.value}`))
 
   const row = computed(() =>
@@ -81,34 +100,29 @@ export function useProject(name: Ref<string>) {
     repository,
     pin: computed(() => pins.data.value?.items.find((p) => p.project === name.value)),
     unit: unitOf,
-    cluster: computed(() =>
-      clusterRows(
+    delivery: computed(() =>
+      deliveryFacts(
         name.value,
         sources.data.value?.items ?? [],
         units.data.value?.items ?? [],
         releases.data.value?.items ?? [],
       ),
     ),
+    health: computed(() => health.data.value),
+    gate: computed(() => (releases.data.value?.items ?? []).find((r) => r.namespace === `${name.value}-system`)),
+    healthUnreadable: computed(() => health.isError.value),
+    updates: computed(() => updates.data.value?.items ?? []),
     alerts: computed(() =>
       inbox(alerts.data.value?.items ?? [], issues.data.value?.items ?? [], releases.data.value?.items ?? []).filter(
         (i) => i.project === name.value,
       ),
     ),
-    deploys: computed(() => deploys.data.value?.items ?? []),
     releases: computed(() => releaseViews(rollouts.data.value?.items ?? [], unitOf.value)),
     streams: computed(() => streams.data.value?.items ?? []),
-    source: computed(() => (sources.data.value?.items ?? []).find((s) => s.name === `project-${name.value}`)),
-    units: computed(() => (units.data.value?.items ?? []).filter((u) => u.source === `project-${name.value}`)),
     pods: computed(() => pods.data.value?.items ?? []),
     podsLoading: computed(() => pods.isPending.value),
     podsUnreadable: computed(() => pods.isError.value),
-    checks: computed(() =>
-      checksOf(
-        name.value,
-        [...new Set((pods.data.value?.items ?? []).map((p) => p.process).filter(Boolean))],
-        checks.data.value?.items ?? [],
-      ),
-    ),
+    checks: probing,
     checksUnreadable: computed(() => checks.isError.value),
     checksLoading: computed(() => checks.isPending.value),
     rolloutsLoading: computed(() => repository.value !== undefined && rollouts.isPending.value),

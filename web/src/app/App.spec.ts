@@ -360,17 +360,25 @@ describe('the overview', () => {
 })
 
 describe('the shell', () => {
-  it('marks the current page in both navs, and links every page', async () => {
-    const { wrapper } = await mountApp(estate())
-    expect(wrapper.findAll('nav').map((nav) => nav.attributes('aria-label'))).toEqual(['Pages', 'Pages, tab bar'])
-    for (const nav of wrapper.findAll('nav')) {
-      expect(nav.findAll('a').map((a) => [a.text(), a.attributes('aria-current') ?? ''])).toEqual([
-        ['Overview', 'page'],
-        ['Projects', ''],
-        ['Alerts', ''],
-        ['Composition', ''],
-      ])
-    }
+  it('marks the current page in the nav and in the phone menu, and links every page', async () => {
+    const { wrapper, router } = await mountApp(estate())
+    const links = (nav: Element) =>
+      [...nav.querySelectorAll('a')].map((a) => [a.textContent.trim(), a.getAttribute('aria-current') ?? ''])
+    const pages = [
+      ['Overview', 'page'],
+      ['Projects', ''],
+      ['Containers', ''],
+      ['Alerts', ''],
+      ['Composition', ''],
+    ]
+    expect(links(wrapper.get('nav[aria-label="Pages"]').element)).toEqual(pages)
+    await wrapper.get('button[aria-label="Menu"]').trigger('click')
+    await flushPromises()
+    const menu = document.querySelector('nav[aria-label="Pages, menu"]')
+    expect(menu && links(menu)).toEqual(pages)
+    await router.push('/containers')
+    await flushPromises()
+    expect(document.querySelector('nav[aria-label="Pages, menu"]')).toBeNull()
   })
 
   it('signs out with a form post', async () => {

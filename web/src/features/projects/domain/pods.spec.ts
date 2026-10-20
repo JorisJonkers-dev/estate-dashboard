@@ -9,6 +9,8 @@ const container = (over: Partial<PodContainer> = {}): PodContainer => ({
   name: 'radarr',
   image: 'radarr:5',
   init: false,
+  sidecar: false,
+  versionSource: 'unknown',
   ready: true,
   state: 'running',
   since: ago(120),

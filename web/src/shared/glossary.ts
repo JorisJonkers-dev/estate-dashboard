@@ -6,7 +6,6 @@ export const glossary = {
   'rollBack':
     'Go back to the last release that works with the current database, after backing up the database. The Project stays paused.',
   'repository': 'The code for this Project on GitHub.',
-  'releaseInFlight': 'A new version is switching in right now. See how far it got.',
   'changelog': 'What changed in this release.',
   'run': 'The GitHub Actions run that published this release. Not a composition run.',
   'details': 'Show the steps of this release and the containers it ran.',
@@ -22,7 +21,6 @@ export const glossary = {
   'oldPath': 'Still deployed by fleet-infra, the old way.',
   'pinnedTwice': 'Pinned more than once with the same release. The workflow ran again. Nothing new was released.',
   'runningNow': 'The containers that run now, as Kubernetes reports them.',
-  'stackHealth': 'Whether Flux applied the pin, every container is ready, and every uptime check answers.',
   'Delivery': 'Whether Flux fetched the pinned release and applied it.',
   'Containers': 'How many pods are ready. A Job that ran to completion is not counted.',
   'Online': 'Whether the uptime checks that probe this Project answer.',

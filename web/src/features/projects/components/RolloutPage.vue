@@ -1,0 +1,357 @@
+<script setup lang="ts">
+import { useQuery } from '@tanstack/vue-query'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { getRolloutWindowOptions } from '../../../infrastructure/api/@tanstack/vue-query.gen'
+import { useNow } from '../../../infrastructure/useNow'
+import { toneText } from '../../../shared/tone'
+import StatusStrip from '../../../shared/ui/StatusStrip.vue'
+import { age } from '../../overview/domain/overview'
+import { useProject } from '../composables/useProject'
+import { clock, ifItFails, laneAt, lanesOf, lastMoment, orderAt, rolloutState, windowOf } from '../domain/rollout'
+
+const route = useRoute()
+const name = computed(() => String(route.params.name))
+const { releases, rolloutsLoading, pods, gate, pin } = useProject(name)
+const now = useNow()
+
+const index = computed(() => {
+  const asked = route.query.version
+  const i = releases.value.findIndex((r) => r.version === asked)
+  return i >= 0 ? i : 0
+})
+const view = computed(() => releases.value[index.value])
+const from = computed(() => releases.value[index.value + 1]?.version)
+const span = computed(() => (view.value ? windowOf(view.value, now.value) : undefined))
+const rolling = computed(() => view.value?.state === 'rolling')
+
+const window = useQuery(
+  computed(() => ({
+    ...getRolloutWindowOptions({
+      path: { project: name.value },
+      query: { from: span.value?.from ?? '', to: span.value?.to ?? '' },
+    }),
+    enabled: span.value !== undefined,
+    refetchInterval: rolling.value ? 10_000 : false,
+    retry: false,
+  })),
+)
+
+const failedAt = computed(() => {
+  const failed = view.value?.stages.find((s) => s.state === 'failure' || s.state === 'error')
+  return failed && span.value ? Math.round((Date.parse(failed.at) - span.value.t0) / 1000) : undefined
+})
+const lanes = computed(() =>
+  view.value && span.value && window.data.value
+    ? lanesOf({
+        view: view.value,
+        from: from.value,
+        window: window.data.value,
+        pods: pods.value,
+        t0: span.value.t0,
+        failedAt: failedAt.value,
+      })
+    : [],
+)
+const end = computed(() => (rolling.value ? (span.value?.end ?? 1) : lastMoment(lanes.value, span.value?.end ?? 1)))
+
+// Replay: a finished release starts at its end, a release in flight follows live until scrubbed.
+const t = ref<number | null>(null)
+const following = computed(() => rolling.value && t.value === null)
+const at = computed(() => (t.value === null ? end.value : Math.min(t.value, end.value)))
+const playing = ref(false)
+let timer: ReturnType<typeof setInterval> | undefined
+function stop() {
+  playing.value = false
+  if (timer !== undefined) clearInterval(timer)
+  timer = undefined
+}
+function play() {
+  if (playing.value) {
+    stop()
+    return
+  }
+  if (at.value >= end.value) t.value = 0
+  playing.value = true
+  timer = setInterval(() => {
+    const next = at.value + 1
+    if (next >= end.value) {
+      t.value = rolling.value ? null : end.value
+      stop()
+    } else t.value = next
+  }, 100)
+}
+function restart() {
+  stop()
+  t.value = 0
+}
+function scrub(event: Event) {
+  stop()
+  const value = Number((event.target as HTMLInputElement).value)
+  t.value = rolling.value && value >= end.value ? null : value
+}
+watch(() => route.fullPath, restart)
+onBeforeUnmount(stop)
+
+const order = computed(() => (view.value && span.value ? orderAt(view.value, gate.value, span.value.t0, at.value) : []))
+const undo = computed(() => ifItFails(name.value, from.value, gate.value))
+const state = computed(() => (view.value ? rolloutState(view.value) : undefined))
+const canary = computed(() => lanes.value.some((l) => l.weights.length > 0))
+const podTone: Record<string, string> = { ...toneText, gone: 'text-dim' }
+
+const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase'
+const head = 'py-2.5 pr-4 text-left text-xs font-semibold tracking-[0.12em] text-text-muted uppercase'
+const icon =
+  'inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-control bg-transparent text-text-primary transition-colors hover:border-accent hover:text-accent max-md:size-11'
+const stepIcon: Record<string, string> = {
+  done: 'text-ok',
+  running: 'text-info',
+  waiting: 'text-dim',
+  failed: 'text-crit',
+}
+</script>
+
+<template>
+  <div class="flex flex-col gap-10">
+    <header class="-mx-6 border-b border-line bg-band px-6 pt-8 pb-7 lg:-mx-10 lg:px-10 lg:pt-10">
+      <RouterLink :to="`/projects/${name}`" class="text-sm text-text-muted">{{ name }} · Rollout</RouterLink>
+      <div class="mt-1.5 flex flex-wrap items-end justify-between gap-6">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-3">
+            <h1 class="m-0 text-3xl leading-tight font-semibold lg:text-4xl">
+              {{ name }}
+              <span v-if="view" class="ml-2 font-mono text-2xl font-normal text-text-muted"
+                ><template v-if="from">{{ from }} <span aria-label="to">→</span> </template>{{ view.version }}</span
+              >
+            </h1>
+            <span
+              v-if="state"
+              class="rounded-full border border-current px-2.5 py-0.5 text-sm"
+              :class="toneText[state.tone]"
+              >{{ state.word }}</span
+            >
+            <span v-if="following" class="flex items-center gap-1.5 text-sm text-accent"
+              ><span class="size-2 animate-pulse rounded-full bg-accent" aria-hidden="true" />Live</span
+            >
+          </div>
+          <dl v-if="view" class="m-0 mt-5 flex flex-wrap gap-x-10 gap-y-3">
+            <div>
+              <dt :class="label">Started</dt>
+              <dd class="m-0 text-sm">
+                <time :datetime="view.at">{{ age(view.at, now) }} ago</time>
+              </dd>
+            </div>
+            <div>
+              <dt :class="label">Switches</dt>
+              <dd class="m-0 text-sm">
+                {{ (gate?.members.length ?? 0) > 0 ? 'blue-green, through a canary' : 'continuously, no canary' }}
+              </dd>
+            </div>
+            <div v-if="pin">
+              <dt :class="label">Pin</dt>
+              <dd class="m-0 font-mono text-sm">{{ pin.digest.replace(/^sha256:/, '').slice(0, 12) }}</dd>
+            </div>
+          </dl>
+        </div>
+        <div v-if="view" role="group" aria-label="Replay" class="flex w-full items-center gap-2 md:w-[26rem]">
+          <button type="button" :class="icon" aria-label="Back to the start" @click="restart">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+              <path d="M2 1h2v12H2zM13 1v12L5 7z" />
+            </svg>
+          </button>
+          <button type="button" :class="icon" :aria-label="playing ? 'Pause' : 'Play'" @click="play">
+            <svg v-if="playing" width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+              <path d="M3 1h3v12H3zM8 1h3v12H8z" />
+            </svg>
+            <svg v-else width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+              <path d="M3 1l10 6-10 6z" />
+            </svg>
+          </button>
+          <label class="sr-only" for="scrub">Time in the rollout</label>
+          <input
+            id="scrub"
+            type="range"
+            min="0"
+            :max="end"
+            step="1"
+            :value="at"
+            class="min-w-0 grow accent-[var(--color-accent)]"
+            @input="scrub"
+          />
+          <time class="shrink-0 font-mono text-sm text-text-muted">{{ clock(at) }} of {{ clock(end) }}</time>
+        </div>
+      </div>
+    </header>
+
+    <p v-if="rolloutsLoading" class="m-0 text-text-muted">Loading…</p>
+    <p v-else-if="!view" class="m-0 text-text-muted">{{ name }} has no release to show yet.</p>
+    <div
+      v-else
+      class="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:items-start lg:gap-12"
+    >
+      <section aria-labelledby="lanes-h" class="min-w-0">
+        <h2 id="lanes-h" class="m-0 mb-3 text-xl font-semibold">Containers</h2>
+        <p v-if="window.isPending.value" class="m-0 text-text-muted">Loading…</p>
+        <p v-else-if="window.isError.value" class="m-0 text-text-muted">Not read: Prometheus did not answer.</p>
+        <p v-else-if="lanes.length === 0" class="m-0 text-text-muted">
+          No pod of {{ name }} ran in this release's window.
+        </p>
+        <template v-else>
+          <table aria-label="Containers" class="w-full table-fixed border-collapse">
+            <colgroup class="hidden md:table-column-group">
+              <col class="w-[20%]" />
+              <col class="w-[18%]" />
+              <col class="w-[18%]" />
+              <col class="w-[22%]" />
+              <col class="w-[22%]" />
+            </colgroup>
+            <thead class="hidden md:table-header-group">
+              <tr class="border-b border-line">
+                <th scope="col" :class="head">Process</th>
+                <th scope="col" :class="head">Old</th>
+                <th scope="col" :class="head">New</th>
+                <th scope="col" :class="head">Health checks</th>
+                <th scope="col" :class="head">Traffic</th>
+              </tr>
+            </thead>
+            <tbody v-for="l in lanes" :key="l.process" class="border-b border-line">
+              <tr class="grid grid-cols-2 gap-x-4 gap-y-2 py-3 md:table-row md:py-0">
+                <th scope="row" class="col-span-2 text-left font-semibold md:py-3 md:pr-4">{{ l.process }}</th>
+                <td class="md:py-3 md:pr-4">
+                  <span class="block font-mono text-sm break-all">{{ l.oldVersion ?? '—' }}</span>
+                  <span class="text-sm" :class="podTone[laneAt(l, at).old.tone]">{{ laneAt(l, at).old.word }}</span>
+                </td>
+                <td class="md:py-3 md:pr-4">
+                  <span class="block font-mono text-sm break-all">{{ l.newVersion ?? '—' }}</span>
+                  <span class="text-sm" :class="podTone[laneAt(l, at).new.tone]">{{ laneAt(l, at).new.word }}</span>
+                </td>
+                <td class="col-span-2 md:py-3 md:pr-4">
+                  <StatusStrip :blocks="laneAt(l, at).blocks" :label="`Health checks of the new ${l.process} pod`" />
+                </td>
+                <td class="col-span-2 md:py-3">
+                  <div
+                    role="img"
+                    :aria-label="`Traffic: new ${String(laneAt(l, at).share)}%, old ${String(100 - laneAt(l, at).share)}%`"
+                    class="flex h-2.5 w-full overflow-hidden rounded-sm bg-line"
+                  >
+                    <span
+                      class="h-full transition-[width]"
+                      :class="laneAt(l, at).failed ? 'bg-crit' : 'bg-accent'"
+                      :style="{ width: `${String(laneAt(l, at).share)}%` }"
+                    />
+                    <span
+                      class="h-full bg-dim"
+                      :class="{ 'opacity-30': laneAt(l, at).old.word === 'Stopped' }"
+                      :style="{ width: `${String(100 - laneAt(l, at).share)}%` }"
+                    />
+                  </div>
+                  <span class="mt-1 flex justify-between text-xs text-text-muted"
+                    ><span>new {{ laneAt(l, at).share }}%</span><span>old {{ 100 - laneAt(l, at).share }}%</span></span
+                  >
+                  <small class="text-xs" :class="laneAt(l, at).failed ? 'text-crit' : 'text-text-muted'">{{
+                    laneAt(l, at).next
+                  }}</small>
+                </td>
+              </tr>
+              <tr
+                v-for="s in l.sidecars"
+                :key="s.name"
+                class="grid grid-cols-2 gap-x-4 pb-3 pl-5 text-sm text-text-muted md:table-row md:pb-0 md:pl-0"
+              >
+                <th scope="row" class="col-span-2 text-left font-normal md:py-2 md:pr-4">
+                  <span class="flex items-center gap-1.5 md:pl-1">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 0v8h9" />
+                    </svg>
+                    {{ s.name }} <em class="text-xs not-italic text-dim">sidecar</em>
+                  </span>
+                </th>
+                <td class="font-mono md:py-2 md:pr-4">{{ s.oldVersion ?? '—' }}</td>
+                <td class="font-mono md:py-2 md:pr-4">{{ s.newVersion ?? '—' }}</td>
+                <td class="md:py-2 md:pr-4">runs with its pod</td>
+                <td class="md:py-2">takes no traffic</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="m-0 mt-3 text-sm text-text-muted">
+            {{
+              canary
+                ? 'A canary takes more of the traffic each round its checks pass; a failed round sends all of it back to the old pod.'
+                : 'A new pod shares traffic with the old one once its readiness check passes; then the old pod stops taking requests, drains, and stops.'
+            }}
+          </p>
+        </template>
+      </section>
+
+      <aside class="flex min-w-0 flex-col gap-10">
+        <section aria-labelledby="order-h">
+          <h2 id="order-h" class="m-0 mb-3 text-xl font-semibold">Order</h2>
+          <ol class="m-0 list-none border-l border-line p-0 pl-5">
+            <li v-for="s in order" :key="s.at + s.title" class="relative pb-4">
+              <span
+                class="absolute top-1 -left-[1.6rem] flex size-3 items-center justify-center rounded-full bg-surface-dark"
+                :class="stepIcon[s.state]"
+              >
+                <svg
+                  v-if="s.conditions"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path d="M3 2v12M13 2v12M3 6h10M3 10h10" />
+                </svg>
+                <span
+                  v-else
+                  class="size-2.5 rounded-full"
+                  :class="s.state === 'waiting' ? 'border border-current' : 'bg-current'"
+                  aria-hidden="true"
+                />
+              </span>
+              <span class="flex items-baseline justify-between gap-3">
+                <span :class="{ 'text-text-muted': s.state === 'waiting', 'text-crit': s.state === 'failed' }">{{
+                  s.title
+                }}</span>
+                <time class="shrink-0 font-mono text-xs text-text-muted">{{ clock(s.at) }}</time>
+              </span>
+              <span class="sr-only">{{ s.state }}</span>
+              <ul
+                v-if="s.conditions"
+                aria-label="What the Release Gate checked"
+                class="m-0 mt-1.5 list-none p-0 text-sm"
+              >
+                <li
+                  v-for="c in s.conditions"
+                  :key="c.label"
+                  class="flex gap-1.5"
+                  :class="c.met ? 'text-ok' : 'text-text-muted'"
+                >
+                  <span aria-hidden="true">{{ c.met ? '✓' : '·' }}</span
+                  >{{ c.label }}<span class="sr-only">{{ c.met ? ', met' : ', not met' }}</span>
+                </li>
+              </ul>
+            </li>
+          </ol>
+        </section>
+        <section aria-labelledby="undo-h">
+          <h2 id="undo-h" class="m-0 mb-3 text-xl font-semibold">If it fails</h2>
+          <p class="m-0 text-text-muted">{{ undo.text }}</p>
+          <ul v-if="undo.conditions.length" class="m-0 mt-2 pl-5 text-sm text-text-muted">
+            <li v-for="c in undo.conditions" :key="c">{{ c }}</li>
+          </ul>
+        </section>
+      </aside>
+    </div>
+  </div>
+</template>

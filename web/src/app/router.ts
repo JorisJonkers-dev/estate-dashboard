@@ -34,9 +34,20 @@ export function createAppRouter(
         component: () => import('../features/projects/components/ProjectPage.vue'),
       },
       {
-        path: '/projects/:name/release',
-        name: 'release',
-        component: () => import('../features/projects/components/ReleasePage.vue'),
+        path: '/projects/:name/rollout',
+        name: 'rollout',
+        component: () => import('../features/projects/components/RolloutPage.vue'),
+      },
+      { path: '/projects/:name/release', redirect: (to) => `/projects/${String(to.params.name)}/rollout` },
+      {
+        path: '/containers',
+        name: 'containers',
+        component: () => import('../features/containers/components/ContainersPage.vue'),
+      },
+      {
+        path: '/containers/:repository(.*)',
+        name: 'container',
+        component: () => import('../features/containers/components/ContainerPage.vue'),
       },
       { path: '/alerts', name: 'alerts', component: () => import('../features/alerts/components/AlertsPage.vue') },
       {
