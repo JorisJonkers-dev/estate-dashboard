@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.6.0...v0.7.0) (2026-10-20)
+
+
+### Features
+
+* the Containers, container, Project and Rollout pages ([#62](https://github.com/JorisJonkers-dev/estate-dashboard/issues/62)) ([ef35498](https://github.com/JorisJonkers-dev/estate-dashboard/commit/ef3549845fad7cf5a27c8b8fc32cf5c0fb271291))
+
+
+### Bug Fixes
+
+* CI installs vacuum as a release binary, not a build from source ([#64](https://github.com/JorisJonkers-dev/estate-dashboard/issues/64)) ([700a018](https://github.com/JorisJonkers-dev/estate-dashboard/commit/700a018d454263ddcb97a6da02bc3e96747b674f))
+
 ## [0.6.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.5.0...v0.6.0) (2026-10-20)
 
 
