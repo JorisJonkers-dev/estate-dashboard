@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetDeclarationData, GetDeclarationErrors, GetDeclarationResponses, GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetReleaseNotesData, GetReleaseNotesErrors, GetReleaseNotesResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListChecksData, ListChecksErrors, ListChecksResponses, ListCompositionRunsData, ListCompositionRunsErrors, ListCompositionRunsResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListLogLinesData, ListLogLinesErrors, ListLogLinesResponses, ListLogStreamsData, ListLogStreamsErrors, ListLogStreamsResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListPodsData, ListPodsErrors, ListPodsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
-import { zGetDeclarationPath, zGetDeclarationResponse, zGetHandoverResponse, zGetReleaseNotesQuery, zGetReleaseNotesResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListChecksResponse, zListCompositionRunsResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListLogLinesPath, zListLogLinesQuery, zListLogLinesResponse, zListLogStreamsPath, zListLogStreamsQuery, zListLogStreamsResponse, zListPinsResponse, zListPodsPath, zListPodsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
+import type { GetDeclarationData, GetDeclarationErrors, GetDeclarationResponses, GetHandoverData, GetHandoverErrors, GetHandoverResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetReleaseNotesData, GetReleaseNotesErrors, GetReleaseNotesResponses, GetSessionData, GetSessionErrors, GetSessionResponses, ListAlertHistoryData, ListAlertHistoryErrors, ListAlertHistoryResponses, ListAlertsData, ListAlertsErrors, ListAlertsResponses, ListChecksData, ListChecksErrors, ListChecksResponses, ListCompositionRunsData, ListCompositionRunsErrors, ListCompositionRunsResponses, ListContainerHistoryData, ListContainerHistoryErrors, ListContainerHistoryResponses, ListContainersData, ListContainersErrors, ListContainersResponses, ListDeploysData, ListDeploysErrors, ListDeploysResponses, ListIssuesData, ListIssuesErrors, ListIssuesResponses, ListLogLinesData, ListLogLinesErrors, ListLogLinesResponses, ListLogStreamsData, ListLogStreamsErrors, ListLogStreamsResponses, ListPinsData, ListPinsErrors, ListPinsResponses, ListPodsData, ListPodsErrors, ListPodsResponses, ListReleasesData, ListReleasesErrors, ListReleasesResponses, ListRolloutsData, ListRolloutsErrors, ListRolloutsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListUnitsData, ListUnitsErrors, ListUnitsResponses, ListUpdatesData, ListUpdatesErrors, ListUpdatesResponses, SilenceAlertData, SilenceAlertErrors, SilenceAlertResponses } from './types.gen';
+import { zGetDeclarationPath, zGetDeclarationResponse, zGetHandoverResponse, zGetHealthPath, zGetHealthQuery, zGetHealthResponse, zGetReleaseNotesQuery, zGetReleaseNotesResponse, zGetSessionResponse, zListAlertHistoryQuery, zListAlertHistoryResponse, zListAlertsResponse, zListChecksResponse, zListCompositionRunsResponse, zListContainerHistoryQuery, zListContainerHistoryResponse, zListContainersResponse, zListDeploysPath, zListDeploysQuery, zListDeploysResponse, zListIssuesResponse, zListLogLinesPath, zListLogLinesQuery, zListLogLinesResponse, zListLogStreamsPath, zListLogStreamsQuery, zListLogStreamsResponse, zListPinsResponse, zListPodsPath, zListPodsResponse, zListReleasesResponse, zListRolloutsPath, zListRolloutsQuery, zListRolloutsResponse, zListSourcesResponse, zListUnitsResponse, zListUpdatesResponse, zSilenceAlertBody, zSilenceAlertPath, zSilenceAlertResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -379,6 +379,90 @@ export const listPods = <ThrowOnError extends boolean = false>(options: Options<
             type: 'apiKey'
         }],
     url: '/api/v1/delivery/projects/{project}/pods',
+    ...options
+});
+
+/**
+ * List every image the estate runs
+ *
+ * One entry per image repository, with every container that runs it: the pods the render manages and the pods of the platform still on the old path, leaving out the system namespaces the dashboard is configured to skip. Each container's version comes from the version annotation the render writes, else from a version-shaped image tag, else it is unknown. A container drifts when the digest it runs is not the one its pod spec pins. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listContainers = <ThrowOnError extends boolean = false>(options?: Options<ListContainersData, ThrowOnError>): RequestResult<ListContainersResponses, ListContainersErrors, ThrowOnError> => (options?.client ?? client).get<ListContainersResponses, ListContainersErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListContainersResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/delivery/containers',
+    ...options
+});
+
+/**
+ * List the software versions one image ran, newest first
+ *
+ * Each software version of the image the cluster's Deployment revisions recorded, the version it replaced, the release that shipped it and when. Revisions that changed no version of the image are left out. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listContainerHistory = <ThrowOnError extends boolean = false>(options: Options<ListContainerHistoryData, ThrowOnError>): RequestResult<ListContainerHistoryResponses, ListContainerHistoryErrors, ThrowOnError> => (options.client ?? client).get<ListContainerHistoryResponses, ListContainerHistoryErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zListContainerHistoryQuery
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListContainerHistoryResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/delivery/containers/history',
+    ...options
+});
+
+/**
+ * List the open Renovate pull requests that bump an image
+ *
+ * Every open pull request Renovate opened across the estate's repositories that moves a Dockerfile's base image or an images-lock entry to a newer version, with the dependency and version it names. Only the repositories the dashboard's token may read are searched. A 503 means GitHub did not answer, or the dashboard has no Estate repository.
+ */
+export const listUpdates = <ThrowOnError extends boolean = false>(options?: Options<ListUpdatesData, ThrowOnError>): RequestResult<ListUpdatesResponses, ListUpdatesErrors, ThrowOnError> => (options?.client ?? client).get<ListUpdatesResponses, ListUpdatesErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListUpdatesResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/estate/updates',
+    ...options
+});
+
+/**
+ * A Project's health over the last hour
+ *
+ * One block per 30 seconds over the last hour, each the worst of the Project's pod readiness, the success of the uptime checks named, and its Reconcile Unit's readiness, from Prometheus. A block with no data is empty, never healthy. A 503 means Prometheus did not answer, or the dashboard runs without one.
+ */
+export const getHealth = <ThrowOnError extends boolean = false>(options: Options<GetHealthData, ThrowOnError>): RequestResult<GetHealthResponses, GetHealthErrors, ThrowOnError> => (options.client ?? client).get<GetHealthResponses, GetHealthErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetHealthPath,
+        query: zGetHealthQuery.optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zGetHealthResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Host-estate_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/health/projects/{project}',
     ...options
 });
 

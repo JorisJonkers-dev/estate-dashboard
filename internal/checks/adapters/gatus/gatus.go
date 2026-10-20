@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/checks/domain"
@@ -18,7 +19,7 @@ import (
 const maxBody = 16 << 20
 
 // recent is how many of the latest probes a check carries.
-const recent = 20
+const recent = 60
 
 // Gatus reads one Gatus.
 type Gatus struct {
@@ -62,7 +63,7 @@ type result struct {
 // Checks implements domain.Monitor: every endpoint Gatus probes, with its latest result.
 func (g *Gatus) Checks(ctx context.Context) ([]domain.Check, error) {
 	u := g.base.JoinPath("/api/v1/endpoints/statuses")
-	u.RawQuery = url.Values{"page": {"1"}}.Encode()
+	u.RawQuery = url.Values{"page": {"1"}, "pageSize": {strconv.Itoa(recent)}}.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("gatus: %w", err)

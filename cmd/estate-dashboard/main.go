@@ -46,6 +46,9 @@ import (
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/estate/adapters/github"
 	estateapp "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/app"
 	estatedomain "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/domain"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/health/adapters/prometheus"
+	healthapp "github.com/JorisJonkers-dev/estate-dashboard/internal/health/app"
+	healthdomain "github.com/JorisJonkers-dev/estate-dashboard/internal/health/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/logs/adapters/loki"
 	logsapp "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/app"
 	logsdomain "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/domain"
@@ -75,6 +78,8 @@ const (
 	lokiTimeout = 15 * time.Second
 	// gatusTimeout bounds one read of Gatus, which answers from its own store.
 	gatusTimeout = 10 * time.Second
+	// prometheusTimeout bounds one range query.
+	prometheusTimeout = 10 * time.Second
 	// githubTimeout bounds one call to GitHub.
 	githubTimeout = 10 * time.Second
 	// gateTimeout bounds one call to the Release Gate.
@@ -228,6 +233,51 @@ func readGatus(getenv func(string) string) (checksdomain.Monitor, error) {
 	return monitor, nil
 }
 
+// readMonitors reads what watches the estate: the uptime monitor and Prometheus.
+func readMonitors(getenv func(string) string) (checksdomain.Monitor, healthdomain.Metrics, error) {
+	monitor, err := readGatus(getenv)
+	if err != nil {
+		return nil, nil, err
+	}
+	metrics, err := readPrometheus(getenv)
+	if err != nil {
+		return nil, nil, err
+	}
+	return monitor, metrics, nil
+}
+
+// readPrometheus reads the Prometheus a Project's health is read from: the one at PROMETHEUS_URL,
+// or none.
+func readPrometheus(getenv func(string) string) (healthdomain.Metrics, error) {
+	base := getenv("PROMETHEUS_URL")
+	if base == "" {
+		return prometheus.Absent{}, nil
+	}
+	metrics, err := prometheus.New(base, &http.Client{Timeout: prometheusTimeout})
+	if err != nil {
+		return nil, fmt.Errorf("PROMETHEUS_URL: %w", err)
+	}
+	return metrics, nil
+}
+
+// defaultSkipped are the namespaces whose pods run the cluster, not the estate's software.
+const defaultSkipped = "kube-system,kube-public,kube-node-lease,flux-system,cert-manager,metallb-system"
+
+// skippedNamespaces is CONTAINERS_SKIP_NAMESPACES, comma separated, or defaultSkipped where unset.
+func skippedNamespaces(getenv func(string) string) []string {
+	list := getenv("CONTAINERS_SKIP_NAMESPACES")
+	if list == "" {
+		list = defaultSkipped
+	}
+	var out []string
+	for _, n := range strings.Split(list, ",") {
+		if n = strings.TrimSpace(n); n != "" {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
 // readAlertmanager reads the Alertmanager to read alerts from and silence them in: the one at
 // ALERTMANAGER_URL, which is watched, or none, which is not.
 func readAlertmanager(getenv func(string) string) (domain.Alertmanager, bool, error) {
@@ -273,7 +323,7 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	if err != nil {
 		return err
 	}
-	monitor, err := readGatus(getenv)
+	monitor, metrics, err := readMonitors(getenv)
 	if err != nil {
 		return err
 	}
@@ -311,7 +361,7 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 	if watched {
 		go watch(ctx, logger, live, watchEvery)
 	}
-	api, err := httpapi.New(logger, gate, app.New(history), live, deliveryapp.New(kube), estateapp.New(repository), logsapp.New(logStore, time.Now), checksapp.New(monitor))
+	api, err := httpapi.New(logger, gate, app.New(history), live, deliveryapp.New(kube, skippedNamespaces(getenv)...), estateapp.New(repository), logsapp.New(logStore, time.Now), checksapp.New(monitor), healthapp.New(metrics, time.Now))
 	if err != nil {
 		return err
 	}

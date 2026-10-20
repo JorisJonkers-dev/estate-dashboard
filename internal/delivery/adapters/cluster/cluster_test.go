@@ -80,7 +80,7 @@ func kube(t *testing.T, releases string, custom ...runtime.Object) cluster.Kube 
 func kubeAsking(g *gate, custom ...runtime.Object) cluster.Kube {
 	kinds := map[schema.GroupVersionResource]string{
 		cluster.OCIRepositories: "OCIRepositoryList", cluster.Kustomizations: "KustomizationList", cluster.Canaries: "CanaryList",
-		cluster.Pods: "PodList",
+		cluster.Pods: "PodList", cluster.ReplicaSets: "ReplicaSetList",
 	}
 	address, _ := url.Parse(g.URL)
 	return cluster.Kube{
@@ -263,7 +263,9 @@ func TestAClusterOrAGateThatRefusesIsAnError(t *testing.T) {
 	_, e1 := k.Sources(t.Context())
 	_, e2 := k.Units(t.Context())
 	_, e3 := k.Releases(t.Context())
-	for _, err := range []error{e1, e2, e3} {
+	_, e4 := k.AllPods(t.Context())
+	_, e5 := k.Revisions(t.Context())
+	for _, err := range []error{e1, e2, e3, e4, e5} {
 		if err == nil {
 			t.Fatal("a refusal read as an answer")
 		}
@@ -303,7 +305,9 @@ func TestWithoutAClusterEveryReadSaysSo(t *testing.T) {
 	_, e1 := c.Sources(t.Context())
 	_, e2 := c.Units(t.Context())
 	_, e3 := c.Releases(t.Context())
-	for _, err := range []error{e1, e2, e3} {
+	_, e4 := c.AllPods(t.Context())
+	_, e5 := c.Revisions(t.Context())
+	for _, err := range []error{e1, e2, e3, e4, e5} {
 		if !errors.Is(err, domain.ErrNoCluster) {
 			t.Fatalf("error = %v", err)
 		}
@@ -380,11 +384,11 @@ func TestAPodIsWhatItsSpecDeclaresAndWhatTheKubeletSaysOfIt(t *testing.T) {
 	page, err := k.Pods(t.Context(), "arr-system")
 	want := []domain.Pod{{
 		Namespace: "arr-system", Name: "radarr-566dd79995-jc5mr", Process: "radarr", Application: "arr", Version: "1.0.4",
-		Owner: "ReplicaSet", Node: "enschede-1", Phase: "Running", Started: at("2026-10-19T20:00:00Z"), Ready: true,
+		Owner: "ReplicaSet", Node: "enschede-1", Phase: "Running", Started: at("2026-10-19T20:00:00Z"), Managed: true, Ready: true,
 		Containers: []domain.Container{
-			{Name: "config-restore", Image: "restic:1", Init: true, Ready: true, State: domain.Terminated, Reason: "Completed", Since: at("2026-10-19T20:00:05Z")},
+			{Name: "config-restore", Image: "restic:1", Init: true, VersionSource: domain.FromNowhere, Ready: true, State: domain.Terminated, Reason: "Completed", Since: at("2026-10-19T20:00:05Z")},
 			{
-				Name: "radarr", Image: "ghcr.io/x/radarr:5", Ready: true, State: domain.Running, Since: at("2026-10-19T20:01:00Z"), Restarts: 2,
+				Name: "radarr", Image: "ghcr.io/x/radarr:5", VersionSource: domain.FromNowhere, Ready: true, State: domain.Running, Since: at("2026-10-19T20:01:00Z"), Restarts: 2,
 				Last:   &domain.Termination{Reason: "OOMKilled", ExitCode: 137, At: at("2026-10-19T20:00:50Z")},
 				Probes: domain.Probes{Readiness: true, Liveness: true},
 			},
@@ -411,7 +415,7 @@ func TestAContainerThatWaitsSaysWhy(t *testing.T) {
 		t.Fatalf("pods = %+v, %v", page.Items, err)
 	}
 	got := page.Items[0].Containers[0]
-	want := domain.Container{Name: "sonarr", Image: "s:1", State: domain.Waiting, Reason: "CrashLoopBackOff", Message: "back-off 5m0s restarting failed container", Restarts: 9}
+	want := domain.Container{Name: "sonarr", Image: "s:1", VersionSource: domain.FromNowhere, State: domain.Waiting, Reason: "CrashLoopBackOff", Message: "back-off 5m0s restarting failed container", Restarts: 9}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("container = %+v, want %+v", got, want)
 	}
@@ -435,5 +439,125 @@ func TestAPodShuttingDownSaysSo(t *testing.T) {
 	page, err := k.Pods(t.Context(), "arr-system")
 	if err != nil || len(page.Items) != 1 || !page.Items[0].Deleting {
 		t.Fatalf("pods = %+v, %v", page.Items, err)
+	}
+}
+
+// versioned is a pod of the render with a Process, a sidecar and the version annotations it writes.
+func versioned() *unstructured.Unstructured {
+	p := pod("arr-system", "sonarr-1", radarrLabels,
+		map[string]any{"containers": []any{
+			map[string]any{"name": "backup", "image": "ghcr.io/x/file-backup@sha256:b"},
+			map[string]any{"name": "radarr", "image": "ghcr.io/x/radarr@sha256:a"},
+			map[string]any{"name": "exporter", "image": "exporter:v0.17.1"},
+		}},
+		map[string]any{"containerStatuses": []any{
+			map[string]any{"name": "radarr", "imageID": "ghcr.io/x/radarr@sha256:c"},
+		}})
+	p.SetAnnotations(map[string]string{"image.jorisjonkers.dev/radarr": "6.3.0.10514-ls314", "image.jorisjonkers.dev/backup": "0.9.2"})
+	return p
+}
+
+func TestAContainersVersionIsTheOneTheRenderAnnotatedOrItsTag(t *testing.T) {
+	page, err := kube(t, "", versioned()).Pods(t.Context(), "arr-system")
+	if err != nil || len(page.Items) != 1 {
+		t.Fatalf("pods = %+v, %v", page.Items, err)
+	}
+	var got []string
+	for _, c := range page.Items[0].Containers {
+		got = append(got, c.Name+" "+c.Version+" "+string(c.VersionSource))
+	}
+	if want := []string{"backup 0.9.2 lock", "radarr 6.3.0.10514-ls314 lock", "exporter v0.17.1 tag"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("versions = %v", got)
+	}
+}
+
+func TestEveryContainerButThePodsProcessIsASidecar(t *testing.T) {
+	page, err := kube(t, "", versioned(), radarr()).Pods(t.Context(), "arr-system")
+	if err != nil || len(page.Items) != 2 {
+		t.Fatalf("pods = %+v, %v", page.Items, err)
+	}
+	var got []string
+	for _, p := range page.Items {
+		for _, c := range p.Containers {
+			got = append(got, c.Name+" "+strconv.FormatBool(c.Sidecar))
+		}
+	}
+	if want := []string{"config-restore false", "radarr false", "backup true", "radarr false", "exporter true"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("sidecars = %v", got)
+	}
+}
+
+func TestAPodNoContainerOfIsNamedForItsProcessHasItsFirstForItsProcess(t *testing.T) {
+	gatus := pod("observability", "gatus-1", map[string]string{"app": "gatus"},
+		map[string]any{"containers": []any{map[string]any{"name": "gatus", "image": "twinproduction/gatus:v5.36.0"}, map[string]any{"name": "reloader", "image": "r:1"}}},
+		map[string]any{})
+	page, err := kube(t, "", gatus).AllPods(t.Context())
+	if err != nil || len(page.Items) != 1 || page.Items[0].Containers[0].Sidecar || !page.Items[0].Containers[1].Sidecar {
+		t.Fatalf("pods = %+v, %v", page.Items, err)
+	}
+}
+
+func TestAContainersRunningDigestIsTheOneTheKubeletReports(t *testing.T) {
+	page, err := kube(t, "", versioned()).Pods(t.Context(), "arr-system")
+	if err != nil || page.Items[0].Containers[1].RunningDigest != "sha256:c" || page.Items[0].Containers[0].RunningDigest != "" {
+		t.Fatalf("pods = %+v, %v", page.Items, err)
+	}
+}
+
+func TestTheImagesTheEstateRunsAreReadFromEveryNamespaceRenderedOrNot(t *testing.T) {
+	platform := pod("observability", "alloy-1", map[string]string{"app.kubernetes.io/name": "alloy"},
+		map[string]any{"containers": []any{map[string]any{"name": "alloy", "image": "grafana/alloy:v1.12.2"}}}, map[string]any{})
+	page, err := kube(t, "", radarr(), platform).AllPods(t.Context())
+	managed := map[string]bool{}
+	for _, p := range page.Items {
+		managed[p.Name] = p.Managed
+	}
+	if err != nil || len(page.Items) != 2 || !managed["radarr-566dd79995-jc5mr"] || managed["alloy-1"] {
+		t.Fatalf("pods = %+v, %v", page.Items, err)
+	}
+}
+
+func replicaSet(name, owner, release, created string, annotations map[string]string, containers ...map[string]any) *unstructured.Unstructured {
+	template := map[string]any{"spec": map[string]any{"containers": func() []any {
+		out := make([]any, 0, len(containers))
+		for _, c := range containers {
+			out = append(out, c)
+		}
+		return out
+	}()}}
+	meta := map[string]any{}
+	if release != "" {
+		meta["labels"] = map[string]any{"app.kubernetes.io/version": release}
+	}
+	if annotations != nil {
+		values := map[string]any{}
+		for k, v := range annotations {
+			values[k] = v
+		}
+		meta["annotations"] = values
+	}
+	template["metadata"] = meta
+	o := object(cluster.ReplicaSets, "ReplicaSet", "arr-system", name, nil, map[string]any{"template": template}, nil)
+	stamp, _ := time.Parse(time.RFC3339, created)
+	o.SetCreationTimestamp(metav1.NewTime(stamp))
+	if owner != "" {
+		o.SetOwnerReferences([]metav1.OwnerReference{{Kind: owner, Name: "sonarr", APIVersion: "apps/v1"}})
+	}
+	return o
+}
+
+func TestADeploymentsRevisionIsTheTemplateItsReplicaSetHolds(t *testing.T) {
+	k := kube(t, "",
+		replicaSet("sonarr-1", "Deployment", "1.0.4", "2026-10-20T09:00:00Z", map[string]string{"image.jorisjonkers.dev/sonarr": "4.0.19"},
+			map[string]any{"name": "sonarr", "image": "ghcr.io/x/sonarr@sha256:1"}),
+		replicaSet("loose", "", "", "2026-10-20T09:00:00Z", nil, map[string]any{"name": "x", "image": "x:1.0.0"}),
+	)
+	page, err := k.Revisions(t.Context())
+	want := []domain.Revision{{
+		Namespace: "arr-system", Deployment: "sonarr", Release: "1.0.4", Created: time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC),
+		Containers: []domain.Container{{Name: "sonarr", Image: "ghcr.io/x/sonarr@sha256:1", Version: "4.0.19", VersionSource: domain.FromLock}},
+	}}
+	if err != nil || !reflect.DeepEqual(page.Items, want) {
+		t.Fatalf("revisions = %+v, %v", page.Items, err)
 	}
 }

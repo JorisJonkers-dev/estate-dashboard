@@ -15,12 +15,22 @@ type cluster struct {
 	units     []domain.Unit
 	releases  []domain.Release
 	pods      map[string][]domain.Pod
+	all       []domain.Pod
+	revisions []domain.Revision
 	truncated bool
 	err       error
 }
 
 func (c cluster) Pods(_ context.Context, namespace string) (domain.Page[domain.Pod], error) {
 	return domain.Page[domain.Pod]{Items: c.pods[namespace]}, c.err
+}
+
+func (c cluster) AllPods(context.Context) (domain.Page[domain.Pod], error) {
+	return domain.Page[domain.Pod]{Items: c.all, Truncated: c.truncated}, c.err
+}
+
+func (c cluster) Revisions(context.Context) (domain.Page[domain.Revision], error) {
+	return domain.Page[domain.Revision]{Items: c.revisions}, c.err
 }
 
 func (c cluster) Sources(context.Context) (domain.Page[domain.Source], error) {

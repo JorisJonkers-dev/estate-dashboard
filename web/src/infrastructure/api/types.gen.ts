@@ -646,6 +646,19 @@ export type PodContainer = {
      */
     init: boolean;
     /**
+     * Whether it runs beside its pod's Process rather than being it.
+     */
+    sidecar: boolean;
+    /**
+     * The version of the software it runs; absent where none is known.
+     */
+    version?: string;
+    versionSource: VersionSource;
+    /**
+     * The digest the kubelet says it runs, once it started.
+     */
+    runningDigest?: string;
+    /**
      * Whether the kubelet reports it ready.
      */
     ready: boolean;
@@ -735,6 +748,243 @@ export type PodList = {
      * The pods.
      */
     items: Array<Pod>;
+};
+
+/**
+ * Where a container's version comes from: the version annotation the render writes from the images lock, a version-shaped image tag, or nowhere.
+ */
+export type VersionSource = 'lock' | 'tag' | 'unknown';
+
+/**
+ * One container that runs an image.
+ */
+export type ContainerInstance = {
+    /**
+     * The Project, from the namespace.
+     */
+    project: string;
+    /**
+     * The Process, from the pod's app.kubernetes.io/name label, else the container.
+     */
+    process: string;
+    /**
+     * The container.
+     */
+    container: string;
+    /**
+     * The pod.
+     */
+    pod: string;
+    /**
+     * The pod's namespace.
+     */
+    namespace: string;
+    /**
+     * The node it runs on, once scheduled.
+     */
+    node?: string;
+    /**
+     * When the pod started.
+     */
+    started?: string;
+    /**
+     * The Project release the pod runs, from its app.kubernetes.io/version label.
+     */
+    release?: string;
+    /**
+     * Whether it is an init container.
+     */
+    init: boolean;
+    /**
+     * Whether it runs beside its pod's Process rather than being it.
+     */
+    sidecar: boolean;
+    /**
+     * Whether the render manages the pod; false for the platform still on fleet-infra.
+     */
+    managed: boolean;
+    /**
+     * Whether its pod is shutting down.
+     */
+    deleting?: boolean;
+    /**
+     * The version of the software it runs; absent where none is known.
+     */
+    version?: string;
+    versionSource: VersionSource;
+    /**
+     * The image tag it names, where it names one.
+     */
+    tag?: string;
+    /**
+     * The digest its pod spec pins, where it pins one.
+     */
+    lockDigest?: string;
+    /**
+     * The digest the kubelet says it runs, once it started.
+     */
+    runningDigest?: string;
+    /**
+     * Whether the digest it runs differs from the one its pod spec pins.
+     */
+    drift: boolean;
+};
+
+/**
+ * One image the estate runs, and every container that runs it.
+ */
+export type Container = {
+    /**
+     * The image's name, the last part of its repository.
+     */
+    name: string;
+    /**
+     * The image repository, without a tag or digest.
+     */
+    repository: string;
+    /**
+     * The newest version any of its containers runs; absent where none is known.
+     */
+    version?: string;
+    versionSource: VersionSource;
+    /**
+     * Whether fleet-infra deploys every container of it, outside the estate path.
+     */
+    platform: boolean;
+    /**
+     * Whether any of its containers drifts.
+     */
+    drift: boolean;
+    /**
+     * Every container that runs it, by Project, Process and pod.
+     */
+    instances: Array<ContainerInstance>;
+};
+
+/**
+ * Every image the estate runs, by name.
+ */
+export type ContainerList = {
+    /**
+     * Whether the cluster holds more pods than one read returns.
+     */
+    truncated: boolean;
+    /**
+     * The images.
+     */
+    items: Array<Container>;
+};
+
+/**
+ * One software version an image ran.
+ */
+export type VersionChange = {
+    /**
+     * The version.
+     */
+    version: string;
+    /**
+     * The version it replaced; absent for the first one recorded.
+     */
+    from?: string;
+    /**
+     * The Project whose Deployment ran it.
+     */
+    project?: string;
+    /**
+     * The Project release that shipped it, where its pods named one.
+     */
+    release?: string;
+    /**
+     * When the revision that first ran it was made.
+     */
+    at: string;
+};
+
+/**
+ * The software versions one image ran, newest first.
+ */
+export type VersionHistory = {
+    /**
+     * The versions.
+     */
+    items: Array<VersionChange>;
+};
+
+/**
+ * One open Renovate pull request that moves an image to a newer version.
+ */
+export type Update = {
+    /**
+     * The image it moves, as Renovate names it.
+     */
+    dependency: string;
+    /**
+     * The version it moves the image to.
+     */
+    version: string;
+    /**
+     * The repository the pull request is in, as owner/name.
+     */
+    repository: string;
+    /**
+     * The pull request's number.
+     */
+    number: number;
+    /**
+     * The pull request.
+     */
+    url: string;
+    /**
+     * Its title.
+     */
+    title: string;
+    /**
+     * When it was opened.
+     */
+    opened: string;
+};
+
+/**
+ * The open Renovate pull requests that move an image, newest first.
+ */
+export type UpdateList = {
+    /**
+     * The pull requests.
+     */
+    items: Array<Update>;
+};
+
+/**
+ * The worst state a Project was in during one step.
+ */
+export type HealthBlock = {
+    /**
+     * When the step starts.
+     */
+    at: string;
+    /**
+     * Healthy, degraded, down, or no data.
+     */
+    state: 'ok' | 'warn' | 'crit' | 'empty';
+    /**
+     * What made it less than healthy, where something did.
+     */
+    detail?: string;
+};
+
+/**
+ * A Project's health over the last hour, oldest block first.
+ */
+export type HealthTimeline = {
+    /**
+     * How long each block lasts, in seconds.
+     */
+    step: number;
+    /**
+     * The blocks.
+     */
+    blocks: Array<HealthBlock>;
 };
 
 /**
@@ -1706,6 +1956,153 @@ export type ListPodsResponses = {
 };
 
 export type ListPodsResponse = ListPodsResponses[keyof ListPodsResponses];
+
+export type ListContainersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/delivery/containers';
+};
+
+export type ListContainersErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListContainersError = ListContainersErrors[keyof ListContainersErrors];
+
+export type ListContainersResponses = {
+    /**
+     * What the cluster runs.
+     */
+    200: ContainerList;
+};
+
+export type ListContainersResponse = ListContainersResponses[keyof ListContainersResponses];
+
+export type ListContainerHistoryData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The image repository, without a tag or digest.
+         */
+        repository: string;
+    };
+    url: '/api/v1/delivery/containers/history';
+};
+
+export type ListContainerHistoryErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListContainerHistoryError = ListContainerHistoryErrors[keyof ListContainerHistoryErrors];
+
+export type ListContainerHistoryResponses = {
+    /**
+     * The versions.
+     */
+    200: VersionHistory;
+};
+
+export type ListContainerHistoryResponse = ListContainerHistoryResponses[keyof ListContainerHistoryResponses];
+
+export type ListUpdatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/estate/updates';
+};
+
+export type ListUpdatesErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type ListUpdatesError = ListUpdatesErrors[keyof ListUpdatesErrors];
+
+export type ListUpdatesResponses = {
+    /**
+     * The pull requests.
+     */
+    200: UpdateList;
+};
+
+export type ListUpdatesResponse = ListUpdatesResponses[keyof ListUpdatesResponses];
+
+export type GetHealthData = {
+    body?: never;
+    path: {
+        /**
+         * The Project.
+         */
+        project: string;
+    };
+    query?: {
+        /**
+         * The keys of the uptime checks that probe the Project.
+         */
+        check?: Array<string>;
+    };
+    url: '/api/v1/health/projects/{project}';
+};
+
+export type GetHealthErrors = {
+    /**
+     * An RFC 9457 problem.
+     */
+    401: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    503: Problem;
+    /**
+     * An RFC 9457 problem.
+     */
+    default: Problem;
+};
+
+export type GetHealthError = GetHealthErrors[keyof GetHealthErrors];
+
+export type GetHealthResponses = {
+    /**
+     * The timeline.
+     */
+    200: HealthTimeline;
+};
+
+export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
 
 export type ListChecksData = {
     body?: never;

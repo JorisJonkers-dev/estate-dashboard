@@ -3,6 +3,7 @@
 package oas
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -94,6 +95,193 @@ func decodeGetDeclarationParams(args [1]string, argsEscaped bool, r *http.Reques
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// GetHealthParams is parameters of getHealth operation.
+type GetHealthParams struct {
+	// The Project.
+	Project string
+	// The keys of the uptime checks that probe the Project.
+	Check []string `json:",omitempty"`
+}
+
+func unpackGetHealthParams(packed middleware.Parameters) (params GetHealthParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project",
+			In:   "path",
+		}
+		params.Project = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "check",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Check = v.([]string)
+		}
+	}
+	return params
+}
+
+func decodeGetHealthParams(args [1]string, argsEscaped bool, r *http.Request) (params GetHealthParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode path: project.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "project",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.Project = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     63,
+					MaxLengthSet:  true,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[a-z0-9_][a-z0-9_-]{0,62}$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(params.Project)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode query: check.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "check",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				params.Check = nil
+				return d.DecodeArray(func(d uri.Decoder) error {
+					var paramsDotCheckVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotCheckVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					params.Check = append(params.Check, paramsDotCheckVal)
+					return nil
+				})
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if params.Check == nil {
+					return nil // optional
+				}
+				if err := (validate.Array{
+					MinLength:    0,
+					MinLengthSet: false,
+					MaxLength:    32,
+					MaxLengthSet: true,
+				}).ValidateLength(len(params.Check)); err != nil {
+					return errors.Wrap(err, "array")
+				}
+				var failures []validate.FieldError
+				for i, elem := range params.Check {
+					if err := func() error {
+						if err := (validate.String{
+							MinLength:     0,
+							MinLengthSet:  false,
+							MaxLength:     256,
+							MaxLengthSet:  true,
+							Email:         false,
+							Hostname:      false,
+							Regex:         nil,
+							MinNumeric:    0,
+							MinNumericSet: false,
+							MaxNumeric:    0,
+							MaxNumericSet: false,
+						}).Validate(string(elem)); err != nil {
+							return errors.Wrap(err, "string")
+						}
+						return nil
+					}(); err != nil {
+						failures = append(failures, validate.FieldError{
+							Name:  fmt.Sprintf("[%d]", i),
+							Error: err,
+						})
+					}
+				}
+				if len(failures) > 0 {
+					return &validate.Error{Fields: failures}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "check",
+			In:   "query",
 			Err:  err,
 		}
 	}
@@ -331,6 +519,84 @@ func decodeListAlertHistoryParams(args [0]string, argsEscaped bool, r *http.Requ
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "limit",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// ListContainerHistoryParams is parameters of listContainerHistory operation.
+type ListContainerHistoryParams struct {
+	// The image repository, without a tag or digest.
+	Repository string
+}
+
+func unpackListContainerHistoryParams(packed middleware.Parameters) (params ListContainerHistoryParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "repository",
+			In:   "query",
+		}
+		params.Repository = packed[key].(string)
+	}
+	return params
+}
+
+func decodeListContainerHistoryParams(args [0]string, argsEscaped bool, r *http.Request) (params ListContainerHistoryParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: repository.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "repository",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.Repository = c
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     512,
+					MaxLengthSet:  true,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[a-z0-9][a-z0-9._/:-]*$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(params.Repository)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "repository",
 			In:   "query",
 			Err:  err,
 		}

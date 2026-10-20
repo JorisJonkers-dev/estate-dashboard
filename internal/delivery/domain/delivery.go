@@ -103,10 +103,17 @@ type Termination struct {
 type Container struct {
 	Name  string
 	Image string
-	// Init is an init container's; it runs to completion before the others start.
-	Init  bool
-	Ready bool
-	State ContainerState
+	// Init is an init container's; it runs to completion before the others start. Sidecar is one
+	// that runs beside its pod's Process rather than being it.
+	Init    bool
+	Sidecar bool
+	// Version is the software it runs and VersionSource where that is read from (VersionOf).
+	Version       string
+	VersionSource VersionSource
+	// RunningDigest is the digest the kubelet says it runs, once it started.
+	RunningDigest string
+	Ready         bool
+	State         ContainerState
 	// Reason and Message say why it waits or ended, where the kubelet says.
 	Reason   string
 	Message  string
@@ -131,6 +138,8 @@ type Pod struct {
 	Node    string
 	Phase   string
 	Started *time.Time
+	// Managed is whether the render wrote it; false for the platform still on fleet-infra.
+	Managed bool
 	// Ready is the pod's Ready condition; Deleting, that it is shutting down.
 	Ready      bool
 	Deleting   bool
@@ -154,4 +163,8 @@ type Cluster interface {
 	Releases(ctx context.Context) (Page[Release], error)
 	// Pods returns every pod the render's workloads run in namespace.
 	Pods(ctx context.Context, namespace string) (Page[Pod], error)
+	// AllPods returns every pod in every namespace, the render's and anyone else's.
+	AllPods(ctx context.Context) (Page[Pod], error)
+	// Revisions returns every Deployment revision the cluster keeps, in every namespace.
+	Revisions(ctx context.Context) (Page[Revision], error)
 }

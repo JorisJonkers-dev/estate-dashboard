@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/vue-query';
 
 import { client } from '../client.gen';
-import { getDeclaration, getHandover, getReleaseNotes, getSession, listAlertHistory, listAlerts, listChecks, listCompositionRuns, listDeploys, listIssues, listLogLines, listLogStreams, listPins, listPods, listReleases, listRollouts, listSources, listUnits, type Options, silenceAlert } from '../sdk.gen';
-import type { GetDeclarationData, GetDeclarationError, GetDeclarationResponse, GetHandoverData, GetHandoverError, GetHandoverResponse, GetReleaseNotesData, GetReleaseNotesError, GetReleaseNotesResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListChecksData, ListChecksError, ListChecksResponse, ListCompositionRunsData, ListCompositionRunsError, ListCompositionRunsResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListLogLinesData, ListLogLinesError, ListLogLinesResponse, ListLogStreamsData, ListLogStreamsError, ListLogStreamsResponse, ListPinsData, ListPinsError, ListPinsResponse, ListPodsData, ListPodsError, ListPodsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
+import { getDeclaration, getHandover, getHealth, getReleaseNotes, getSession, listAlertHistory, listAlerts, listChecks, listCompositionRuns, listContainerHistory, listContainers, listDeploys, listIssues, listLogLines, listLogStreams, listPins, listPods, listReleases, listRollouts, listSources, listUnits, listUpdates, type Options, silenceAlert } from '../sdk.gen';
+import type { GetDeclarationData, GetDeclarationError, GetDeclarationResponse, GetHandoverData, GetHandoverError, GetHandoverResponse, GetHealthData, GetHealthError, GetHealthResponse, GetReleaseNotesData, GetReleaseNotesError, GetReleaseNotesResponse, GetSessionData, GetSessionError, GetSessionResponse, ListAlertHistoryData, ListAlertHistoryError, ListAlertHistoryResponse, ListAlertsData, ListAlertsError, ListAlertsResponse, ListChecksData, ListChecksError, ListChecksResponse, ListCompositionRunsData, ListCompositionRunsError, ListCompositionRunsResponse, ListContainerHistoryData, ListContainerHistoryError, ListContainerHistoryResponse, ListContainersData, ListContainersError, ListContainersResponse, ListDeploysData, ListDeploysError, ListDeploysResponse, ListIssuesData, ListIssuesError, ListIssuesResponse, ListLogLinesData, ListLogLinesError, ListLogLinesResponse, ListLogStreamsData, ListLogStreamsError, ListLogStreamsResponse, ListPinsData, ListPinsError, ListPinsResponse, ListPodsData, ListPodsError, ListPodsResponse, ListReleasesData, ListReleasesError, ListReleasesResponse, ListRolloutsData, ListRolloutsError, ListRolloutsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, ListUnitsData, ListUnitsError, ListUnitsResponse, ListUpdatesData, ListUpdatesError, ListUpdatesResponse, SilenceAlertData, SilenceAlertError, SilenceAlertResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -376,6 +376,86 @@ export const listPodsOptions = (options: Options<ListPodsData>) => queryOptions<
         return data;
     },
     queryKey: listPodsQueryKey(options)
+});
+
+export const listContainersQueryKey = (options?: Options<ListContainersData>) => createQueryKey('listContainers', options);
+
+/**
+ * List every image the estate runs
+ *
+ * One entry per image repository, with every container that runs it: the pods the render manages and the pods of the platform still on the old path, leaving out the system namespaces the dashboard is configured to skip. Each container's version comes from the version annotation the render writes, else from a version-shaped image tag, else it is unknown. A container drifts when the digest it runs is not the one its pod spec pins. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listContainersOptions = (options?: Options<ListContainersData>) => queryOptions<ListContainersResponse, ListContainersError, ListContainersResponse, ReturnType<typeof listContainersQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listContainers({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listContainersQueryKey(options)
+});
+
+export const listContainerHistoryQueryKey = (options: Options<ListContainerHistoryData>) => createQueryKey('listContainerHistory', options);
+
+/**
+ * List the software versions one image ran, newest first
+ *
+ * Each software version of the image the cluster's Deployment revisions recorded, the version it replaced, the release that shipped it and when. Revisions that changed no version of the image are left out. A 503 means the cluster did not answer, or the dashboard runs without one.
+ */
+export const listContainerHistoryOptions = (options: Options<ListContainerHistoryData>) => queryOptions<ListContainerHistoryResponse, ListContainerHistoryError, ListContainerHistoryResponse, ReturnType<typeof listContainerHistoryQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listContainerHistory({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listContainerHistoryQueryKey(options)
+});
+
+export const listUpdatesQueryKey = (options?: Options<ListUpdatesData>) => createQueryKey('listUpdates', options);
+
+/**
+ * List the open Renovate pull requests that bump an image
+ *
+ * Every open pull request Renovate opened across the estate's repositories that moves a Dockerfile's base image or an images-lock entry to a newer version, with the dependency and version it names. Only the repositories the dashboard's token may read are searched. A 503 means GitHub did not answer, or the dashboard has no Estate repository.
+ */
+export const listUpdatesOptions = (options?: Options<ListUpdatesData>) => queryOptions<ListUpdatesResponse, ListUpdatesError, ListUpdatesResponse, ReturnType<typeof listUpdatesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listUpdates({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listUpdatesQueryKey(options)
+});
+
+export const getHealthQueryKey = (options: Options<GetHealthData>) => createQueryKey('getHealth', options);
+
+/**
+ * A Project's health over the last hour
+ *
+ * One block per 30 seconds over the last hour, each the worst of the Project's pod readiness, the success of the uptime checks named, and its Reconcile Unit's readiness, from Prometheus. A block with no data is empty, never healthy. A 503 means Prometheus did not answer, or the dashboard runs without one.
+ */
+export const getHealthOptions = (options: Options<GetHealthData>) => queryOptions<GetHealthResponse, GetHealthError, GetHealthResponse, ReturnType<typeof getHealthQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getHealth({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getHealthQueryKey(options)
 });
 
 export const listChecksQueryKey = (options?: Options<ListChecksData>) => createQueryKey('listChecks', options);

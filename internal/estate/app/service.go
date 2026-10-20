@@ -101,3 +101,13 @@ func (s *Service) Issues(ctx context.Context) ([]domain.Issue, error) {
 	slices.SortStableFunc(issues, func(a, b domain.Issue) int { return b.UpdatedAt.Compare(a.UpdatedAt) })
 	return issues, nil
 }
+
+// Updates returns every open Renovate pull request that moves an image, the newest first.
+func (s *Service) Updates(ctx context.Context) ([]domain.Update, error) {
+	updates, err := s.repo.Updates(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read the updates: %w", err)
+	}
+	slices.SortStableFunc(updates, func(a, b domain.Update) int { return b.Opened.Compare(a.Opened) })
+	return updates, nil
+}

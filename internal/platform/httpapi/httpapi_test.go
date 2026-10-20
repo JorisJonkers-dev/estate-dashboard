@@ -28,6 +28,10 @@ import (
 	estateweb "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/adapters/web"
 	estateapp "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/app"
 	estatedomain "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/domain"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/health/adapters/prometheus"
+	healthweb "github.com/JorisJonkers-dev/estate-dashboard/internal/health/adapters/web"
+	healthapp "github.com/JorisJonkers-dev/estate-dashboard/internal/health/app"
+	healthdomain "github.com/JorisJonkers-dev/estate-dashboard/internal/health/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/logs/adapters/loki"
 	logsweb "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/adapters/web"
 	logsapp "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/app"
@@ -105,7 +109,12 @@ func serveLogs(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCase
 
 func serveChecks(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases, estate estateweb.UseCases, logs logsweb.UseCases, checks checksweb.UseCases) *httptest.Server {
 	t.Helper()
-	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l, delivery, estate, logs, checks)
+	return serveHealth(t, repo, l, delivery, estate, logs, checks, healthapp.New(prometheus.Absent{}, time.Now))
+}
+
+func serveHealth(t *testing.T, repo *memory, l *live, delivery deliveryweb.UseCases, estate estateweb.UseCases, logs logsweb.UseCases, checks checksweb.UseCases, health healthweb.UseCases) *httptest.Server {
+	t.Helper()
+	h, err := httpapi.New(slog.New(slog.DiscardHandler), gate{}, app.New(repo), l, delivery, estate, logs, checks, health)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,11 +286,12 @@ func TestASilenceOfNothingFiringOrOfNoLengthIsRefused(t *testing.T) {
 
 // estate is a cluster read in memory.
 type estate struct {
-	sources  []delivery.Source
-	units    []delivery.Unit
-	releases []delivery.Release
-	pods     []delivery.Pod
-	err      error
+	sources   []delivery.Source
+	units     []delivery.Unit
+	releases  []delivery.Release
+	pods      []delivery.Pod
+	revisions []delivery.Revision
+	err       error
 }
 
 func (e estate) Pods(_ context.Context, namespace string) (delivery.Page[delivery.Pod], error) {
@@ -292,6 +302,14 @@ func (e estate) Pods(_ context.Context, namespace string) (delivery.Page[deliver
 		}
 	}
 	return delivery.Page[delivery.Pod]{Items: in}, e.err
+}
+
+func (e estate) AllPods(context.Context) (delivery.Page[delivery.Pod], error) {
+	return delivery.Page[delivery.Pod]{Items: e.pods, Truncated: true}, e.err
+}
+
+func (e estate) Revisions(context.Context) (delivery.Page[delivery.Revision], error) {
+	return delivery.Page[delivery.Revision]{Items: e.revisions}, e.err
 }
 
 func (e estate) Sources(context.Context) (delivery.Page[delivery.Source], error) {
@@ -437,7 +455,7 @@ func TestAClusterThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 		"The dashboard runs without a cluster to read.": deliveryapp.New(cluster.Absent{}),
 	} {
 		srv := serveAll(t, &memory{}, &live{}, uc)
-		for _, path := range []string{"/api/v1/delivery/sources", "/api/v1/delivery/units", "/api/v1/delivery/releases", "/api/v1/delivery/projects/arr/pods"} {
+		for _, path := range []string{"/api/v1/delivery/sources", "/api/v1/delivery/units", "/api/v1/delivery/releases", "/api/v1/delivery/projects/arr/pods", "/api/v1/delivery/containers", "/api/v1/delivery/containers/history?repository=ghcr.io/o/x"} {
 			if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
 				t.Fatalf("%s = %d %v", path, got.code, got.body)
 			}
@@ -452,9 +470,12 @@ type repository struct {
 	rollouts []estatedomain.Rollout
 	deploys  []estatedomain.Deploy
 	issues   []estatedomain.Issue
+	updates  []estatedomain.Update
 	err      error
 	asked    []string
 }
+
+func (r *repository) Updates(context.Context) ([]estatedomain.Update, error) { return r.updates, r.err }
 
 func (r *repository) Pins(context.Context) ([]estatedomain.Pin, error) { return r.pins, r.err }
 
@@ -549,7 +570,7 @@ func TestAnEstateRepositoryThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 		"The dashboard runs without the Estate repository to read.": estateapp.New(github.Absent{}),
 	} {
 		srv := serveEstate(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), uc)
-		for _, path := range []string{"/api/v1/estate/pins", "/api/v1/estate/handover", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys", "/api/v1/estate/projects/auth/rollouts?repository=a/b"} {
+		for _, path := range []string{"/api/v1/estate/pins", "/api/v1/estate/handover", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys", "/api/v1/estate/projects/auth/rollouts?repository=a/b", "/api/v1/estate/updates"} {
 			if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
 				t.Fatalf("%s = %d %v", path, got.code, got.body)
 			}
@@ -668,6 +689,128 @@ func TestALokiThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 			if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
 				t.Fatalf("%s = %d %v", path, got.code, got.body)
 			}
+		}
+	}
+}
+
+func TestTheImagesTheEstateRunsAreServedGroupedWithTheirVersionsAndDrift(t *testing.T) {
+	started := time.Date(2026, 10, 19, 20, 0, 0, 0, time.UTC)
+	srv := serveAll(t, &memory{}, &live{}, deliveryapp.New(estate{pods: []delivery.Pod{
+		{
+			Namespace: "arr-system", Name: "sonarr-1", Process: "sonarr", Version: "1.0.4", Node: "enschede-1", Started: &started, Managed: true,
+			Containers: []delivery.Container{
+				{Name: "sonarr", Image: "ghcr.io/o/sonarr@sha256:a", Version: "4.0.19", VersionSource: delivery.FromLock, RunningDigest: "sha256:b"},
+				{Name: "backup", Image: "ghcr.io/o/file-backup@sha256:c", Version: "0.9.2", VersionSource: delivery.FromLock, Sidecar: true},
+			},
+		},
+		{Namespace: "edge", Name: "traefik-1", Process: "traefik", Containers: []delivery.Container{{Name: "traefik", Image: "traefik:v3.7.12", Version: "v3.7.12", VersionSource: delivery.FromTag}}},
+	}}))
+
+	got := call(t, srv, http.MethodGet, "/api/v1/delivery/containers", "", true)
+	items, _ := got.body["items"].([]any)
+	if got.code != http.StatusOK || len(items) != 3 || got.body["truncated"] != true {
+		t.Fatalf("containers = %d %v", got.code, got.body)
+	}
+	backup, sonarr, traefik := items[0].(map[string]any), items[1].(map[string]any), items[2].(map[string]any)
+	if backup["name"] != "file-backup" || backup["platform"] != false || backup["instances"].([]any)[0].(map[string]any)["sidecar"] != true {
+		t.Fatalf("file-backup = %v", backup)
+	}
+	instance := sonarr["instances"].([]any)[0].(map[string]any)
+	if sonarr["version"] != "4.0.19" || sonarr["versionSource"] != "lock" || sonarr["drift"] != true ||
+		instance["project"] != "arr" || instance["release"] != "1.0.4" || instance["lockDigest"] != "sha256:a" || instance["runningDigest"] != "sha256:b" || instance["drift"] != true {
+		t.Fatalf("sonarr = %v", sonarr)
+	}
+	if traefik["repository"] != "docker.io/library/traefik" || traefik["platform"] != true || traefik["versionSource"] != "tag" ||
+		traefik["instances"].([]any)[0].(map[string]any)["tag"] != "v3.7.12" {
+		t.Fatalf("traefik = %v", traefik)
+	}
+}
+
+func TestAProjectsPodsCarryEachContainersVersionAndWhetherItIsASidecar(t *testing.T) {
+	srv := serveAll(t, &memory{}, &live{}, deliveryapp.New(estate{pods: []delivery.Pod{{
+		Namespace: "arr-system", Name: "radarr-1", Process: "radarr",
+		Containers: []delivery.Container{
+			{Name: "radarr", Image: "r@sha256:a", Version: "6.3.0", VersionSource: delivery.FromLock, RunningDigest: "sha256:a"},
+			{Name: "backup", Image: "b:latest", VersionSource: delivery.FromNowhere, Sidecar: true},
+		},
+	}}}))
+	got := call(t, srv, http.MethodGet, "/api/v1/delivery/projects/arr/pods", "", true)
+	containers := got.body["items"].([]any)[0].(map[string]any)["containers"].([]any)
+	radarr, backup := containers[0].(map[string]any), containers[1].(map[string]any)
+	if radarr["version"] != "6.3.0" || radarr["versionSource"] != "lock" || radarr["sidecar"] != false || radarr["runningDigest"] != "sha256:a" ||
+		backup["version"] != nil || backup["versionSource"] != "unknown" || backup["sidecar"] != true {
+		t.Fatalf("containers = %v", containers)
+	}
+}
+
+func TestAnImagesVersionHistoryIsServedNewestFirst(t *testing.T) {
+	at := func(h int) time.Time { return time.Date(2026, 10, 20, h, 0, 0, 0, time.UTC) }
+	srv := serveAll(t, &memory{}, &live{}, deliveryapp.New(estate{revisions: []delivery.Revision{
+		{Namespace: "n8n-system", Deployment: "n8n", Release: "2.43.6", Created: at(1), Containers: []delivery.Container{{Name: "n8n", Image: "ghcr.io/o/n8n@sha256:1", Version: "2.42.1"}}},
+		{Namespace: "n8n-system", Deployment: "n8n", Release: "2.43.10", Created: at(5), Containers: []delivery.Container{{Name: "n8n", Image: "ghcr.io/o/n8n@sha256:2", Version: "2.43.8"}}},
+	}}))
+	got := call(t, srv, http.MethodGet, "/api/v1/delivery/containers/history?repository=ghcr.io/o/n8n", "", true)
+	items, _ := got.body["items"].([]any)
+	if got.code != http.StatusOK || len(items) != 2 {
+		t.Fatalf("history = %d %v", got.code, got.body)
+	}
+	if newest := items[0].(map[string]any); newest["version"] != "2.43.8" || newest["from"] != "2.42.1" || newest["release"] != "2.43.10" || newest["project"] != "n8n" || newest["at"] != "2026-10-20T05:00:00Z" {
+		t.Fatalf("newest = %v", newest)
+	}
+	if first := items[1].(map[string]any); first["from"] != nil {
+		t.Fatalf("first = %v", first)
+	}
+}
+
+func TestTheOpenUpdatesAreServedInTheContractsShape(t *testing.T) {
+	opened := time.Date(2026, 10, 19, 10, 0, 0, 0, time.UTC)
+	srv := serveEstate(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(&repository{updates: []estatedomain.Update{
+		{Dependency: "n8nio/n8n", Version: "v2.44.0", Repository: "JorisJonkers-dev/n8n", Number: 41, URL: "https://github.com/JorisJonkers-dev/n8n/pull/41", Title: "update n8nio/n8n docker tag to v2.44.0", Opened: opened},
+		{Dependency: "x", Version: "1.0.0", Repository: "a/b", Number: 2, URL: "::not a url", Opened: opened},
+	}}))
+	got := call(t, srv, http.MethodGet, "/api/v1/estate/updates", "", true)
+	items, _ := got.body["items"].([]any)
+	if got.code != http.StatusOK || len(items) != 1 {
+		t.Fatalf("updates = %d %v", got.code, got.body)
+	}
+	if u := items[0].(map[string]any); u["dependency"] != "n8nio/n8n" || u["version"] != "v2.44.0" || u["number"] != float64(41) || u["url"] != "https://github.com/JorisJonkers-dev/n8n/pull/41" || u["opened"] != "2026-10-19T10:00:00Z" {
+		t.Fatalf("update = %v", u)
+	}
+}
+
+// metrics is Prometheus read in memory: one healthy pod sample at every step.
+type metrics struct{ err error }
+
+func (m metrics) Samples(_ context.Context, _ string, _ []string, start, end time.Time, step time.Duration) (map[time.Time]healthdomain.Sample, error) {
+	ready := 1.0
+	out := map[time.Time]healthdomain.Sample{}
+	for at := start; !at.After(end); at = at.Add(step) {
+		out[at] = healthdomain.Sample{PodsReady: &ready}
+	}
+	return out, m.err
+}
+
+func serveMetrics(t *testing.T, m healthdomain.Metrics) *httptest.Server {
+	t.Helper()
+	return serveHealth(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(github.Absent{}), logsapp.New(loki.Absent{}, time.Now),
+		checksapp.New(gatus.Absent{}), healthapp.New(m, time.Now))
+}
+
+func TestAProjectsHealthIsServedAsAnHourOfThirtySecondBlocks(t *testing.T) {
+	got := call(t, serveMetrics(t, metrics{}), http.MethodGet, "/api/v1/health/projects/arr?check=home-media_sonarr", "", true)
+	blocks, _ := got.body["blocks"].([]any)
+	if got.code != http.StatusOK || got.body["step"] != float64(30) || len(blocks) != 120 || blocks[0].(map[string]any)["state"] != "ok" {
+		t.Fatalf("health = %d %v", got.code, got.body)
+	}
+}
+
+func TestAPrometheusThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
+	for want, m := range map[string]healthdomain.Metrics{
+		"Prometheus did not answer.":             metrics{err: errors.New("timeout")},
+		"The dashboard runs without Prometheus.": prometheus.Absent{},
+	} {
+		if got := call(t, serveMetrics(t, m), http.MethodGet, "/api/v1/health/projects/arr", "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
+			t.Fatalf("health = %d %v", got.code, got.body)
 		}
 	}
 }

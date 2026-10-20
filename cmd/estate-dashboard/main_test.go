@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/alerts/adapters/gateway"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/checks/adapters/gatus"
+	"github.com/JorisJonkers-dev/estate-dashboard/internal/health/adapters/prometheus"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/pg/pgtest"
 )
 
@@ -73,6 +75,7 @@ func TestStartRefusesABadEnvironment(t *testing.T) {
 		"no Alertmanager URL":  {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": "alertmanager:9093"},
 		"half a gate address":  {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": "http://alertmanager:9093", "RELEASE_GATE_HOST": "release-gate"},
 		"no Gatus URL":         {"DATABASE_URL": unreachable, "DEV_USER": "dev", "ALERTMANAGER_URL": "http://alertmanager:9093", "GATUS_URL": "gatus:80"},
+		"no Prometheus URL":    {"DATABASE_URL": unreachable, "DEV_USER": "dev", "PROMETHEUS_URL": "prometheus:9090"},
 	}
 	for name, vars := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -105,6 +108,26 @@ func TestTheEnvironmentSaysWhichUptimeMonitorToRead(t *testing.T) {
 	m, err = readGatus(env(map[string]string{"GATUS_URL": "http://gatus.observability.svc.cluster.local"}))
 	if _, reads := m.(*gatus.Gatus); err != nil || !reads {
 		t.Fatalf("with one: %T, %v", m, err)
+	}
+}
+
+func TestTheEnvironmentSaysWhichPrometheusToRead(t *testing.T) {
+	m, err := readPrometheus(env(map[string]string{}))
+	if _, absent := m.(prometheus.Absent); err != nil || !absent {
+		t.Fatalf("without one: %T, %v", m, err)
+	}
+	m, err = readPrometheus(env(map[string]string{"PROMETHEUS_URL": "http://metrics-stack-prometheus.observability.svc.cluster.local:9090"}))
+	if _, reads := m.(*prometheus.Prometheus); err != nil || !reads {
+		t.Fatalf("with one: %T, %v", m, err)
+	}
+}
+
+func TestTheClustersOwnNamespacesAreSkippedUnlessTheEnvironmentNamesOthers(t *testing.T) {
+	if got := skippedNamespaces(env(map[string]string{})); !slices.Contains(got, "kube-system") || !slices.Contains(got, "flux-system") {
+		t.Fatalf("by default: %v", got)
+	}
+	if got := skippedNamespaces(env(map[string]string{"CONTAINERS_SKIP_NAMESPACES": " kube-system, ,tailscale "})); !slices.Equal(got, []string{"kube-system", "tailscale"}) {
+		t.Fatalf("named: %v", got)
 	}
 }
 

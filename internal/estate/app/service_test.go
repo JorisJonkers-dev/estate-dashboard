@@ -11,11 +11,12 @@ import (
 )
 
 type repository struct {
-	pins   []domain.Pin
-	ledger domain.Handover
-	issues []domain.Issue
-	asked  int
-	err    error
+	pins    []domain.Pin
+	ledger  domain.Handover
+	issues  []domain.Issue
+	updates []domain.Update
+	asked   int
+	err     error
 }
 
 func (r *repository) Pins(context.Context) ([]domain.Pin, error) { return r.pins, r.err }
@@ -28,6 +29,8 @@ func (r *repository) Deploys(_ context.Context, _ string, limit int) ([]domain.D
 }
 
 func (r *repository) Issues(context.Context) ([]domain.Issue, error) { return r.issues, r.err }
+
+func (r *repository) Updates(context.Context) ([]domain.Update, error) { return r.updates, r.err }
 
 func (r *repository) Rollouts(_ context.Context, _, _ string, limit int) ([]domain.Rollout, error) {
 	r.asked = limit
@@ -98,9 +101,19 @@ func TestEveryReadReportsTheRepositorysFailure(t *testing.T) {
 	_, e2 := s.Deploys(t.Context(), "auth", 1)
 	_, e3 := s.Issues(t.Context())
 	_, e4 := s.Handover(t.Context())
-	for _, err := range []error{e1, e2, e3, e4} {
+	_, e5 := s.Updates(t.Context())
+	for _, err := range []error{e1, e2, e3, e4, e5} {
 		if !errors.Is(err, domain.ErrNoRepository) {
 			t.Fatalf("error = %v", err)
 		}
+	}
+}
+
+func TestUpdatesAreTheNewestPullRequestFirst(t *testing.T) {
+	older := domain.Update{Number: 1, Opened: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)}
+	newer := domain.Update{Number: 2, Opened: time.Date(2026, 10, 2, 0, 0, 0, 0, time.UTC)}
+	got, err := app.New(&repository{updates: []domain.Update{older, newer}}).Updates(t.Context())
+	if err != nil || len(got) != 2 || got[0].Number != 2 {
+		t.Fatalf("updates = %+v, %v", got, err)
 	}
 }

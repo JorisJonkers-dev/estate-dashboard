@@ -315,12 +315,25 @@ export const zTermination = z.object({
 });
 
 /**
+ * Where a container's version comes from: the version annotation the render writes from the images lock, a version-shaped image tag, or nowhere.
+ */
+export const zVersionSource = z.enum([
+    'lock',
+    'tag',
+    'unknown'
+]);
+
+/**
  * One container of a pod.
  */
 export const zPodContainer = z.object({
     name: z.string().max(253),
     image: z.string().max(1024),
     init: z.boolean(),
+    sidecar: z.boolean(),
+    version: z.string().max(128).optional(),
+    versionSource: zVersionSource,
+    runningDigest: z.string().max(128).optional(),
     ready: z.boolean(),
     state: z.enum([
         'running',
@@ -361,6 +374,111 @@ export const zPodList = z.object({
 });
 
 /**
+ * One container that runs an image.
+ */
+export const zContainerInstance = z.object({
+    project: z.string().max(63),
+    process: z.string().max(63),
+    container: z.string().max(253),
+    pod: z.string().max(253),
+    namespace: z.string().max(63),
+    node: z.string().max(253).optional(),
+    started: z.iso.datetime({ offset: true }).max(64).optional(),
+    release: z.string().max(128).optional(),
+    init: z.boolean(),
+    sidecar: z.boolean(),
+    managed: z.boolean(),
+    deleting: z.boolean().optional(),
+    version: z.string().max(128).optional(),
+    versionSource: zVersionSource,
+    tag: z.string().max(128).optional(),
+    lockDigest: z.string().max(128).optional(),
+    runningDigest: z.string().max(128).optional(),
+    drift: z.boolean()
+});
+
+/**
+ * One image the estate runs, and every container that runs it.
+ */
+export const zContainer = z.object({
+    name: z.string().max(253),
+    repository: z.string().max(512),
+    version: z.string().max(128).optional(),
+    versionSource: zVersionSource,
+    platform: z.boolean(),
+    drift: z.boolean(),
+    instances: z.array(zContainerInstance).max(1000)
+});
+
+/**
+ * Every image the estate runs, by name.
+ */
+export const zContainerList = z.object({
+    truncated: z.boolean(),
+    items: z.array(zContainer).max(1000)
+});
+
+/**
+ * One software version an image ran.
+ */
+export const zVersionChange = z.object({
+    version: z.string().max(128),
+    from: z.string().max(128).optional(),
+    project: z.string().max(63).optional(),
+    release: z.string().max(128).optional(),
+    at: z.iso.datetime({ offset: true }).max(64)
+});
+
+/**
+ * The software versions one image ran, newest first.
+ */
+export const zVersionHistory = z.object({
+    items: z.array(zVersionChange).max(100)
+});
+
+/**
+ * One open Renovate pull request that moves an image to a newer version.
+ */
+export const zUpdate = z.object({
+    dependency: z.string().max(512),
+    version: z.string().max(128),
+    repository: z.string().max(140),
+    number: z.int().gte(1).lte(2147483647),
+    url: z.url().max(2048),
+    title: z.string().max(512),
+    opened: z.iso.datetime({ offset: true }).max(64)
+});
+
+/**
+ * The open Renovate pull requests that move an image, newest first.
+ */
+export const zUpdateList = z.object({
+    items: z.array(zUpdate).max(1000)
+});
+
+/**
+ * The worst state a Project was in during one step.
+ */
+export const zHealthBlock = z.object({
+    at: z.iso.datetime({ offset: true }).max(64),
+    state: z.enum([
+        'ok',
+        'warn',
+        'crit',
+        'empty'
+    ]),
+    detail: z.string().max(256).optional()
+});
+
+/**
+ * A Project's health over the last hour, oldest block first.
+ */
+export const zHealthTimeline = z.object({
+    step: z.int().gte(1).lte(3600),
+    blocks: z.array(zHealthBlock).max(240)
+});
+
+/**
  * One condition a probe holds an answer to.
  */
 export const zCheckCondition = z.object({
@@ -382,7 +500,7 @@ export const zCheck = z.object({
     durationMs: z.coerce.bigint().gte(BigInt(0)).lte(BigInt(86400000)).optional(),
     error: z.string().max(1024).optional(),
     conditions: z.array(zCheckCondition).max(32),
-    recent: z.array(z.boolean()).max(20)
+    recent: z.array(z.boolean()).max(60)
 });
 
 /**
@@ -657,6 +775,38 @@ export const zListPodsPath = z.object({
  * What the cluster holds.
  */
 export const zListPodsResponse = zPodList;
+
+/**
+ * What the cluster runs.
+ */
+export const zListContainersResponse = zContainerList;
+
+export const zListContainerHistoryQuery = z.object({
+    repository: z.string().min(1).max(512).regex(/^[a-z0-9][a-z0-9._\/:-]*$/)
+});
+
+/**
+ * The versions.
+ */
+export const zListContainerHistoryResponse = zVersionHistory;
+
+/**
+ * The pull requests.
+ */
+export const zListUpdatesResponse = zUpdateList;
+
+export const zGetHealthPath = z.object({
+    project: z.string().min(1).max(63).regex(/^[a-z0-9_][a-z0-9_-]{0,62}$/)
+});
+
+export const zGetHealthQuery = z.object({
+    check: z.array(z.string().max(256)).max(32).optional()
+});
+
+/**
+ * The timeline.
+ */
+export const zGetHealthResponse = zHealthTimeline;
 
 /**
  * What the monitor holds.

@@ -46,6 +46,15 @@ type Invoker interface {
 	//
 	// GET /api/v1/estate/handover
 	GetHandover(ctx context.Context) (GetHandoverRes, error)
+	// GetHealth invokes getHealth operation.
+	//
+	// One block per 30 seconds over the last hour, each the worst of the Project's pod readiness, the
+	// success of the uptime checks named, and its Reconcile Unit's readiness, from Prometheus. A block
+	// with no data is empty, never healthy. A 503 means Prometheus did not answer, or the dashboard runs
+	// without one.
+	//
+	// GET /api/v1/health/projects/{project}
+	GetHealth(ctx context.Context, params GetHealthParams) (GetHealthRes, error)
 	// GetReleaseNotes invokes getReleaseNotes operation.
 	//
 	// The body of the GitHub Release a repository of the estate published for a version, as Markdown. A
@@ -91,6 +100,25 @@ type Invoker interface {
 	//
 	// GET /api/v1/estate/composition/runs
 	ListCompositionRuns(ctx context.Context) (ListCompositionRunsRes, error)
+	// ListContainerHistory invokes listContainerHistory operation.
+	//
+	// Each software version of the image the cluster's Deployment revisions recorded, the version it
+	// replaced, the release that shipped it and when. Revisions that changed no version of the image are
+	// left out. A 503 means the cluster did not answer, or the dashboard runs without one.
+	//
+	// GET /api/v1/delivery/containers/history
+	ListContainerHistory(ctx context.Context, params ListContainerHistoryParams) (ListContainerHistoryRes, error)
+	// ListContainers invokes listContainers operation.
+	//
+	// One entry per image repository, with every container that runs it: the pods the render manages and
+	// the pods of the platform still on the old path, leaving out the system namespaces the dashboard is
+	// configured to skip. Each container's version comes from the version annotation the render writes,
+	// else from a version-shaped image tag, else it is unknown. A container drifts when the digest it runs
+	// is not the one its pod spec pins. A 503 means the cluster did not answer, or the dashboard runs
+	// without one.
+	//
+	// GET /api/v1/delivery/containers
+	ListContainers(ctx context.Context) (ListContainersRes, error)
 	// ListDeploys invokes listDeploys operation.
 	//
 	// The Estate repository's history of projects//source.yaml: its deploy log. A Project with no pin has
@@ -168,6 +196,15 @@ type Invoker interface {
 	//
 	// GET /api/v1/delivery/units
 	ListUnits(ctx context.Context) (ListUnitsRes, error)
+	// ListUpdates invokes listUpdates operation.
+	//
+	// Every open pull request Renovate opened across the estate's repositories that moves a Dockerfile's
+	// base image or an images-lock entry to a newer version, with the dependency and version it names.
+	// Only the repositories the dashboard's token may read are searched. A 503 means GitHub did not
+	// answer, or the dashboard has no Estate repository.
+	//
+	// GET /api/v1/estate/updates
+	ListUpdates(ctx context.Context) (ListUpdatesRes, error)
 	// SilenceAlert invokes silenceAlert operation.
 	//
 	// Silences one firing alert, matching every one of its labels exactly, for an hour, four hours, a day,
@@ -464,6 +501,170 @@ func (c *Client) sendGetHandover(ctx context.Context) (res GetHandoverRes, err e
 
 	stage = "DecodeResponse"
 	result, err := decodeGetHandoverResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetHealth invokes getHealth operation.
+//
+// One block per 30 seconds over the last hour, each the worst of the Project's pod readiness, the
+// success of the uptime checks named, and its Reconcile Unit's readiness, from Prometheus. A block
+// with no data is empty, never healthy. A 503 means Prometheus did not answer, or the dashboard runs
+// without one.
+//
+// GET /api/v1/health/projects/{project}
+func (c *Client) GetHealth(ctx context.Context, params GetHealthParams) (GetHealthRes, error) {
+	res, err := c.sendGetHealth(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetHealth(ctx context.Context, params GetHealthParams) (res GetHealthRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getHealth"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/v1/health/projects/{project}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetHealthOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/api/v1/health/projects/"
+	{
+		// Encode "project" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.Project))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "check" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "check",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if params.Check != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.Check {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(item))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetHealthOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetHealthResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -1204,6 +1405,257 @@ func (c *Client) sendListCompositionRuns(ctx context.Context) (res ListCompositi
 
 	stage = "DecodeResponse"
 	result, err := decodeListCompositionRunsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListContainerHistory invokes listContainerHistory operation.
+//
+// Each software version of the image the cluster's Deployment revisions recorded, the version it
+// replaced, the release that shipped it and when. Revisions that changed no version of the image are
+// left out. A 503 means the cluster did not answer, or the dashboard runs without one.
+//
+// GET /api/v1/delivery/containers/history
+func (c *Client) ListContainerHistory(ctx context.Context, params ListContainerHistoryParams) (ListContainerHistoryRes, error) {
+	res, err := c.sendListContainerHistory(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListContainerHistory(ctx context.Context, params ListContainerHistoryParams) (res ListContainerHistoryRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listContainerHistory"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/v1/delivery/containers/history"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListContainerHistoryOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/api/v1/delivery/containers/history"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "repository" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "repository",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.Repository))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListContainerHistoryOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeListContainerHistoryResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListContainers invokes listContainers operation.
+//
+// One entry per image repository, with every container that runs it: the pods the render manages and
+// the pods of the platform still on the old path, leaving out the system namespaces the dashboard is
+// configured to skip. Each container's version comes from the version annotation the render writes,
+// else from a version-shaped image tag, else it is unknown. A container drifts when the digest it runs
+// is not the one its pod spec pins. A 503 means the cluster did not answer, or the dashboard runs
+// without one.
+//
+// GET /api/v1/delivery/containers
+func (c *Client) ListContainers(ctx context.Context) (ListContainersRes, error) {
+	res, err := c.sendListContainers(ctx)
+	return res, err
+}
+
+func (c *Client) sendListContainers(ctx context.Context) (res ListContainersRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listContainers"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/v1/delivery/containers"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListContainersOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/api/v1/delivery/containers"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListContainersOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeListContainersResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -2589,6 +3041,122 @@ func (c *Client) sendListUnits(ctx context.Context) (res ListUnitsRes, err error
 
 	stage = "DecodeResponse"
 	result, err := decodeListUnitsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListUpdates invokes listUpdates operation.
+//
+// Every open pull request Renovate opened across the estate's repositories that moves a Dockerfile's
+// base image or an images-lock entry to a newer version, with the dependency and version it names.
+// Only the repositories the dashboard's token may read are searched. A 503 means GitHub did not
+// answer, or the dashboard has no Estate repository.
+//
+// GET /api/v1/estate/updates
+func (c *Client) ListUpdates(ctx context.Context) (ListUpdatesRes, error) {
+	res, err := c.sendListUpdates(ctx)
+	return res, err
+}
+
+func (c *Client) sendListUpdates(ctx context.Context) (res ListUpdatesRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listUpdates"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/v1/estate/updates"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListUpdatesOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/api/v1/estate/updates"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListUpdatesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeListUpdatesResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

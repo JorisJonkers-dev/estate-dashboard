@@ -87,3 +87,27 @@ func TestWithoutAMonitorEveryReadSaysSo(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestACheckCarriesItsLastSixtyProbesAndAsksGatusForThem(t *testing.T) {
+	var asked string
+	results := ""
+	for i := range 70 {
+		if i > 0 {
+			results += ","
+		}
+		results += `{"status":200,"success":` + map[bool]string{true: "true", false: "false"}[i >= 10] + `,"timestamp":"2026-10-19T21:11:18Z"}`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = r.URL.Query().Get("pageSize")
+		_, _ = w.Write([]byte(`[{"name":"n","group":"g","key":"g_n","results":[` + results + `]}]`))
+	}))
+	t.Cleanup(srv.Close)
+	g, err := gatus.New(srv.URL, srv.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := g.Checks(t.Context())
+	if err != nil || asked != "60" || len(got[0].Recent) != 60 || !got[0].Recent[0] {
+		t.Fatalf("asked %q, checks = %+v, %v", asked, got, err)
+	}
+}

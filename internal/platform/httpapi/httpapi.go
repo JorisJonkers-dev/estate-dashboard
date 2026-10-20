@@ -14,6 +14,7 @@ import (
 	checksweb "github.com/JorisJonkers-dev/estate-dashboard/internal/checks/adapters/web"
 	deliveryweb "github.com/JorisJonkers-dev/estate-dashboard/internal/delivery/adapters/web"
 	estateweb "github.com/JorisJonkers-dev/estate-dashboard/internal/estate/adapters/web"
+	healthweb "github.com/JorisJonkers-dev/estate-dashboard/internal/health/adapters/web"
 	logsweb "github.com/JorisJonkers-dev/estate-dashboard/internal/logs/adapters/web"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpx"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/oas"
@@ -33,6 +34,7 @@ type api struct {
 	*estateweb.Estate
 	*logsweb.Logs
 	*checksweb.Checks
+	*healthweb.Health
 	logger *slog.Logger
 }
 
@@ -75,9 +77,9 @@ func (s admitted) HandleSessionCookie(ctx context.Context, _ oas.OperationName, 
 }
 
 // New returns the API's http.Handler, serving every path the contract declares under /api.
-func New(logger *slog.Logger, gate Gate, alerts alertsweb.UseCases, live alertsweb.LiveUseCases, delivery deliveryweb.UseCases, estate estateweb.UseCases, logs logsweb.UseCases, checks checksweb.UseCases) (http.Handler, error) {
+func New(logger *slog.Logger, gate Gate, alerts alertsweb.UseCases, live alertsweb.LiveUseCases, delivery deliveryweb.UseCases, estate estateweb.UseCases, logs logsweb.UseCases, checks checksweb.UseCases, health healthweb.UseCases) (http.Handler, error) {
 	return oas.NewServer(
-		&api{Handler: alertsweb.New(alerts), Live: alertsweb.NewLive(live, logger), Delivery: deliveryweb.New(delivery, logger), Estate: estateweb.New(estate, logger), Logs: logsweb.New(logs, logger), Checks: checksweb.New(checks, logger), logger: logger},
+		&api{Handler: alertsweb.New(alerts), Live: alertsweb.NewLive(live, logger), Delivery: deliveryweb.New(delivery, logger), Estate: estateweb.New(estate, logger), Logs: logsweb.New(logs, logger), Checks: checksweb.New(checks, logger), Health: healthweb.New(health, logger), logger: logger},
 		admitted{gate: gate},
 		oas.WithErrorHandler(func(_ context.Context, w http.ResponseWriter, _ *http.Request, err error) {
 			httpx.WriteProblem(w, ogenerrors.ErrorCode(err), "")

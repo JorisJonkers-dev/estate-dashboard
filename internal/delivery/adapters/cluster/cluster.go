@@ -31,8 +31,11 @@ var (
 	OCIRepositories = schema.GroupVersionResource{Group: "source.toolkit.fluxcd.io", Version: "v1", Resource: "ocirepositories"}
 	Kustomizations  = schema.GroupVersionResource{Group: "kustomize.toolkit.fluxcd.io", Version: "v1", Resource: "kustomizations"}
 	Canaries        = schema.GroupVersionResource{Group: "flagger.app", Version: "v1beta1", Resource: "canaries"}
-	// Pods are the one core kind read, in one Project's namespace at a time.
+	// Pods are the one core kind read: in one Project's namespace, or in every namespace for the
+	// images the estate runs.
 	Pods = schema.GroupVersionResource{Version: "v1", Resource: "pods"}
+	// ReplicaSets hold each Deployment revision's pod template, for an image's version history.
+	ReplicaSets = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}
 )
 
 const (
@@ -307,6 +310,56 @@ func (k Kube) Pods(ctx context.Context, namespace string) (domain.Page[domain.Po
 	return domain.Page[domain.Pod]{Items: pods, Truncated: list.GetContinue() != ""}, nil
 }
 
+// AllPods implements domain.Cluster: every pod in every namespace, the render's and the platform's.
+func (k Kube) AllPods(ctx context.Context) (domain.Page[domain.Pod], error) {
+	list, err := k.Dynamic.Resource(Pods).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{Limit: maxListed})
+	if err != nil {
+		return domain.Page[domain.Pod]{}, fmt.Errorf("list pods: %w", err)
+	}
+	pods := make([]domain.Pod, 0, len(list.Items))
+	for _, o := range list.Items {
+		pods = append(pods, readPod(o))
+	}
+	return domain.Page[domain.Pod]{Items: pods, Truncated: list.GetContinue() != ""}, nil
+}
+
+// Revisions implements domain.Cluster: every ReplicaSet a Deployment owns, as the revision of it.
+func (k Kube) Revisions(ctx context.Context) (domain.Page[domain.Revision], error) {
+	list, err := k.Dynamic.Resource(ReplicaSets).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{Limit: maxListed})
+	if err != nil {
+		return domain.Page[domain.Revision]{}, fmt.Errorf("list replicasets: %w", err)
+	}
+	revisions := make([]domain.Revision, 0, len(list.Items))
+	for _, o := range list.Items {
+		owners := o.GetOwnerReferences()
+		if len(owners) == 0 || owners[0].Kind != "Deployment" {
+			continue
+		}
+		template, _, _ := unstructured.NestedMap(o.Object, "spec", "template")
+		pod := unstructured.Unstructured{Object: template}
+		annotations := pod.GetAnnotations()
+		r := domain.Revision{
+			Namespace: o.GetNamespace(), Deployment: owners[0].Name, Release: pod.GetLabels()["app.kubernetes.io/version"],
+			Created: o.GetCreationTimestamp().UTC(),
+		}
+		for _, field := range []string{"initContainers", "containers"} {
+			declared, _, _ := unstructured.NestedSlice(template, "spec", field)
+			for _, d := range declared {
+				spec, ok := d.(map[string]any)
+				if !ok {
+					continue
+				}
+				name, _ := spec["name"].(string)
+				image, _ := spec["image"].(string)
+				version, source := domain.VersionOf(annotations[domain.VersionAnnotation+name], domain.ParseImage(image))
+				r.Containers = append(r.Containers, domain.Container{Name: name, Image: image, Version: version, VersionSource: source})
+			}
+		}
+		revisions = append(revisions, r)
+	}
+	return domain.Page[domain.Revision]{Items: revisions, Truncated: list.GetContinue() != ""}, nil
+}
+
 func readPod(o unstructured.Unstructured) domain.Pod {
 	labels := o.GetLabels()
 	p := domain.Pod{
@@ -315,6 +368,7 @@ func readPod(o unstructured.Unstructured) domain.Pod {
 		Version: labels["app.kubernetes.io/version"],
 		Node:    str(o, "spec", "nodeName"), Phase: str(o, "status", "phase"),
 		Started:  timeAt(o.Object, "status", "startTime"),
+		Managed:  labels["app.kubernetes.io/managed-by"] == "deploy-kit",
 		Deleting: o.GetDeletionTimestamp() != nil,
 	}
 	if owners := o.GetOwnerReferences(); len(owners) > 0 {
@@ -327,7 +381,31 @@ func readPod(o unstructured.Unstructured) domain.Pod {
 		}
 	}
 	p.Containers = append(containers(o, "initContainers", "initContainerStatuses", true), containers(o, "containers", "containerStatuses", false)...)
+	annotations := o.GetAnnotations()
+	main := mainContainer(p)
+	for i := range p.Containers {
+		c := &p.Containers[i]
+		c.Version, c.VersionSource = domain.VersionOf(annotations[domain.VersionAnnotation+c.Name], domain.ParseImage(c.Image))
+		c.Sidecar = !c.Init && c.Name != main
+	}
 	return p
+}
+
+// mainContainer is the container that is the pod's Process: the one named for it, else the first.
+func mainContainer(p domain.Pod) string {
+	first := ""
+	for _, c := range p.Containers {
+		if c.Init {
+			continue
+		}
+		if c.Name == p.Process {
+			return c.Name
+		}
+		if first == "" {
+			first = c.Name
+		}
+	}
+	return first
 }
 
 // containers joins each container the spec declares with what the kubelet reports of it.
@@ -356,6 +434,8 @@ func containers(o unstructured.Unstructured, specField, statusField string, init
 		}
 		if status := statuses[name]; status != nil {
 			c.Ready, _ = status["ready"].(bool)
+			imageID, _ := status["imageID"].(string)
+			c.RunningDigest = domain.DigestOf(imageID)
 			restarts, _, _ := unstructured.NestedInt64(status, "restartCount")
 			c.Restarts = int(restarts)
 			c.State, c.Reason, c.Message, c.Since = state(status, "state")
@@ -424,6 +504,16 @@ func (Absent) Releases(context.Context) (domain.Page[domain.Release], error) {
 // Pods implements domain.Cluster.
 func (Absent) Pods(context.Context, string) (domain.Page[domain.Pod], error) {
 	return domain.Page[domain.Pod]{}, domain.ErrNoCluster
+}
+
+// AllPods implements domain.Cluster.
+func (Absent) AllPods(context.Context) (domain.Page[domain.Pod], error) {
+	return domain.Page[domain.Pod]{}, domain.ErrNoCluster
+}
+
+// Revisions implements domain.Cluster.
+func (Absent) Revisions(context.Context) (domain.Page[domain.Revision], error) {
+	return domain.Page[domain.Revision]{}, domain.ErrNoCluster
 }
 
 // Connect reads the cluster the dashboard runs in, or the one KUBECONFIG names on a local run,
