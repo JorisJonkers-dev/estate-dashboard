@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.5.0...v0.6.0) (2026-10-20)
+
+
+### Features
+
+* show each Project's live pods, its uptime checks and its stack's health ([#52](https://github.com/JorisJonkers-dev/estate-dashboard/issues/52)) ([be3997f](https://github.com/JorisJonkers-dev/estate-dashboard/commit/be3997fb07e54273f6acf1bc360f04aba3804fb7))
+
 ## [0.5.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.4.0...v0.5.0) (2026-10-16)
 
 
