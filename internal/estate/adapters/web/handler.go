@@ -6,7 +6,9 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math"
 	"net/http"
+	"net/url"
 
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/estate/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpx"
@@ -21,6 +23,7 @@ type UseCases interface {
 	Issues(ctx context.Context) ([]domain.Issue, error)
 	Rollouts(ctx context.Context, repository, project string, limit int) ([]domain.Rollout, error)
 	Notes(ctx context.Context, repository, version string) (domain.Notes, error)
+	Updates(ctx context.Context) ([]domain.Update, error)
 }
 
 // Estate implements the estate operations.
@@ -174,4 +177,26 @@ func opt(s string) oas.OptString {
 		return oas.OptString{}
 	}
 	return oas.NewOptString(s)
+}
+
+// ListUpdates implements listUpdates. A pull request whose address does not parse is left out.
+func (h *Estate) ListUpdates(ctx context.Context) (oas.ListUpdatesRes, error) {
+	updates, err := h.uc.Updates(ctx)
+	if err != nil {
+		down := oas.ListUpdatesServiceUnavailable(h.unavailable(ctx, "updates", err))
+		return &down, nil //nolint:nilerr // the cause is logged; the contract's 503 is the answer
+	}
+	items := make([]oas.Update, 0, len(updates))
+	for _, u := range updates {
+		at, err := url.Parse(u.URL)
+		if err != nil {
+			continue
+		}
+		items = append(items, oas.Update{
+			Dependency: u.Dependency, Version: u.Version, Repository: u.Repository,
+			Number: int32(min(max(u.Number, 1), math.MaxInt32)), //nolint:gosec // clamped to the int32 range
+			URL:    *at, Title: u.Title, Opened: u.Opened,
+		})
+	}
+	return &oas.UpdateList{Items: items}, nil
 }

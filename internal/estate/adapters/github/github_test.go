@@ -291,9 +291,36 @@ func TestWithoutARepositoryEveryReadSaysSo(t *testing.T) {
 	_, e4 := a.Handover(t.Context())
 	_, e5 := a.Rollouts(t.Context(), "a/b", "x", 1)
 	_, e6 := a.Notes(t.Context(), "a/b", "1.0.0")
-	for _, err := range []error{e1, e2, e3, e4, e5, e6} {
+	_, e7 := a.Updates(t.Context())
+	for _, err := range []error{e1, e2, e3, e4, e5, e6, e7} {
 		if !errors.Is(err, domain.ErrNoRepository) {
 			t.Fatalf("error = %v", err)
 		}
+	}
+}
+
+func TestAnUpdateIsARenovatePullRequestThatMovesOneImageToAVersion(t *testing.T) {
+	f := &fake{status: http.StatusOK, rest: `{"items":[
+		{"number":41,"title":"chore(deps): update n8nio/n8n docker tag to v2.44.0","html_url":"https://github.com/JorisJonkers-dev/n8n/pull/41","created_at":"2026-10-19T10:00:00Z","repository_url":"https://api.github.com/repos/JorisJonkers-dev/n8n"},
+		{"number":27,"title":"fix(deps): update dependency linuxserver/sonarr to 4.0.20.3001-ls323","html_url":"https://github.com/JorisJonkers-dev/arr/pull/27","created_at":"2026-10-20T07:00:00Z","repository_url":"https://api.github.com/repos/JorisJonkers-dev/arr"},
+		{"number":5,"title":"chore(deps): update all non-major dependencies","html_url":"https://github.com/JorisJonkers-dev/x/pull/5","created_at":"2026-10-20T07:00:00Z","repository_url":"https://api.github.com/repos/JorisJonkers-dev/x"},
+		{"number":6,"title":"chore(deps): pin n8nio/n8n docker digest","html_url":"https://github.com/JorisJonkers-dev/x/pull/6","created_at":"2026-10-20T07:00:00Z","repository_url":"https://api.github.com/repos/JorisJonkers-dev/x"}
+	]}`}
+	got, err := f.serve(t).Updates(t.Context())
+	want := []domain.Update{
+		{Dependency: "n8nio/n8n", Version: "v2.44.0", Repository: "JorisJonkers-dev/n8n", Number: 41, URL: "https://github.com/JorisJonkers-dev/n8n/pull/41", Title: "chore(deps): update n8nio/n8n docker tag to v2.44.0", Opened: time.Date(2026, 10, 19, 10, 0, 0, 0, time.UTC)},
+		{Dependency: "linuxserver/sonarr", Version: "4.0.20.3001-ls323", Repository: "JorisJonkers-dev/arr", Number: 27, URL: "https://github.com/JorisJonkers-dev/arr/pull/27", Title: "fix(deps): update dependency linuxserver/sonarr to 4.0.20.3001-ls323", Opened: time.Date(2026, 10, 20, 7, 0, 0, 0, time.UTC)},
+	}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("updates = %+v, %v", got, err)
+	}
+	if f.seen[0] != "GET /api/search/issues?per_page=100&q=is%3Apr+is%3Aopen+author%3Aapp%2Frenovate+org%3AJorisJonkers-dev" {
+		t.Fatalf("asked %v", f.seen)
+	}
+}
+
+func TestASearchGitHubRefusesIsAnError(t *testing.T) {
+	if _, err := (&fake{status: http.StatusForbidden}).serve(t).Updates(t.Context()); err == nil {
+		t.Fatal("a refused search was a list of updates")
 	}
 }

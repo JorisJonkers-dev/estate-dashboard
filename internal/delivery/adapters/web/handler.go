@@ -22,6 +22,8 @@ type UseCases interface {
 	Units(ctx context.Context) (domain.Page[domain.Unit], error)
 	Releases(ctx context.Context) (domain.Page[domain.Release], error)
 	Pods(ctx context.Context, project string) (domain.Page[domain.Pod], error)
+	Containers(ctx context.Context) (domain.Page[domain.Images], error)
+	History(ctx context.Context, repository string) ([]domain.VersionChange, error)
 }
 
 // Delivery implements the delivery operations.
@@ -144,7 +146,8 @@ func toPod(p domain.Pod) oas.Pod {
 	}
 	for _, c := range p.Containers {
 		container := oas.PodContainer{
-			Name: c.Name, Image: c.Image, Init: c.Init, Ready: c.Ready, Reason: opt(c.Reason), Message: opt(c.Message),
+			Name: c.Name, Image: c.Image, Init: c.Init, Sidecar: c.Sidecar, Ready: c.Ready, Reason: opt(c.Reason), Message: opt(c.Message),
+			Version: opt(c.Version), VersionSource: oas.VersionSource(c.VersionSource), RunningDigest: opt(c.RunningDigest),
 			Since: optTime(c.Since), Restarts: clamp(c.Restarts),
 			Probes: oas.Probes{Readiness: c.Probes.Readiness, Liveness: c.Probes.Liveness, Startup: c.Probes.Startup},
 		}
@@ -157,6 +160,49 @@ func toPod(p domain.Pod) oas.Pod {
 		out.Containers = append(out.Containers, container)
 	}
 	return out
+}
+
+// ListContainers implements listContainers.
+func (h *Delivery) ListContainers(ctx context.Context) (oas.ListContainersRes, error) {
+	images, err := h.uc.Containers(ctx)
+	if err != nil {
+		down := oas.ListContainersServiceUnavailable(h.unavailable(ctx, "containers", err))
+		return &down, nil //nolint:nilerr // the cause is logged; the contract's 503 is the answer
+	}
+	items := make([]oas.Container, 0, len(images.Items))
+	for _, g := range images.Items {
+		version, source := g.Newest()
+		out := oas.Container{
+			Name: g.Name, Repository: g.Repository, Version: opt(version), VersionSource: oas.VersionSource(source),
+			Platform: g.Platform(), Drift: g.Drift(), Instances: make([]oas.ContainerInstance, 0, len(g.Instances)),
+		}
+		for _, i := range g.Instances {
+			img := domain.ParseImage(i.Image)
+			out.Instances = append(out.Instances, oas.ContainerInstance{
+				Project: i.Project, Process: i.Process, Container: i.Name, Pod: i.Pod, Namespace: i.Namespace,
+				Node: opt(i.Node), Started: optTime(i.Started), Release: opt(i.Release), Init: i.Init, Sidecar: i.Sidecar,
+				Managed: i.Managed, Deleting: oas.NewOptBool(i.Deleting), Version: opt(i.Version),
+				VersionSource: oas.VersionSource(i.VersionSource), Tag: opt(img.Tag), LockDigest: opt(img.Digest),
+				RunningDigest: opt(i.RunningDigest), Drift: i.Drift(),
+			})
+		}
+		items = append(items, out)
+	}
+	return &oas.ContainerList{Items: items, Truncated: images.Truncated}, nil
+}
+
+// ListContainerHistory implements listContainerHistory.
+func (h *Delivery) ListContainerHistory(ctx context.Context, params oas.ListContainerHistoryParams) (oas.ListContainerHistoryRes, error) {
+	changes, err := h.uc.History(ctx, params.Repository)
+	if err != nil {
+		down := oas.ListContainerHistoryServiceUnavailable(h.unavailable(ctx, "history", err))
+		return &down, nil //nolint:nilerr // the cause is logged; the contract's 503 is the answer
+	}
+	items := make([]oas.VersionChange, 0, len(changes))
+	for _, c := range changes {
+		items = append(items, oas.VersionChange{Version: c.Version, From: opt(c.From), Project: opt(c.Project), Release: opt(c.Release), At: c.At})
+	}
+	return &oas.VersionHistory{Items: items}, nil
 }
 
 func optTime(t *time.Time) oas.OptDateTime {

@@ -36,6 +36,18 @@ func (UnimplementedHandler) GetHandover(ctx context.Context) (r GetHandoverRes, 
 	return r, ht.ErrNotImplemented
 }
 
+// GetHealth implements getHealth operation.
+//
+// One block per 30 seconds over the last hour, each the worst of the Project's pod readiness, the
+// success of the uptime checks named, and its Reconcile Unit's readiness, from Prometheus. A block
+// with no data is empty, never healthy. A 503 means Prometheus did not answer, or the dashboard runs
+// without one.
+//
+// GET /api/v1/health/projects/{project}
+func (UnimplementedHandler) GetHealth(ctx context.Context, params GetHealthParams) (r GetHealthRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetReleaseNotes implements getReleaseNotes operation.
 //
 // The body of the GitHub Release a repository of the estate published for a version, as Markdown. A
@@ -44,6 +56,19 @@ func (UnimplementedHandler) GetHandover(ctx context.Context) (r GetHandoverRes, 
 //
 // GET /api/v1/estate/releases/notes
 func (UnimplementedHandler) GetReleaseNotes(ctx context.Context, params GetReleaseNotesParams) (r GetReleaseNotesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetRolloutWindow implements getRolloutWindow operation.
+//
+// Every pod of the Project Prometheus saw from `from` to `to`: when it started, when it first turned
+// ready, when it was last seen, and its readiness every five seconds; and each Process's canary weight
+// as Flagger moved it. The dashboard joins this with the release's stages and the Release Gate's
+// record to show how the release rolled out. A 503 means Prometheus did not answer, or the dashboard
+// runs without one.
+//
+// GET /api/v1/health/projects/{project}/rollout
+func (UnimplementedHandler) GetRolloutWindow(ctx context.Context, params GetRolloutWindowParams) (r GetRolloutWindowRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -96,6 +121,31 @@ func (UnimplementedHandler) ListChecks(ctx context.Context) (r ListChecksRes, _ 
 //
 // GET /api/v1/estate/composition/runs
 func (UnimplementedHandler) ListCompositionRuns(ctx context.Context) (r ListCompositionRunsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListContainerHistory implements listContainerHistory operation.
+//
+// Each software version of the image the cluster's Deployment revisions recorded, the version it
+// replaced, the release that shipped it and when. Revisions that changed no version of the image are
+// left out. A 503 means the cluster did not answer, or the dashboard runs without one.
+//
+// GET /api/v1/delivery/containers/history
+func (UnimplementedHandler) ListContainerHistory(ctx context.Context, params ListContainerHistoryParams) (r ListContainerHistoryRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListContainers implements listContainers operation.
+//
+// One entry per image repository, with every container that runs it: the pods the render manages and
+// the pods of the platform still on the old path, leaving out the system namespaces the dashboard is
+// configured to skip. Each container's version comes from the version annotation the render writes,
+// else from a version-shaped image tag, else it is unknown. A container drifts when the digest it runs
+// is not the one its pod spec pins. A 503 means the cluster did not answer, or the dashboard runs
+// without one.
+//
+// GET /api/v1/delivery/containers
+func (UnimplementedHandler) ListContainers(ctx context.Context) (r ListContainersRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -203,6 +253,18 @@ func (UnimplementedHandler) ListSources(ctx context.Context) (r ListSourcesRes, 
 //
 // GET /api/v1/delivery/units
 func (UnimplementedHandler) ListUnits(ctx context.Context) (r ListUnitsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListUpdates implements listUpdates operation.
+//
+// Every open pull request Renovate opened across the estate's repositories that moves a Dockerfile's
+// base image or an images-lock entry to a newer version, with the dependency and version it names.
+// Only the repositories the dashboard's token may read are searched. A 503 means GitHub did not
+// answer, or the dashboard has no Estate repository.
+//
+// GET /api/v1/estate/updates
+func (UnimplementedHandler) ListUpdates(ctx context.Context) (r ListUpdatesRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

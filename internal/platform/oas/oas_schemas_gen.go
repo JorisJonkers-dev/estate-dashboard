@@ -4,6 +4,7 @@ package oas
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/go-faster/errors"
@@ -333,6 +334,47 @@ func (s *AlertList) SetItems(val []Alert) {
 }
 
 func (*AlertList) listAlertsRes() {}
+
+// The share of traffic Flagger sent a Process's canary at one moment.
+// Ref: #/components/schemas/CanaryWeight
+type CanaryWeight struct {
+	// The Process.
+	Process string `json:"process"`
+	// When.
+	At time.Time `json:"at"`
+	// The canary's share, in percent.
+	Weight int32 `json:"weight"`
+}
+
+// GetProcess returns the value of Process.
+func (s *CanaryWeight) GetProcess() string {
+	return s.Process
+}
+
+// GetAt returns the value of At.
+func (s *CanaryWeight) GetAt() time.Time {
+	return s.At
+}
+
+// GetWeight returns the value of Weight.
+func (s *CanaryWeight) GetWeight() int32 {
+	return s.Weight
+}
+
+// SetProcess sets the value of Process.
+func (s *CanaryWeight) SetProcess(val string) {
+	s.Process = val
+}
+
+// SetAt sets the value of At.
+func (s *CanaryWeight) SetAt(val time.Time) {
+	s.At = val
+}
+
+// SetWeight sets the value of Weight.
+func (s *CanaryWeight) SetWeight(val int32) {
+	s.Weight = val
+}
 
 // One endpoint the uptime monitor probes, and its latest result.
 // Ref: #/components/schemas/Check
@@ -840,6 +882,345 @@ func (s *CompositionRunOutcome) UnmarshalText(data []byte) error {
 	}
 }
 
+// One image the estate runs, and every container that runs it.
+// Ref: #/components/schemas/Container
+type Container struct {
+	// The image's name, the last part of its repository.
+	Name string `json:"name"`
+	// The image repository, without a tag or digest.
+	Repository string `json:"repository"`
+	// The newest version any of its containers runs; absent where none is known.
+	Version       OptString     `json:"version"`
+	VersionSource VersionSource `json:"versionSource"`
+	// Whether fleet-infra deploys every container of it, outside the estate path.
+	Platform bool `json:"platform"`
+	// Whether any of its containers drifts.
+	Drift bool `json:"drift"`
+	// Every container that runs it, by Project, Process and pod.
+	Instances []ContainerInstance `json:"instances"`
+}
+
+// GetName returns the value of Name.
+func (s *Container) GetName() string {
+	return s.Name
+}
+
+// GetRepository returns the value of Repository.
+func (s *Container) GetRepository() string {
+	return s.Repository
+}
+
+// GetVersion returns the value of Version.
+func (s *Container) GetVersion() OptString {
+	return s.Version
+}
+
+// GetVersionSource returns the value of VersionSource.
+func (s *Container) GetVersionSource() VersionSource {
+	return s.VersionSource
+}
+
+// GetPlatform returns the value of Platform.
+func (s *Container) GetPlatform() bool {
+	return s.Platform
+}
+
+// GetDrift returns the value of Drift.
+func (s *Container) GetDrift() bool {
+	return s.Drift
+}
+
+// GetInstances returns the value of Instances.
+func (s *Container) GetInstances() []ContainerInstance {
+	return s.Instances
+}
+
+// SetName sets the value of Name.
+func (s *Container) SetName(val string) {
+	s.Name = val
+}
+
+// SetRepository sets the value of Repository.
+func (s *Container) SetRepository(val string) {
+	s.Repository = val
+}
+
+// SetVersion sets the value of Version.
+func (s *Container) SetVersion(val OptString) {
+	s.Version = val
+}
+
+// SetVersionSource sets the value of VersionSource.
+func (s *Container) SetVersionSource(val VersionSource) {
+	s.VersionSource = val
+}
+
+// SetPlatform sets the value of Platform.
+func (s *Container) SetPlatform(val bool) {
+	s.Platform = val
+}
+
+// SetDrift sets the value of Drift.
+func (s *Container) SetDrift(val bool) {
+	s.Drift = val
+}
+
+// SetInstances sets the value of Instances.
+func (s *Container) SetInstances(val []ContainerInstance) {
+	s.Instances = val
+}
+
+// One container that runs an image.
+// Ref: #/components/schemas/ContainerInstance
+type ContainerInstance struct {
+	// The Project, from the namespace.
+	Project string `json:"project"`
+	// The Process, from the pod's app.kubernetes.io/name label, else the container.
+	Process string `json:"process"`
+	// The container.
+	Container string `json:"container"`
+	// The pod.
+	Pod string `json:"pod"`
+	// The pod's namespace.
+	Namespace string `json:"namespace"`
+	// The node it runs on, once scheduled.
+	Node OptString `json:"node"`
+	// When the pod started.
+	Started OptDateTime `json:"started"`
+	// The Project release the pod runs, from its app.kubernetes.io/version label.
+	Release OptString `json:"release"`
+	// Whether it is an init container.
+	Init bool `json:"init"`
+	// Whether it runs beside its pod's Process rather than being it.
+	Sidecar bool `json:"sidecar"`
+	// Whether the render manages the pod; false for the platform still on fleet-infra.
+	Managed bool `json:"managed"`
+	// Whether its pod is shutting down.
+	Deleting OptBool `json:"deleting"`
+	// The version of the software it runs; absent where none is known.
+	Version       OptString     `json:"version"`
+	VersionSource VersionSource `json:"versionSource"`
+	// The image tag it names, where it names one.
+	Tag OptString `json:"tag"`
+	// The digest its pod spec pins, where it pins one.
+	LockDigest OptString `json:"lockDigest"`
+	// The digest the kubelet says it runs, once it started.
+	RunningDigest OptString `json:"runningDigest"`
+	// Whether the digest it runs differs from the one its pod spec pins.
+	Drift bool `json:"drift"`
+}
+
+// GetProject returns the value of Project.
+func (s *ContainerInstance) GetProject() string {
+	return s.Project
+}
+
+// GetProcess returns the value of Process.
+func (s *ContainerInstance) GetProcess() string {
+	return s.Process
+}
+
+// GetContainer returns the value of Container.
+func (s *ContainerInstance) GetContainer() string {
+	return s.Container
+}
+
+// GetPod returns the value of Pod.
+func (s *ContainerInstance) GetPod() string {
+	return s.Pod
+}
+
+// GetNamespace returns the value of Namespace.
+func (s *ContainerInstance) GetNamespace() string {
+	return s.Namespace
+}
+
+// GetNode returns the value of Node.
+func (s *ContainerInstance) GetNode() OptString {
+	return s.Node
+}
+
+// GetStarted returns the value of Started.
+func (s *ContainerInstance) GetStarted() OptDateTime {
+	return s.Started
+}
+
+// GetRelease returns the value of Release.
+func (s *ContainerInstance) GetRelease() OptString {
+	return s.Release
+}
+
+// GetInit returns the value of Init.
+func (s *ContainerInstance) GetInit() bool {
+	return s.Init
+}
+
+// GetSidecar returns the value of Sidecar.
+func (s *ContainerInstance) GetSidecar() bool {
+	return s.Sidecar
+}
+
+// GetManaged returns the value of Managed.
+func (s *ContainerInstance) GetManaged() bool {
+	return s.Managed
+}
+
+// GetDeleting returns the value of Deleting.
+func (s *ContainerInstance) GetDeleting() OptBool {
+	return s.Deleting
+}
+
+// GetVersion returns the value of Version.
+func (s *ContainerInstance) GetVersion() OptString {
+	return s.Version
+}
+
+// GetVersionSource returns the value of VersionSource.
+func (s *ContainerInstance) GetVersionSource() VersionSource {
+	return s.VersionSource
+}
+
+// GetTag returns the value of Tag.
+func (s *ContainerInstance) GetTag() OptString {
+	return s.Tag
+}
+
+// GetLockDigest returns the value of LockDigest.
+func (s *ContainerInstance) GetLockDigest() OptString {
+	return s.LockDigest
+}
+
+// GetRunningDigest returns the value of RunningDigest.
+func (s *ContainerInstance) GetRunningDigest() OptString {
+	return s.RunningDigest
+}
+
+// GetDrift returns the value of Drift.
+func (s *ContainerInstance) GetDrift() bool {
+	return s.Drift
+}
+
+// SetProject sets the value of Project.
+func (s *ContainerInstance) SetProject(val string) {
+	s.Project = val
+}
+
+// SetProcess sets the value of Process.
+func (s *ContainerInstance) SetProcess(val string) {
+	s.Process = val
+}
+
+// SetContainer sets the value of Container.
+func (s *ContainerInstance) SetContainer(val string) {
+	s.Container = val
+}
+
+// SetPod sets the value of Pod.
+func (s *ContainerInstance) SetPod(val string) {
+	s.Pod = val
+}
+
+// SetNamespace sets the value of Namespace.
+func (s *ContainerInstance) SetNamespace(val string) {
+	s.Namespace = val
+}
+
+// SetNode sets the value of Node.
+func (s *ContainerInstance) SetNode(val OptString) {
+	s.Node = val
+}
+
+// SetStarted sets the value of Started.
+func (s *ContainerInstance) SetStarted(val OptDateTime) {
+	s.Started = val
+}
+
+// SetRelease sets the value of Release.
+func (s *ContainerInstance) SetRelease(val OptString) {
+	s.Release = val
+}
+
+// SetInit sets the value of Init.
+func (s *ContainerInstance) SetInit(val bool) {
+	s.Init = val
+}
+
+// SetSidecar sets the value of Sidecar.
+func (s *ContainerInstance) SetSidecar(val bool) {
+	s.Sidecar = val
+}
+
+// SetManaged sets the value of Managed.
+func (s *ContainerInstance) SetManaged(val bool) {
+	s.Managed = val
+}
+
+// SetDeleting sets the value of Deleting.
+func (s *ContainerInstance) SetDeleting(val OptBool) {
+	s.Deleting = val
+}
+
+// SetVersion sets the value of Version.
+func (s *ContainerInstance) SetVersion(val OptString) {
+	s.Version = val
+}
+
+// SetVersionSource sets the value of VersionSource.
+func (s *ContainerInstance) SetVersionSource(val VersionSource) {
+	s.VersionSource = val
+}
+
+// SetTag sets the value of Tag.
+func (s *ContainerInstance) SetTag(val OptString) {
+	s.Tag = val
+}
+
+// SetLockDigest sets the value of LockDigest.
+func (s *ContainerInstance) SetLockDigest(val OptString) {
+	s.LockDigest = val
+}
+
+// SetRunningDigest sets the value of RunningDigest.
+func (s *ContainerInstance) SetRunningDigest(val OptString) {
+	s.RunningDigest = val
+}
+
+// SetDrift sets the value of Drift.
+func (s *ContainerInstance) SetDrift(val bool) {
+	s.Drift = val
+}
+
+// Every image the estate runs, by name.
+// Ref: #/components/schemas/ContainerList
+type ContainerList struct {
+	// Whether the cluster holds more pods than one read returns.
+	Truncated bool `json:"truncated"`
+	// The images.
+	Items []Container `json:"items"`
+}
+
+// GetTruncated returns the value of Truncated.
+func (s *ContainerList) GetTruncated() bool {
+	return s.Truncated
+}
+
+// GetItems returns the value of Items.
+func (s *ContainerList) GetItems() []Container {
+	return s.Items
+}
+
+// SetTruncated sets the value of Truncated.
+func (s *ContainerList) SetTruncated(val bool) {
+	s.Truncated = val
+}
+
+// SetItems sets the value of Items.
+func (s *ContainerList) SetItems(val []Container) {
+	s.Items = val
+}
+
+func (*ContainerList) listContainersRes() {}
+
 // What a Project declares at its pinned release.
 // Ref: #/components/schemas/Declaration
 type Declaration struct {
@@ -1232,6 +1613,14 @@ type GetHandoverUnauthorized ProblemStatusCode
 
 func (*GetHandoverUnauthorized) getHandoverRes() {}
 
+type GetHealthServiceUnavailable ProblemStatusCode
+
+func (*GetHealthServiceUnavailable) getHealthRes() {}
+
+type GetHealthUnauthorized ProblemStatusCode
+
+func (*GetHealthUnauthorized) getHealthRes() {}
+
 type GetReleaseNotesNotFound ProblemStatusCode
 
 func (*GetReleaseNotesNotFound) getReleaseNotesRes() {}
@@ -1243,6 +1632,18 @@ func (*GetReleaseNotesServiceUnavailable) getReleaseNotesRes() {}
 type GetReleaseNotesUnauthorized ProblemStatusCode
 
 func (*GetReleaseNotesUnauthorized) getReleaseNotesRes() {}
+
+type GetRolloutWindowBadRequest ProblemStatusCode
+
+func (*GetRolloutWindowBadRequest) getRolloutWindowRes() {}
+
+type GetRolloutWindowServiceUnavailable ProblemStatusCode
+
+func (*GetRolloutWindowServiceUnavailable) getRolloutWindowRes() {}
+
+type GetRolloutWindowUnauthorized ProblemStatusCode
+
+func (*GetRolloutWindowUnauthorized) getRolloutWindowRes() {}
 
 // One secret a Process may read or use.
 // Ref: #/components/schemas/Grant
@@ -1315,6 +1716,134 @@ func (s *Handover) SetLegacy(val []string) {
 }
 
 func (*Handover) getHandoverRes() {}
+
+// The worst state a Project was in during one step.
+// Ref: #/components/schemas/HealthBlock
+type HealthBlock struct {
+	// When the step starts.
+	At time.Time `json:"at"`
+	// Healthy, degraded, down, or no data.
+	State HealthBlockState `json:"state"`
+	// What made it less than healthy, where something did.
+	Detail OptString `json:"detail"`
+}
+
+// GetAt returns the value of At.
+func (s *HealthBlock) GetAt() time.Time {
+	return s.At
+}
+
+// GetState returns the value of State.
+func (s *HealthBlock) GetState() HealthBlockState {
+	return s.State
+}
+
+// GetDetail returns the value of Detail.
+func (s *HealthBlock) GetDetail() OptString {
+	return s.Detail
+}
+
+// SetAt sets the value of At.
+func (s *HealthBlock) SetAt(val time.Time) {
+	s.At = val
+}
+
+// SetState sets the value of State.
+func (s *HealthBlock) SetState(val HealthBlockState) {
+	s.State = val
+}
+
+// SetDetail sets the value of Detail.
+func (s *HealthBlock) SetDetail(val OptString) {
+	s.Detail = val
+}
+
+// Healthy, degraded, down, or no data.
+type HealthBlockState string
+
+const (
+	HealthBlockStateOk    HealthBlockState = "ok"
+	HealthBlockStateWarn  HealthBlockState = "warn"
+	HealthBlockStateCrit  HealthBlockState = "crit"
+	HealthBlockStateEmpty HealthBlockState = "empty"
+)
+
+// AllValues returns all HealthBlockState values.
+func (HealthBlockState) AllValues() []HealthBlockState {
+	return []HealthBlockState{
+		HealthBlockStateOk,
+		HealthBlockStateWarn,
+		HealthBlockStateCrit,
+		HealthBlockStateEmpty,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s HealthBlockState) MarshalText() ([]byte, error) {
+	switch s {
+	case HealthBlockStateOk:
+		return []byte(s), nil
+	case HealthBlockStateWarn:
+		return []byte(s), nil
+	case HealthBlockStateCrit:
+		return []byte(s), nil
+	case HealthBlockStateEmpty:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *HealthBlockState) UnmarshalText(data []byte) error {
+	switch HealthBlockState(data) {
+	case HealthBlockStateOk:
+		*s = HealthBlockStateOk
+		return nil
+	case HealthBlockStateWarn:
+		*s = HealthBlockStateWarn
+		return nil
+	case HealthBlockStateCrit:
+		*s = HealthBlockStateCrit
+		return nil
+	case HealthBlockStateEmpty:
+		*s = HealthBlockStateEmpty
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A Project's health over the last hour, oldest block first.
+// Ref: #/components/schemas/HealthTimeline
+type HealthTimeline struct {
+	// How long each block lasts, in seconds.
+	Step int32 `json:"step"`
+	// The blocks.
+	Blocks []HealthBlock `json:"blocks"`
+}
+
+// GetStep returns the value of Step.
+func (s *HealthTimeline) GetStep() int32 {
+	return s.Step
+}
+
+// GetBlocks returns the value of Blocks.
+func (s *HealthTimeline) GetBlocks() []HealthBlock {
+	return s.Blocks
+}
+
+// SetStep sets the value of Step.
+func (s *HealthTimeline) SetStep(val int32) {
+	s.Step = val
+}
+
+// SetBlocks sets the value of Blocks.
+func (s *HealthTimeline) SetBlocks(val []HealthBlock) {
+	s.Blocks = val
+}
+
+func (*HealthTimeline) getHealthRes() {}
 
 // One open issue of the Estate repository.
 // Ref: #/components/schemas/Issue
@@ -1449,6 +1978,22 @@ type ListCompositionRunsUnauthorized ProblemStatusCode
 
 func (*ListCompositionRunsUnauthorized) listCompositionRunsRes() {}
 
+type ListContainerHistoryServiceUnavailable ProblemStatusCode
+
+func (*ListContainerHistoryServiceUnavailable) listContainerHistoryRes() {}
+
+type ListContainerHistoryUnauthorized ProblemStatusCode
+
+func (*ListContainerHistoryUnauthorized) listContainerHistoryRes() {}
+
+type ListContainersServiceUnavailable ProblemStatusCode
+
+func (*ListContainersServiceUnavailable) listContainersRes() {}
+
+type ListContainersUnauthorized ProblemStatusCode
+
+func (*ListContainersUnauthorized) listContainersRes() {}
+
 type ListDeploysServiceUnavailable ProblemStatusCode
 
 func (*ListDeploysServiceUnavailable) listDeploysRes() {}
@@ -1528,6 +2073,14 @@ func (*ListUnitsServiceUnavailable) listUnitsRes() {}
 type ListUnitsUnauthorized ProblemStatusCode
 
 func (*ListUnitsUnauthorized) listUnitsRes() {}
+
+type ListUpdatesServiceUnavailable ProblemStatusCode
+
+func (*ListUpdatesServiceUnavailable) listUpdatesRes() {}
+
+type ListUpdatesUnauthorized ProblemStatusCode
+
+func (*ListUpdatesUnauthorized) listUpdatesRes() {}
 
 // One log line.
 // Ref: #/components/schemas/LogLine
@@ -1670,6 +2223,52 @@ func (o OptAlertClass) Get() (v AlertClass, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAlertClass) Or(d AlertClass) AlertClass {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBool returns new OptBool with value set to v.
+func NewOptBool(v bool) OptBool {
+	return OptBool{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBool is optional bool.
+type OptBool struct {
+	Value bool
+	Set   bool
+}
+
+// IsSet returns true if OptBool was set.
+func (o OptBool) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBool) Reset() {
+	var v bool
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBool) SetTo(v bool) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBool) Get() (v bool, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBool) Or(d bool) bool {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -2393,6 +2992,13 @@ type PodContainer struct {
 	Image string `json:"image"`
 	// Whether it is an init container, which runs to completion before the others start.
 	Init bool `json:"init"`
+	// Whether it runs beside its pod's Process rather than being it.
+	Sidecar bool `json:"sidecar"`
+	// The version of the software it runs; absent where none is known.
+	Version       OptString     `json:"version"`
+	VersionSource VersionSource `json:"versionSource"`
+	// The digest the kubelet says it runs, once it started.
+	RunningDigest OptString `json:"runningDigest"`
 	// Whether the kubelet reports it ready.
 	Ready bool `json:"ready"`
 	// What it is doing now; absent before the kubelet reports it.
@@ -2422,6 +3028,26 @@ func (s *PodContainer) GetImage() string {
 // GetInit returns the value of Init.
 func (s *PodContainer) GetInit() bool {
 	return s.Init
+}
+
+// GetSidecar returns the value of Sidecar.
+func (s *PodContainer) GetSidecar() bool {
+	return s.Sidecar
+}
+
+// GetVersion returns the value of Version.
+func (s *PodContainer) GetVersion() OptString {
+	return s.Version
+}
+
+// GetVersionSource returns the value of VersionSource.
+func (s *PodContainer) GetVersionSource() VersionSource {
+	return s.VersionSource
+}
+
+// GetRunningDigest returns the value of RunningDigest.
+func (s *PodContainer) GetRunningDigest() OptString {
+	return s.RunningDigest
 }
 
 // GetReady returns the value of Ready.
@@ -2477,6 +3103,26 @@ func (s *PodContainer) SetImage(val string) {
 // SetInit sets the value of Init.
 func (s *PodContainer) SetInit(val bool) {
 	s.Init = val
+}
+
+// SetSidecar sets the value of Sidecar.
+func (s *PodContainer) SetSidecar(val bool) {
+	s.Sidecar = val
+}
+
+// SetVersion sets the value of Version.
+func (s *PodContainer) SetVersion(val OptString) {
+	s.Version = val
+}
+
+// SetVersionSource sets the value of VersionSource.
+func (s *PodContainer) SetVersionSource(val VersionSource) {
+	s.VersionSource = val
+}
+
+// SetRunningDigest sets the value of RunningDigest.
+func (s *PodContainer) SetRunningDigest(val OptString) {
+	s.RunningDigest = val
 }
 
 // SetReady sets the value of Ready.
@@ -2598,6 +3244,83 @@ func (s *PodList) SetItems(val []Pod) {
 }
 
 func (*PodList) listPodsRes() {}
+
+// One pod over a release's window.
+// Ref: #/components/schemas/PodSpan
+type PodSpan struct {
+	// The pod.
+	Pod string `json:"pod"`
+	// The Process, from the pod's name, Flagger's -primary taken off.
+	Process string `json:"process"`
+	// When it was first seen in the window.
+	Start OptDateTime `json:"start"`
+	// When it first turned ready in the window.
+	Ready OptDateTime `json:"ready"`
+	// When it was last seen, where it was gone before the window ended.
+	End OptDateTime `json:"end"`
+	// Its readiness every five seconds, oldest first.
+	Checks []ReadinessCheck `json:"checks"`
+}
+
+// GetPod returns the value of Pod.
+func (s *PodSpan) GetPod() string {
+	return s.Pod
+}
+
+// GetProcess returns the value of Process.
+func (s *PodSpan) GetProcess() string {
+	return s.Process
+}
+
+// GetStart returns the value of Start.
+func (s *PodSpan) GetStart() OptDateTime {
+	return s.Start
+}
+
+// GetReady returns the value of Ready.
+func (s *PodSpan) GetReady() OptDateTime {
+	return s.Ready
+}
+
+// GetEnd returns the value of End.
+func (s *PodSpan) GetEnd() OptDateTime {
+	return s.End
+}
+
+// GetChecks returns the value of Checks.
+func (s *PodSpan) GetChecks() []ReadinessCheck {
+	return s.Checks
+}
+
+// SetPod sets the value of Pod.
+func (s *PodSpan) SetPod(val string) {
+	s.Pod = val
+}
+
+// SetProcess sets the value of Process.
+func (s *PodSpan) SetProcess(val string) {
+	s.Process = val
+}
+
+// SetStart sets the value of Start.
+func (s *PodSpan) SetStart(val OptDateTime) {
+	s.Start = val
+}
+
+// SetReady sets the value of Ready.
+func (s *PodSpan) SetReady(val OptDateTime) {
+	s.Ready = val
+}
+
+// SetEnd sets the value of End.
+func (s *PodSpan) SetEnd(val OptDateTime) {
+	s.End = val
+}
+
+// SetChecks sets the value of Checks.
+func (s *PodSpan) SetChecks(val []ReadinessCheck) {
+	s.Checks = val
+}
 
 // Which checks the kubelet runs on a container.
 // Ref: #/components/schemas/Probes
@@ -2721,6 +3444,35 @@ func (s *ProblemStatusCode) SetResponse(val Problem) {
 
 func (*ProblemStatusCode) getSessionRes()       {}
 func (*ProblemStatusCode) listAlertHistoryRes() {}
+
+// Whether a pod was ready at one moment.
+// Ref: #/components/schemas/ReadinessCheck
+type ReadinessCheck struct {
+	// When.
+	At time.Time `json:"at"`
+	// Whether it was ready.
+	Ready bool `json:"ready"`
+}
+
+// GetAt returns the value of At.
+func (s *ReadinessCheck) GetAt() time.Time {
+	return s.At
+}
+
+// GetReady returns the value of Ready.
+func (s *ReadinessCheck) GetReady() bool {
+	return s.Ready
+}
+
+// SetAt sets the value of At.
+func (s *ReadinessCheck) SetAt(val time.Time) {
+	s.At = val
+}
+
+// SetReady sets the value of Ready.
+func (s *ReadinessCheck) SetReady(val bool) {
+	s.Ready = val
+}
 
 // One gated Application.
 // Ref: #/components/schemas/Release
@@ -3087,6 +3839,37 @@ func (s *RolloutList) SetItems(val []Rollout) {
 }
 
 func (*RolloutList) listRolloutsRes() {}
+
+// What a Project's pods and canaries did over a window.
+// Ref: #/components/schemas/RolloutWindow
+type RolloutWindow struct {
+	// The pods, by Process then start.
+	Pods []PodSpan `json:"pods"`
+	// Each change of a canary's weight, oldest first.
+	Weights []CanaryWeight `json:"weights"`
+}
+
+// GetPods returns the value of Pods.
+func (s *RolloutWindow) GetPods() []PodSpan {
+	return s.Pods
+}
+
+// GetWeights returns the value of Weights.
+func (s *RolloutWindow) GetWeights() []CanaryWeight {
+	return s.Weights
+}
+
+// SetPods sets the value of Pods.
+func (s *RolloutWindow) SetPods(val []PodSpan) {
+	s.Pods = val
+}
+
+// SetWeights sets the value of Weights.
+func (s *RolloutWindow) SetWeights(val []CanaryWeight) {
+	s.Weights = val
+}
+
+func (*RolloutWindow) getRolloutWindowRes() {}
 
 // The signed-in admin.
 // Ref: #/components/schemas/Session
@@ -3753,3 +4536,246 @@ func (s *UnitList) SetItems(val []Unit) {
 }
 
 func (*UnitList) listUnitsRes() {}
+
+// One open Renovate pull request that moves an image to a newer version.
+// Ref: #/components/schemas/Update
+type Update struct {
+	// The image it moves, as Renovate names it.
+	Dependency string `json:"dependency"`
+	// The version it moves the image to.
+	Version string `json:"version"`
+	// The repository the pull request is in, as owner/name.
+	Repository string `json:"repository"`
+	// The pull request's number.
+	Number int32 `json:"number"`
+	// The pull request.
+	URL url.URL `json:"url"`
+	// Its title.
+	Title string `json:"title"`
+	// When it was opened.
+	Opened time.Time `json:"opened"`
+}
+
+// GetDependency returns the value of Dependency.
+func (s *Update) GetDependency() string {
+	return s.Dependency
+}
+
+// GetVersion returns the value of Version.
+func (s *Update) GetVersion() string {
+	return s.Version
+}
+
+// GetRepository returns the value of Repository.
+func (s *Update) GetRepository() string {
+	return s.Repository
+}
+
+// GetNumber returns the value of Number.
+func (s *Update) GetNumber() int32 {
+	return s.Number
+}
+
+// GetURL returns the value of URL.
+func (s *Update) GetURL() url.URL {
+	return s.URL
+}
+
+// GetTitle returns the value of Title.
+func (s *Update) GetTitle() string {
+	return s.Title
+}
+
+// GetOpened returns the value of Opened.
+func (s *Update) GetOpened() time.Time {
+	return s.Opened
+}
+
+// SetDependency sets the value of Dependency.
+func (s *Update) SetDependency(val string) {
+	s.Dependency = val
+}
+
+// SetVersion sets the value of Version.
+func (s *Update) SetVersion(val string) {
+	s.Version = val
+}
+
+// SetRepository sets the value of Repository.
+func (s *Update) SetRepository(val string) {
+	s.Repository = val
+}
+
+// SetNumber sets the value of Number.
+func (s *Update) SetNumber(val int32) {
+	s.Number = val
+}
+
+// SetURL sets the value of URL.
+func (s *Update) SetURL(val url.URL) {
+	s.URL = val
+}
+
+// SetTitle sets the value of Title.
+func (s *Update) SetTitle(val string) {
+	s.Title = val
+}
+
+// SetOpened sets the value of Opened.
+func (s *Update) SetOpened(val time.Time) {
+	s.Opened = val
+}
+
+// The open Renovate pull requests that move an image, newest first.
+// Ref: #/components/schemas/UpdateList
+type UpdateList struct {
+	// The pull requests.
+	Items []Update `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *UpdateList) GetItems() []Update {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *UpdateList) SetItems(val []Update) {
+	s.Items = val
+}
+
+func (*UpdateList) listUpdatesRes() {}
+
+// One software version an image ran.
+// Ref: #/components/schemas/VersionChange
+type VersionChange struct {
+	// The version.
+	Version string `json:"version"`
+	// The version it replaced; absent for the first one recorded.
+	From OptString `json:"from"`
+	// The Project whose Deployment ran it.
+	Project OptString `json:"project"`
+	// The Project release that shipped it, where its pods named one.
+	Release OptString `json:"release"`
+	// When the revision that first ran it was made.
+	At time.Time `json:"at"`
+}
+
+// GetVersion returns the value of Version.
+func (s *VersionChange) GetVersion() string {
+	return s.Version
+}
+
+// GetFrom returns the value of From.
+func (s *VersionChange) GetFrom() OptString {
+	return s.From
+}
+
+// GetProject returns the value of Project.
+func (s *VersionChange) GetProject() OptString {
+	return s.Project
+}
+
+// GetRelease returns the value of Release.
+func (s *VersionChange) GetRelease() OptString {
+	return s.Release
+}
+
+// GetAt returns the value of At.
+func (s *VersionChange) GetAt() time.Time {
+	return s.At
+}
+
+// SetVersion sets the value of Version.
+func (s *VersionChange) SetVersion(val string) {
+	s.Version = val
+}
+
+// SetFrom sets the value of From.
+func (s *VersionChange) SetFrom(val OptString) {
+	s.From = val
+}
+
+// SetProject sets the value of Project.
+func (s *VersionChange) SetProject(val OptString) {
+	s.Project = val
+}
+
+// SetRelease sets the value of Release.
+func (s *VersionChange) SetRelease(val OptString) {
+	s.Release = val
+}
+
+// SetAt sets the value of At.
+func (s *VersionChange) SetAt(val time.Time) {
+	s.At = val
+}
+
+// The software versions one image ran, newest first.
+// Ref: #/components/schemas/VersionHistory
+type VersionHistory struct {
+	// The versions.
+	Items []VersionChange `json:"items"`
+}
+
+// GetItems returns the value of Items.
+func (s *VersionHistory) GetItems() []VersionChange {
+	return s.Items
+}
+
+// SetItems sets the value of Items.
+func (s *VersionHistory) SetItems(val []VersionChange) {
+	s.Items = val
+}
+
+func (*VersionHistory) listContainerHistoryRes() {}
+
+// Where a container's version comes from: the version annotation the render writes from the images
+// lock, a version-shaped image tag, or nowhere.
+// Ref: #/components/schemas/VersionSource
+type VersionSource string
+
+const (
+	VersionSourceLock    VersionSource = "lock"
+	VersionSourceTag     VersionSource = "tag"
+	VersionSourceUnknown VersionSource = "unknown"
+)
+
+// AllValues returns all VersionSource values.
+func (VersionSource) AllValues() []VersionSource {
+	return []VersionSource{
+		VersionSourceLock,
+		VersionSourceTag,
+		VersionSourceUnknown,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VersionSource) MarshalText() ([]byte, error) {
+	switch s {
+	case VersionSourceLock:
+		return []byte(s), nil
+	case VersionSourceTag:
+		return []byte(s), nil
+	case VersionSourceUnknown:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VersionSource) UnmarshalText(data []byte) error {
+	switch VersionSource(data) {
+	case VersionSourceLock:
+		*s = VersionSourceLock
+		return nil
+	case VersionSourceTag:
+		*s = VersionSourceTag
+		return nil
+	case VersionSourceUnknown:
+		*s = VersionSourceUnknown
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}

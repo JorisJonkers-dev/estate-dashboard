@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	rn33AllowedHeaders = map[string]string{
+	rn39AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
 )
@@ -161,7 +161,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn33AllowedHeaders,
+									allowedHeaders: rn39AllowedHeaders,
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -211,6 +211,57 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 				switch elem[0] {
+				case 'c': // Prefix: "containers"
+
+					if l := len("containers"); len(elem) >= l && elem[0:l] == "containers" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						switch r.Method {
+						case "GET":
+							s.handleListContainersRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: nil,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/history"
+
+						if l := len("/history"); len(elem) >= l && elem[0:l] == "/history" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleListContainerHistoryRequest([0]string{}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: nil,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
+					}
+
 				case 'p': // Prefix: "projects/"
 
 					if l := len("projects/"); len(elem) >= l && elem[0:l] == "projects/" {
@@ -621,6 +672,95 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
+				case 'u': // Prefix: "updates"
+
+					if l := len("updates"); len(elem) >= l && elem[0:l] == "updates" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "GET":
+							s.handleListUpdatesRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: nil,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+
+				}
+
+			case 'h': // Prefix: "health/projects/"
+
+				if l := len("health/projects/"); len(elem) >= l && elem[0:l] == "health/projects/" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				// Param: "project"
+				// Match until "/"
+				idx := strings.IndexByte(elem, '/')
+				if idx < 0 {
+					idx = len(elem)
+				}
+				args[0] = elem[:idx]
+				elem = elem[idx:]
+
+				if len(elem) == 0 {
+					switch r.Method {
+					case "GET":
+						s.handleGetHealthRequest([1]string{
+							args[0],
+						}, elemIsEscaped, w, r)
+					default:
+						s.notAllowed(w, r, notAllowedParams{
+							allowedMethods: "GET",
+							allowedHeaders: nil,
+							acceptPost:     "",
+							acceptPatch:    "",
+						})
+					}
+
+					return
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/rollout"
+
+					if l := len("/rollout"); len(elem) >= l && elem[0:l] == "/rollout" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "GET":
+							s.handleGetRolloutWindowRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: nil,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+
 				}
 
 			case 'p': // Prefix: "projects/"
@@ -968,6 +1108,57 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					break
 				}
 				switch elem[0] {
+				case 'c': // Prefix: "containers"
+
+					if l := len("containers"); len(elem) >= l && elem[0:l] == "containers" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						switch method {
+						case "GET":
+							r.name = ListContainersOperation
+							r.summary = "List every image the estate runs"
+							r.operationID = "listContainers"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/delivery/containers"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
+						}
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/history"
+
+						if l := len("/history"); len(elem) >= l && elem[0:l] == "/history" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = ListContainerHistoryOperation
+								r.summary = "List the software versions one image ran, newest first"
+								r.operationID = "listContainerHistory"
+								r.operationGroup = ""
+								r.pathPattern = "/api/v1/delivery/containers/history"
+								r.args = args
+								r.count = 0
+								return r, true
+							default:
+								return
+							}
+						}
+
+					}
+
 				case 'p': // Prefix: "projects/"
 
 					if l := len("projects/"); len(elem) >= l && elem[0:l] == "projects/" {
@@ -1364,6 +1555,91 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							r.pathPattern = "/api/v1/estate/releases/notes"
 							r.args = args
 							r.count = 0
+							return r, true
+						default:
+							return
+						}
+					}
+
+				case 'u': // Prefix: "updates"
+
+					if l := len("updates"); len(elem) >= l && elem[0:l] == "updates" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "GET":
+							r.name = ListUpdatesOperation
+							r.summary = "List the open Renovate pull requests that bump an image"
+							r.operationID = "listUpdates"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/estate/updates"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
+						}
+					}
+
+				}
+
+			case 'h': // Prefix: "health/projects/"
+
+				if l := len("health/projects/"); len(elem) >= l && elem[0:l] == "health/projects/" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				// Param: "project"
+				// Match until "/"
+				idx := strings.IndexByte(elem, '/')
+				if idx < 0 {
+					idx = len(elem)
+				}
+				args[0] = elem[:idx]
+				elem = elem[idx:]
+
+				if len(elem) == 0 {
+					switch method {
+					case "GET":
+						r.name = GetHealthOperation
+						r.summary = "A Project's health over the last hour"
+						r.operationID = "getHealth"
+						r.operationGroup = ""
+						r.pathPattern = "/api/v1/health/projects/{project}"
+						r.args = args
+						r.count = 1
+						return r, true
+					default:
+						return
+					}
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/rollout"
+
+					if l := len("/rollout"); len(elem) >= l && elem[0:l] == "/rollout" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "GET":
+							r.name = GetRolloutWindowOperation
+							r.summary = "What a Project's pods and canaries did over a release's window"
+							r.operationID = "getRolloutWindow"
+							r.operationGroup = ""
+							r.pathPattern = "/api/v1/health/projects/{project}/rollout"
+							r.args = args
+							r.count = 1
 							return r, true
 						default:
 							return

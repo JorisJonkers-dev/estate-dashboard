@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query'
 import {
+  DialogClose,
+  DialogContent,
+  DialogPortal,
+  DialogRoot,
+  DialogTitle,
+  DialogTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -8,7 +14,7 @@ import {
   DropdownMenuRoot,
   DropdownMenuTrigger,
 } from 'reka-ui'
-import { computed, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { getSessionOptions, listAlertsOptions } from '../infrastructure/api/@tanstack/vue-query.gen'
 
@@ -17,7 +23,8 @@ const route = useRoute()
 /** Nav pages. */
 const pages = [
   { to: '/', label: 'Overview', names: ['overview'] },
-  { to: '/projects', label: 'Projects', names: ['projects', 'project', 'release'] },
+  { to: '/projects', label: 'Projects', names: ['projects', 'project', 'rollout'] },
+  { to: '/containers', label: 'Containers', names: ['containers', 'container'] },
   { to: '/alerts', label: 'Alerts', names: ['alerts', 'alert-history'] },
   { to: '/composition', label: 'Composition', names: ['composition'] },
 ] as const
@@ -31,6 +38,13 @@ const alerts = useQuery(
   computed(() => ({ ...listAlertsOptions(), enabled: signedInPage.value, refetchInterval: 30_000 })),
 )
 const firing = computed(() => (alerts.data.value?.items ?? []).filter((a) => a.silencedBy.length === 0).length)
+
+// On a phone the nav is a full-screen sheet; going anywhere closes it.
+const menu = ref(false)
+watch(
+  () => route.fullPath,
+  () => (menu.value = false),
+)
 
 // Sign out posts a form. The server ends the session.
 const signOut = useTemplateRef<HTMLFormElement>('signOut')
@@ -65,6 +79,62 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
             }}<span v-if="p.to === '/alerts' && firing > 0" class="font-semibold text-warn">{{ firing }}</span>
           </RouterLink>
         </nav>
+        <DialogRoot v-model:open="menu">
+          <DialogTrigger
+            aria-label="Menu"
+            class="order-last ml-2 flex size-11 cursor-pointer items-center justify-center self-center rounded-md border border-control bg-transparent text-nav md:hidden"
+          >
+            <svg
+              width="18"
+              height="14"
+              viewBox="0 0 18 14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path d="M1 1h16M1 7h16M1 13h16" />
+            </svg>
+          </DialogTrigger>
+          <DialogPortal>
+            <DialogContent
+              :aria-describedby="undefined"
+              class="fixed inset-0 z-30 flex flex-col bg-surface-dark font-sans text-text-primary outline-none"
+            >
+              <div class="flex h-14 items-center justify-between border-b border-line px-6">
+                <DialogTitle class="m-0 text-lg font-semibold tracking-wider">estate</DialogTitle>
+                <DialogClose
+                  aria-label="Close the menu"
+                  class="flex size-11 cursor-pointer items-center justify-center rounded-md border border-control bg-transparent text-nav"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    aria-hidden="true"
+                  >
+                    <path d="M1 1l12 12M13 1L1 13" />
+                  </svg>
+                </DialogClose>
+              </div>
+              <nav aria-label="Pages, menu" class="flex flex-col px-6 py-4">
+                <RouterLink
+                  v-for="p in pages"
+                  :key="p.to"
+                  :to="p.to"
+                  :aria-current="current(p.names)"
+                  class="flex min-h-13 items-center gap-2 border-b border-line-soft text-xl text-nav no-underline aria-[current=page]:text-white"
+                >
+                  {{ p.label
+                  }}<span v-if="p.to === '/alerts' && firing > 0" class="font-semibold text-warn">{{ firing }}</span>
+                </RouterLink>
+              </nav>
+            </DialogContent>
+          </DialogPortal>
+        </DialogRoot>
         <DropdownMenuRoot>
           <DropdownMenuTrigger
             aria-label="Account"
@@ -108,23 +178,8 @@ const signOut = useTemplateRef<HTMLFormElement>('signOut')
     </header>
 
     <!-- The theme pads main for a fixed phone header; this header scrolls, so drop it. -->
-    <main class="box-border w-full grow px-6 pt-0! pb-24 md:pb-16 lg:px-10">
+    <main class="box-border w-full grow px-6 pt-0! pb-16 lg:px-10">
       <RouterView />
     </main>
-
-    <nav
-      aria-label="Pages, tab bar"
-      class="fixed inset-x-0 bottom-0 grid auto-cols-fr grid-flow-col border-t border-line bg-surface-dark md:hidden"
-    >
-      <RouterLink
-        v-for="p in pages"
-        :key="p.to"
-        :to="p.to"
-        :aria-current="current(p.names)"
-        class="-mt-px flex min-h-13 items-center justify-center gap-1 border-t-2 border-transparent text-sm text-nav no-underline aria-[current=page]:border-accent aria-[current=page]:text-white"
-      >
-        {{ p.label }}<span v-if="p.to === '/alerts' && firing > 0" class="font-semibold text-warn">{{ firing }}</span>
-      </RouterLink>
-    </nav>
   </div>
 </template>

@@ -304,6 +304,42 @@ func (e *Estate) Issues(ctx context.Context) ([]domain.Issue, error) {
 	return out, nil
 }
 
+// maxUpdates is the most pull requests one search returns: what one page of it holds.
+const maxUpdates = 100
+
+// Updates implements domain.Repository: Renovate's open pull requests in every repository of the
+// Estate repository's owner the token may read, each that moves one image to a version.
+func (e *Estate) Updates(ctx context.Context) ([]domain.Update, error) {
+	owner, _, _ := strings.Cut(e.repository, "/")
+	var found struct {
+		Items []struct {
+			Number        int       `json:"number"`
+			Title         string    `json:"title"`
+			HTMLURL       string    `json:"html_url"`
+			CreatedAt     time.Time `json:"created_at"`
+			RepositoryURL string    `json:"repository_url"`
+		} `json:"items"`
+	}
+	query := url.Values{"q": {"is:pr is:open author:app/renovate org:" + owner}, "per_page": {strconv.Itoa(maxUpdates)}}
+	if err := e.do(ctx, http.MethodGet, "/search/issues", query, nil, &found); err != nil {
+		return nil, fmt.Errorf("github: search the updates: %w", err)
+	}
+	out := make([]domain.Update, 0, len(found.Items))
+	for _, i := range found.Items {
+		dependency, version, ok := domain.UpdateOf(i.Title)
+		if !ok {
+			continue
+		}
+		parts := strings.Split(i.RepositoryURL, "/")
+		repository := strings.Join(parts[max(len(parts)-2, 0):], "/")
+		out = append(out, domain.Update{
+			Dependency: dependency, Version: version, Repository: repository, Number: i.Number,
+			URL: i.HTMLURL, Title: i.Title, Opened: i.CreatedAt.UTC(),
+		})
+	}
+	return out, nil
+}
+
 // repositoryName matches an owner/name repository.
 var repositoryName = regexp.MustCompile(`^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$`)
 
@@ -454,3 +490,6 @@ func (Absent) Notes(context.Context, string, string) (domain.Notes, error) {
 
 // Issues implements domain.Repository.
 func (Absent) Issues(context.Context) ([]domain.Issue, error) { return nil, domain.ErrNoRepository }
+
+// Updates implements domain.Repository.
+func (Absent) Updates(context.Context) ([]domain.Update, error) { return nil, domain.ErrNoRepository }

@@ -304,8 +304,11 @@ const pods = (project: string) =>
         containers: [
           {
             name: s.container,
-            image: `ghcr.io/jorisjonkers-dev/${s.container}:${s.version}`,
+            image: `ghcr.io/jorisjonkers-dev/${s.container}@sha256:${s.version.replaceAll('.', '')}`,
             init: false,
+            sidecar: false,
+            version: s.version,
+            versionSource: 'lock',
             ready: !job && !looping,
             restarts: looping ? 14 : 0,
             probes: job ? { readiness: false, liveness: false, startup: false } : probes,
@@ -320,9 +323,243 @@ const pods = (project: string) =>
                   }
                 : { state: 'running', since: s.first }),
           },
+          // notes runs the backup method beside each pod of it.
+          ...(project === 'notes' && !job
+            ? [
+                {
+                  name: 'file-backup',
+                  image: 'ghcr.io/jorisjonkers-dev/delivery/file-backup@sha256:3780da3df24d',
+                  init: false,
+                  sidecar: true,
+                  version: '0.9.2',
+                  versionSource: 'lock',
+                  ready: true,
+                  restarts: 0,
+                  probes: { readiness: false, liveness: false, startup: false },
+                  state: 'running',
+                  since: s.first,
+                },
+              ]
+            : []),
         ],
       }
     })
+
+// Every image the estate runs, as the containers read groups them.
+const at = (project: string, process: string, pod: string, version: string | undefined, over: object = {}) => ({
+  project,
+  process,
+  container: process,
+  pod,
+  namespace: `${project}-system`,
+  node: 'enschede-t1000-1',
+  started: minutesAgo(2900),
+  init: false,
+  sidecar: false,
+  managed: true,
+  deleting: false,
+  ...(version ? { version } : {}),
+  versionSource: version ? 'lock' : 'unknown',
+  drift: false,
+  ...over,
+})
+const containers = {
+  truncated: false,
+  items: [
+    {
+      name: 'auth-api',
+      repository: 'ghcr.io/jorisjonkers-dev/auth-api',
+      version: '3.5.0',
+      versionSource: 'lock',
+      platform: false,
+      drift: false,
+      instances: [
+        at('auth', 'auth-api', 'auth-api-7f8c9d6b5-kq2lm', '3.5.0', { release: '3.5.0' }),
+        at('auth', 'auth-api', 'auth-api-primary-5b6d7c8f9-z4w8n', '3.4.2', { release: '3.4.2' }),
+      ],
+    },
+    {
+      name: 'file-backup',
+      repository: 'ghcr.io/jorisjonkers-dev/delivery/file-backup',
+      version: '0.9.2',
+      versionSource: 'lock',
+      platform: false,
+      drift: false,
+      instances: [
+        at('notes', 'notes', 'notes-primary-6d9f7c5b8-2hxlq', '0.9.2', {
+          container: 'file-backup',
+          sidecar: true,
+          lockDigest: 'sha256:3780da3df24d',
+          runningDigest: 'sha256:3780da3df24d',
+        }),
+      ],
+    },
+    {
+      name: 'jellyseerr',
+      repository: 'ghcr.io/jorisjonkers-dev/jellyseerr',
+      version: '3.5.0',
+      versionSource: 'lock',
+      platform: false,
+      drift: true,
+      instances: [
+        at('jellyseerr', 'jellyseerr', 'jellyseerr-q7w2e', '3.5.0', {
+          lockDigest: 'sha256:5ab0c37e19f2',
+          runningDigest: 'sha256:0c41d9e2a7b3',
+          drift: true,
+        }),
+      ],
+    },
+    {
+      name: 'n8n',
+      repository: 'ghcr.io/jorisjonkers-dev/n8n',
+      version: '2.43.8',
+      versionSource: 'lock',
+      platform: false,
+      drift: false,
+      instances: [
+        at('n8n', 'n8n', 'n8n-x2k4p', '2.43.8', {
+          lockDigest: 'sha256:ff8831a3e368',
+          runningDigest: 'sha256:ff8831a3e368',
+        }),
+      ],
+    },
+    {
+      name: 'pgvector',
+      repository: 'docker.io/pgvector/pgvector',
+      versionSource: 'unknown',
+      platform: true,
+      drift: false,
+      instances: [
+        at('data', 'postgres', 'postgres-0', undefined, {
+          namespace: 'data',
+          managed: false,
+          tag: 'pg17',
+          container: 'postgres',
+        }),
+      ],
+    },
+    {
+      name: 'traefik',
+      repository: 'docker.io/library/traefik',
+      version: 'v3.7.12',
+      versionSource: 'tag',
+      platform: true,
+      drift: false,
+      instances: [
+        at('edge', 'traefik', 'traefik-5d8f9-a1', 'v3.7.12', {
+          namespace: 'edge',
+          managed: false,
+          versionSource: 'tag',
+          tag: 'v3.7.12',
+        }),
+      ],
+    },
+    {
+      name: 'vault',
+      repository: 'docker.io/hashicorp/vault',
+      version: '2.0.4',
+      versionSource: 'tag',
+      platform: true,
+      drift: false,
+      instances: [
+        at('data', 'vault', 'vault-0', '1.21.2', {
+          namespace: 'data',
+          managed: false,
+          versionSource: 'tag',
+          tag: '1.21.2',
+        }),
+        at('data', 'vault-agent', 'vault-agent-7d9c8', '2.0.4', {
+          namespace: 'data',
+          managed: false,
+          versionSource: 'tag',
+          tag: '2.0.4',
+        }),
+        at('data', 'renew', 'renew-29117', '1.21.4', {
+          namespace: 'data',
+          managed: false,
+          versionSource: 'tag',
+          tag: '1.21.4',
+        }),
+      ],
+    },
+  ],
+}
+const updates = {
+  items: [
+    {
+      dependency: 'n8nio/n8n',
+      version: '2.44.0',
+      repository: 'JorisJonkers-dev/n8n',
+      number: 41,
+      url: 'https://github.com/JorisJonkers-dev/n8n/pull/41',
+      title: 'chore(deps): update n8nio/n8n docker tag to v2.44.0',
+      opened: minutesAgo(1440),
+    },
+  ],
+}
+const histories: Record<string, unknown[]> = {
+  'ghcr.io/jorisjonkers-dev/n8n': [
+    { version: '2.43.8', from: '2.43.6', project: 'n8n', release: '2.43.10', at: minutesAgo(2900) },
+    { version: '2.43.6', from: '2.42.1', project: 'n8n', release: '2.43.9', at: minutesAgo(13000) },
+    { version: '2.42.1', project: 'n8n', release: '2.42.1', at: minutesAgo(33000) },
+  ],
+}
+
+// A release's window: each Process's old pod hands over to a new one a minute in; auth's switch
+// through canaries, and notes' new pods never turn ready.
+function rolloutWindow(project: string, from: string, to: string) {
+  const start = Date.parse(from)
+  const end = Date.parse(to)
+  const t0 = start + 60_000
+  const iso = (ms: number) => new Date(ms).toISOString()
+  const checks = (first: number, last: number, readyAt?: number) => {
+    const out: { at: string; ready: boolean }[] = []
+    for (let at = first; at <= Math.min(last, end); at += 5000)
+      out.push({ at: iso(at), ready: readyAt !== undefined && at >= readyAt })
+    return out
+  }
+  const processes = [
+    ...new Set((streams[project] ?? []).filter((x) => !x.pod.includes('migration')).map((x) => x.container)),
+  ]
+  const failing = project === 'notes'
+  const pods = processes.flatMap((process, i) => {
+    const begin = t0 + 30_000 + i * 120_000
+    const ready = failing ? undefined : begin + 30_000
+    const handover = failing ? end : begin + 90_000
+    return [
+      {
+        pod: `${process}-old00000a-aaaaa`,
+        process,
+        start: iso(start),
+        ready: iso(start),
+        ...(failing ? {} : { end: iso(handover + 20_000) }),
+        checks: checks(start, failing ? end : handover + 20_000, start),
+      },
+      {
+        pod: `${process}-new00000b-bbbbb`,
+        process,
+        start: iso(begin),
+        ...(ready ? { ready: iso(ready) } : {}),
+        checks: checks(begin, end, ready),
+      },
+    ]
+  })
+  const weights =
+    project === 'auth'
+      ? [0, 20, 40].map((weight, i) => ({ process: 'auth-api', at: iso(t0 + 90_000 + i * 15_000), weight }))
+      : []
+  return { pods, weights }
+}
+
+// A Project's last hour: healthy, but for a minute around its latest release.
+const health = (project: string) => ({
+  step: 30,
+  blocks: Array.from({ length: 120 }, (_, i) => ({
+    at: minutesAgo((119 - i) / 2),
+    state: project === 'knowledge' ? 'crit' : i === 40 || i === 41 ? 'warn' : i < 3 ? 'empty' : 'ok',
+    ...(i === 40 ? { detail: 'a pod was not ready' } : {}),
+  })),
+})
 
 const check = (group: string, name: string, host: string, up: boolean, ms: number, error?: string) => ({
   key: `${group}_${name}`,
@@ -338,7 +575,7 @@ const check = (group: string, name: string, host: string, up: boolean, ms: numbe
     { condition: '[STATUS] == 200', success: up },
     { condition: '[RESPONSE_TIME] < 1500', success: ms < 1500 },
   ],
-  recent: Array.from({ length: 20 }, (_, i) => up || i < 14),
+  recent: Array.from({ length: 60 }, (_, i) => up || i < 54),
 })
 const checks = {
   items: [
@@ -579,6 +816,17 @@ export function mockFetch(input: RequestInfo | URL, init?: RequestInit): Promise
   const podsOf = /^\/api\/v1\/delivery\/projects\/([^/]+)\/pods$/.exec(pathname)
   if (podsOf) return Promise.resolve(json({ items: pods(podsOf[1] ?? ''), truncated: false }))
   if (pathname === '/api/v1/checks') return Promise.resolve(json(checks))
+  if (pathname === '/api/v1/delivery/containers') return Promise.resolve(json(containers))
+  if (pathname === '/api/v1/delivery/containers/history')
+    return Promise.resolve(json({ items: histories[new URL(request.url).searchParams.get('repository') ?? ''] ?? [] }))
+  if (pathname === '/api/v1/estate/updates') return Promise.resolve(json(updates))
+  const windowOf = /^\/api\/v1\/health\/projects\/([^/]+)\/rollout$/.exec(pathname)
+  if (windowOf) {
+    const query = new URL(request.url).searchParams
+    return Promise.resolve(json(rolloutWindow(windowOf[1] ?? '', query.get('from') ?? '', query.get('to') ?? '')))
+  }
+  const healthOf = /^\/api\/v1\/health\/projects\/([^/]+)$/.exec(pathname)
+  if (healthOf) return Promise.resolve(json(health(healthOf[1] ?? '')))
   const ofProject = /^\/api\/v1\/estate\/projects\/([^/]+)\/rollouts$/.exec(pathname)
   if (ofProject) return Promise.resolve(json({ items: rollouts[ofProject[1] ?? ''] ?? [] }))
   if (pathname in answers) return Promise.resolve(json(answers[pathname]))

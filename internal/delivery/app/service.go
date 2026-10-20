@@ -16,11 +16,32 @@ import (
 // Service reads the cluster.
 type Service struct {
 	cluster domain.Cluster
+	skipped []string
 }
 
-// New returns a Service over cluster.
-func New(cluster domain.Cluster) *Service {
-	return &Service{cluster: cluster}
+// New returns a Service over cluster. The images the estate runs leave out the pods of the skipped
+// namespaces: the cluster's own, which run none of the estate's software.
+func New(cluster domain.Cluster, skipped ...string) *Service {
+	return &Service{cluster: cluster, skipped: skipped}
+}
+
+// Containers returns every image the estate runs, with every container that runs it.
+func (s *Service) Containers(ctx context.Context) (domain.Page[domain.Images], error) {
+	pods, err := s.cluster.AllPods(ctx)
+	if err != nil {
+		return domain.Page[domain.Images]{}, fmt.Errorf("read the pods: %w", err)
+	}
+	kept := slices.DeleteFunc(pods.Items, func(p domain.Pod) bool { return slices.Contains(s.skipped, p.Namespace) })
+	return domain.Page[domain.Images]{Items: domain.Group(kept), Truncated: pods.Truncated}, nil
+}
+
+// History returns every software version the image at repository ran, newest first.
+func (s *Service) History(ctx context.Context, repository string) ([]domain.VersionChange, error) {
+	revisions, err := s.cluster.Revisions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read the revisions: %w", err)
+	}
+	return domain.History(repository, revisions.Items), nil
 }
 
 // Sources returns every pin source, by name.

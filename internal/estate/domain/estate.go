@@ -115,4 +115,7 @@ type Repository interface {
 	Rollouts(ctx context.Context, repository, project string, limit int) ([]Rollout, error)
 	// Notes returns the notes of version's GitHub Release in repository.
 	Notes(ctx context.Context, repository, version string) (Notes, error)
+	// Updates returns every open Renovate pull request across the owner's repositories that moves
+	// an image to a newer version.
+	Updates(ctx context.Context) ([]Update, error)
 }

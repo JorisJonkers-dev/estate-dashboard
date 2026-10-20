@@ -25,6 +25,15 @@ type Handler interface {
 	//
 	// GET /api/v1/estate/handover
 	GetHandover(ctx context.Context) (GetHandoverRes, error)
+	// GetHealth implements getHealth operation.
+	//
+	// One block per 30 seconds over the last hour, each the worst of the Project's pod readiness, the
+	// success of the uptime checks named, and its Reconcile Unit's readiness, from Prometheus. A block
+	// with no data is empty, never healthy. A 503 means Prometheus did not answer, or the dashboard runs
+	// without one.
+	//
+	// GET /api/v1/health/projects/{project}
+	GetHealth(ctx context.Context, params GetHealthParams) (GetHealthRes, error)
 	// GetReleaseNotes implements getReleaseNotes operation.
 	//
 	// The body of the GitHub Release a repository of the estate published for a version, as Markdown. A
@@ -33,6 +42,16 @@ type Handler interface {
 	//
 	// GET /api/v1/estate/releases/notes
 	GetReleaseNotes(ctx context.Context, params GetReleaseNotesParams) (GetReleaseNotesRes, error)
+	// GetRolloutWindow implements getRolloutWindow operation.
+	//
+	// Every pod of the Project Prometheus saw from `from` to `to`: when it started, when it first turned
+	// ready, when it was last seen, and its readiness every five seconds; and each Process's canary weight
+	// as Flagger moved it. The dashboard joins this with the release's stages and the Release Gate's
+	// record to show how the release rolled out. A 503 means Prometheus did not answer, or the dashboard
+	// runs without one.
+	//
+	// GET /api/v1/health/projects/{project}/rollout
+	GetRolloutWindow(ctx context.Context, params GetRolloutWindowParams) (GetRolloutWindowRes, error)
 	// GetSession implements getSession operation.
 	//
 	// Returns the admin the session cookie belongs to. A request without a session, or with one auth no
@@ -70,6 +89,25 @@ type Handler interface {
 	//
 	// GET /api/v1/estate/composition/runs
 	ListCompositionRuns(ctx context.Context) (ListCompositionRunsRes, error)
+	// ListContainerHistory implements listContainerHistory operation.
+	//
+	// Each software version of the image the cluster's Deployment revisions recorded, the version it
+	// replaced, the release that shipped it and when. Revisions that changed no version of the image are
+	// left out. A 503 means the cluster did not answer, or the dashboard runs without one.
+	//
+	// GET /api/v1/delivery/containers/history
+	ListContainerHistory(ctx context.Context, params ListContainerHistoryParams) (ListContainerHistoryRes, error)
+	// ListContainers implements listContainers operation.
+	//
+	// One entry per image repository, with every container that runs it: the pods the render manages and
+	// the pods of the platform still on the old path, leaving out the system namespaces the dashboard is
+	// configured to skip. Each container's version comes from the version annotation the render writes,
+	// else from a version-shaped image tag, else it is unknown. A container drifts when the digest it runs
+	// is not the one its pod spec pins. A 503 means the cluster did not answer, or the dashboard runs
+	// without one.
+	//
+	// GET /api/v1/delivery/containers
+	ListContainers(ctx context.Context) (ListContainersRes, error)
 	// ListDeploys implements listDeploys operation.
 	//
 	// The Estate repository's history of projects//source.yaml: its deploy log. A Project with no pin has
@@ -147,6 +185,15 @@ type Handler interface {
 	//
 	// GET /api/v1/delivery/units
 	ListUnits(ctx context.Context) (ListUnitsRes, error)
+	// ListUpdates implements listUpdates operation.
+	//
+	// Every open pull request Renovate opened across the estate's repositories that moves a Dockerfile's
+	// base image or an images-lock entry to a newer version, with the dependency and version it names.
+	// Only the repositories the dashboard's token may read are searched. A 503 means GitHub did not
+	// answer, or the dashboard has no Estate repository.
+	//
+	// GET /api/v1/estate/updates
+	ListUpdates(ctx context.Context) (ListUpdatesRes, error)
 	// SilenceAlert implements silenceAlert operation.
 	//
 	// Silences one firing alert, matching every one of its labels exactly, for an hour, four hours, a day,

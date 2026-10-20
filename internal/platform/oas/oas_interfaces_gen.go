@@ -9,8 +9,16 @@ type GetHandoverRes interface {
 	getHandoverRes()
 }
 
+type GetHealthRes interface {
+	getHealthRes()
+}
+
 type GetReleaseNotesRes interface {
 	getReleaseNotesRes()
+}
+
+type GetRolloutWindowRes interface {
+	getRolloutWindowRes()
 }
 
 type GetSessionRes interface {
@@ -31,6 +39,14 @@ type ListChecksRes interface {
 
 type ListCompositionRunsRes interface {
 	listCompositionRunsRes()
+}
+
+type ListContainerHistoryRes interface {
+	listContainerHistoryRes()
+}
+
+type ListContainersRes interface {
+	listContainersRes()
 }
 
 type ListDeploysRes interface {
@@ -71,6 +87,10 @@ type ListSourcesRes interface {
 
 type ListUnitsRes interface {
 	listUnitsRes()
+}
+
+type ListUpdatesRes interface {
+	listUpdatesRes()
 }
 
 type SilenceAlertRes interface {
