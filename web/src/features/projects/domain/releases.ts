@@ -27,7 +27,16 @@ const newest = (stages: Stage[]) =>
     undefined,
   )
 
-/** Each release, newest first. The newest is live once its unit runs it and is ready. */
+/** Whether release a is newer than b, both X.Y.Z; false where either is not. */
+function newer(a: string, b: string): boolean {
+  const release = /^\d+\.\d+\.\d+$/
+  return release.test(a) && release.test(b) && a.localeCompare(b, 'en', { numeric: true }) > 0
+}
+
+/**
+ * Each release, newest first. The newest is live once its unit runs it and is ready, and overtaken
+ * where its unit already runs a newer release that opened no Rollout.
+ */
 export function releases(rollouts: Rollout[], unit: Unit | undefined): ReleaseView[] {
   const out: ReleaseView[] = []
   for (const r of rollouts) {
@@ -52,6 +61,7 @@ export function releases(rollouts: Rollout[], unit: Unit | undefined): ReleaseVi
     const last = newest(v.stages)
     v.recovered = last !== undefined && !failed(last) && v.stages.some(failed)
     if (last !== undefined && failed(last)) v.state = 'failed'
+    else if (i === 0 && unit?.version !== undefined && newer(unit.version, v.version)) v.state = 'past'
     else if (i === 0) v.state = unit?.version === v.version && unit.ready ? 'live' : 'rolling'
   })
   return out

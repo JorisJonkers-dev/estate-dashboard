@@ -83,6 +83,16 @@ describe('the releases of a Project', () => {
     expect(releases([rollout(2, '1.1.0', ['failure', 'success'])], unit('1.0.0'))[0]?.recovered).toBe(false)
   })
 
+  it('is overtaken, not switching in, when its unit already runs a newer release', () => {
+    expect(releases([rollout(2, '10.11.11', ['success'])], unit('10.12.0')).map((v) => v.state)).toEqual(['past'])
+    expect(releases([rollout(2, '1.9.0', ['success'])], unit('1.10.0')).map((v) => v.state)).toEqual(['past'])
+  })
+
+  it('still switches in while its unit runs an older release, or one that is no version', () => {
+    expect(releases([rollout(2, '1.10.0', ['in_progress'])], unit('1.9.0')).map((v) => v.state)).toEqual(['rolling'])
+    expect(releases([rollout(2, '1.1.0', ['in_progress'])], unit('main')).map((v) => v.state)).toEqual(['rolling'])
+  })
+
   it('is served by the last good release while a newer one switches in', () => {
     const views = releases(
       [rollout(4, '1.2.0', ['in_progress']), rollout(3, '1.1.0', ['failure']), rollout(2, '1.0.0', [])],
