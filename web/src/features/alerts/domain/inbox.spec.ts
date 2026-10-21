@@ -98,4 +98,39 @@ describe('the Alerts screen', () => {
     // A member the Release Gate has not seen yet says so.
     expect(items[0]?.labels).toContainEqual(['m', 'not seen, 0 checks'])
   })
+
+  it('reads an alert with no class by its severity label, as the rules on the cluster put it', () => {
+    const alert = (fingerprint: string, severity?: string) => ({
+      fingerprint,
+      name: 'X',
+      startsAt: '2026-10-15T06:00:00Z',
+      labels: { alertname: 'X', ...(severity ? { severity } : {}) },
+      silencedBy: [],
+    })
+    const items = inbox([alert('c', 'critical'), alert('w', 'warning'), alert('i', 'info'), alert('n')], [], [])
+    expect(items.map((i) => [i.fingerprint, i.severity, i.tone])).toEqual([
+      ['c', 'Critical', 'crit'],
+      ['w', 'Warning', 'warn'],
+      ['i', 'Info', 'info'],
+      ['n', 'Info', 'info'],
+    ])
+  })
+
+  it('reads an alert by its class where it has one, whatever its severity label says', () => {
+    const items = inbox(
+      [
+        {
+          fingerprint: 'p',
+          name: 'X',
+          class: 'page',
+          startsAt: '2026-10-15T06:00:00Z',
+          labels: { severity: 'info' },
+          silencedBy: [],
+        },
+      ],
+      [],
+      [],
+    )
+    expect(items[0]?.severity).toBe('Critical')
+  })
 })
