@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.8.0...v0.8.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* a Rollout its unit has already moved past reads as done, not as switching in ([#76](https://github.com/JorisJonkers-dev/estate-dashboard/issues/76)) ([2b4ee00](https://github.com/JorisJonkers-dev/estate-dashboard/commit/2b4ee007e51aa8dc0a5e1d2ef3a66ad9efd2f9a2))
+
 ## [0.8.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.7.0...v0.8.0) (2026-10-21)
 
 
