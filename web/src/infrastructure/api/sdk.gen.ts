@@ -238,7 +238,7 @@ export const getReleaseNotes = <ThrowOnError extends boolean = false>(options: O
 /**
  * List the estate's composition runs, newest first
  *
- * Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed. Read from each run's artifact (#30). A 503 means the runs are not read yet, or GitHub did not answer.
+ * Each run of the estate's compose.yml that recorded what it composed, as the run's `composition` artifact: when, what started it, its outcome, and what it composed. A run whose artifact has expired, or that ran before runs recorded one, is left out. A 503 means GitHub did not answer, or the dashboard runs without the Estate repository.
  */
 export const listCompositionRuns = <ThrowOnError extends boolean = false>(options?: Options<ListCompositionRunsData, ThrowOnError>): RequestResult<ListCompositionRunsResponses, ListCompositionRunsErrors, ThrowOnError> => (options?.client ?? client).get<ListCompositionRunsResponses, ListCompositionRunsErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({

@@ -15,8 +15,14 @@ type repository struct {
 	ledger  domain.Handover
 	issues  []domain.Issue
 	updates []domain.Update
+	runs    []domain.CompositionRun
 	asked   int
 	err     error
+}
+
+func (r *repository) CompositionRuns(_ context.Context, limit int) ([]domain.CompositionRun, error) {
+	r.asked = limit
+	return r.runs, r.err
 }
 
 func (r *repository) Pins(context.Context) ([]domain.Pin, error) { return r.pins, r.err }
@@ -115,5 +121,21 @@ func TestUpdatesAreTheNewestPullRequestFirst(t *testing.T) {
 	got, err := app.New(&repository{updates: []domain.Update{older, newer}}).Updates(t.Context())
 	if err != nil || len(got) != 2 || got[0].Number != 2 {
 		t.Fatalf("updates = %+v, %v", got, err)
+	}
+}
+
+func TestCompositionRunsAreTheNewestRecordedRunsNewestFirst(t *testing.T) {
+	older := domain.CompositionRun{ID: 1, At: time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)}
+	newer := domain.CompositionRun{ID: 2, At: time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC)}
+	repo := &repository{runs: []domain.CompositionRun{older, newer}}
+	got, err := app.New(repo).CompositionRuns(t.Context())
+	if err != nil || len(got) != 2 || got[0].ID != 2 || repo.asked != app.CompositionRunsRead {
+		t.Fatalf("CompositionRuns = %+v, %v, asked %d", got, err, repo.asked)
+	}
+}
+
+func TestCompositionRunsThatCannotBeReadAreTheRepositorysFailure(t *testing.T) {
+	if _, err := app.New(&repository{err: domain.ErrNoRepository}).CompositionRuns(t.Context()); !errors.Is(err, domain.ErrNoRepository) {
+		t.Fatalf("error = %v", err)
 	}
 }

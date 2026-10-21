@@ -566,14 +566,14 @@ func (*CheckList) listChecksRes() {}
 type CompositionFragment struct {
 	// The Project.
 	Project string `json:"project"`
-	// Its release.
-	Version string `json:"version"`
+	// Its release; absent for a Project that published no fragment.
+	Version OptString `json:"version"`
 	// What the run did with it.
 	Outcome CompositionFragmentOutcome `json:"outcome"`
 	// Why, where it was set aside or held.
 	Reason OptString `json:"reason"`
-	// When it was published.
-	Published time.Time `json:"published"`
+	// When it was published; absent for a Project that published no fragment.
+	Published OptDateTime `json:"published"`
 }
 
 // GetProject returns the value of Project.
@@ -582,7 +582,7 @@ func (s *CompositionFragment) GetProject() string {
 }
 
 // GetVersion returns the value of Version.
-func (s *CompositionFragment) GetVersion() string {
+func (s *CompositionFragment) GetVersion() OptString {
 	return s.Version
 }
 
@@ -597,7 +597,7 @@ func (s *CompositionFragment) GetReason() OptString {
 }
 
 // GetPublished returns the value of Published.
-func (s *CompositionFragment) GetPublished() time.Time {
+func (s *CompositionFragment) GetPublished() OptDateTime {
 	return s.Published
 }
 
@@ -607,7 +607,7 @@ func (s *CompositionFragment) SetProject(val string) {
 }
 
 // SetVersion sets the value of Version.
-func (s *CompositionFragment) SetVersion(val string) {
+func (s *CompositionFragment) SetVersion(val OptString) {
 	s.Version = val
 }
 
@@ -622,7 +622,7 @@ func (s *CompositionFragment) SetReason(val OptString) {
 }
 
 // SetPublished sets the value of Published.
-func (s *CompositionFragment) SetPublished(val time.Time) {
+func (s *CompositionFragment) SetPublished(val OptDateTime) {
 	s.Published = val
 }
 
@@ -700,7 +700,7 @@ type CompositionRun struct {
 	Trigger string `json:"trigger"`
 	// All composed, some set aside, or the run failed.
 	Outcome CompositionRunOutcome `json:"outcome"`
-	// The composition lock it published.
+	// The digest of the composition lock it published, sha256:.
 	Lock OptString `json:"lock"`
 	// The deploy-kit release it composed with.
 	Toolkit OptString `json:"toolkit"`

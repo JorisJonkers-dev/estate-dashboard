@@ -9,7 +9,7 @@ import { toneText } from '../../../shared/tone'
 import EmptyPlate from '../../../shared/ui/EmptyPlate.vue'
 import HeadBand from '../../../shared/ui/HeadBand.vue'
 import { describeError } from '../../alerts/composables/useAlertHistory'
-import { age } from '../../overview/domain/overview'
+import { age, shortDigest } from '../../overview/domain/overview'
 
 const runs = useQuery({ ...listCompositionRunsOptions(), refetchInterval: 60_000 })
 const items = computed(() => runs.data.value?.items ?? [])
@@ -91,7 +91,7 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
         <dl class="m-0 grid grid-cols-2 gap-4 md:grid-cols-4">
           <div>
             <dt :class="label">Lock</dt>
-            <dd class="m-0 font-mono text-sm break-all">{{ picked.lock ?? '' }}</dd>
+            <dd class="m-0 font-mono text-sm break-all">{{ picked.lock ? shortDigest(picked.lock) : '' }}</dd>
           </div>
           <div>
             <dt :class="label">Toolkit</dt>
@@ -129,12 +129,12 @@ const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
                     f.project
                   }}</RouterLink>
                 </th>
-                <td class="py-2.5 pr-4">{{ f.version }}</td>
+                <td class="py-2.5 pr-4">{{ f.version ?? '' }}</td>
                 <td class="py-2.5 pr-4" :class="toneText[fragment[f.outcome].tone]">
                   {{ fragment[f.outcome].word
                   }}<span v-if="f.reason" class="block text-sm text-text-muted">{{ f.reason }}</span>
                 </td>
-                <td class="py-2.5 text-text-muted">{{ age(f.published, now) }}</td>
+                <td class="py-2.5 text-text-muted">{{ f.published ? age(f.published, now) : '' }}</td>
               </tr>
             </tbody>
           </table>

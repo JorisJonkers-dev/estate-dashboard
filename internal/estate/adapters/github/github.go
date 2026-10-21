@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"sigs.k8s.io/yaml"
@@ -45,6 +46,10 @@ type Estate struct {
 	repository string
 	token      string
 	client     *http.Client
+
+	mu sync.Mutex
+	// recorded holds each composition run read so far, by run id; nil for one with no record.
+	recorded map[int64]*domain.CompositionRun
 }
 
 var _ domain.Repository = (*Estate)(nil)
@@ -493,3 +498,8 @@ func (Absent) Issues(context.Context) ([]domain.Issue, error) { return nil, doma
 
 // Updates implements domain.Repository.
 func (Absent) Updates(context.Context) ([]domain.Update, error) { return nil, domain.ErrNoRepository }
+
+// CompositionRuns implements domain.Repository.
+func (Absent) CompositionRuns(context.Context, int) ([]domain.CompositionRun, error) {
+	return nil, domain.ErrNoRepository
+}

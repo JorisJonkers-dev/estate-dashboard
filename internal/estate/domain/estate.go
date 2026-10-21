@@ -118,4 +118,7 @@ type Repository interface {
 	// Updates returns every open Renovate pull request across the owner's repositories that moves
 	// an image to a newer version.
 	Updates(ctx context.Context) ([]Update, error)
+	// CompositionRuns returns up to limit finished runs of the estate's compose.yml that recorded
+	// what they composed, newest first.
+	CompositionRuns(ctx context.Context, limit int) ([]CompositionRun, error)
 }

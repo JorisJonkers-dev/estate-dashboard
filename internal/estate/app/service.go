@@ -111,3 +111,17 @@ func (s *Service) Updates(ctx context.Context) ([]domain.Update, error) {
 	slices.SortStableFunc(updates, func(a, b domain.Update) int { return b.Opened.Compare(a.Opened) })
 	return updates, nil
 }
+
+// CompositionRunsRead is how many of the newest runs one read looks at.
+const CompositionRunsRead = 20
+
+// CompositionRuns returns the newest runs of the estate's compose.yml that recorded what they
+// composed, newest first.
+func (s *Service) CompositionRuns(ctx context.Context) ([]domain.CompositionRun, error) {
+	runs, err := s.repo.CompositionRuns(ctx, CompositionRunsRead)
+	if err != nil {
+		return nil, fmt.Errorf("read the composition runs: %w", err)
+	}
+	slices.SortStableFunc(runs, func(a, b domain.CompositionRun) int { return b.At.Compare(a.At) })
+	return runs, nil
+}
