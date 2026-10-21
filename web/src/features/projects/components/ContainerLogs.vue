@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query'
 import { computed } from 'vue'
-import { listLogStreamsOptions } from '../../../infrastructure/api/@tanstack/vue-query.gen'
+import { getDeclarationOptions, listLogStreamsOptions } from '../../../infrastructure/api/@tanstack/vue-query.gen'
 import { window } from '../domain/logs'
 import LogView from './LogView.vue'
 
@@ -15,11 +15,18 @@ const of = computed(() =>
     .filter((s) => s.container === props.container && (props.pod === undefined || s.pod === props.pod))
     .sort((a, b) => (b.first ?? '').localeCompare(a.first ?? '')),
 )
+// Flagger gates a blue-green Process, so its pods are named by role even with no primary listed.
+const declaration = useQuery(computed(() => getDeclarationOptions({ path: { project: props.project } })))
+const gated = computed(() =>
+  (declaration.data.value?.applications ?? []).some((a) =>
+    a.processes.some((p) => p.name === props.container && p.switchover === 'blue-green'),
+  ),
+)
 </script>
 
 <template>
   <p v-if="streams.isPending.value" class="m-0 text-text-muted">Loading…</p>
   <p v-else-if="streams.isError.value" class="m-0 text-text-muted">Loki did not answer.</p>
   <p v-else-if="of.length === 0" class="m-0 text-text-muted">{{ container }} wrote nothing in the last hours.</p>
-  <LogView v-else :key="of[0]?.pod" :project="project" :streams="of" />
+  <LogView v-else :key="of[0]?.pod" :project="project" :streams="of" :gated="gated" />
 </template>

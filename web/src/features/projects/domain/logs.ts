@@ -48,10 +48,15 @@ export function hoursOf(s: Stream, now: number): number {
   return Math.min(window, Math.max(1, Math.ceil((now - Date.parse(s.first)) / 3_600_000) + 1))
 }
 
-/** A pod's name in a list of its Process's pods: Flagger's role, or the pod's own suffix. */
-export function podName(s: Stream, all: Stream[]): string {
-  if (all.some((o) => o.pod.includes('-primary-'))) return s.pod.includes('-primary-') ? 'primary' : 'canary'
-  return s.pod.slice(s.pod.lastIndexOf('-') + 1)
+/** A pod's name in a list of its Process's pods: Flagger's role where Flagger gates it, or the pod's own suffix. */
+export function podName(s: Stream, all: Stream[], gated: boolean): string {
+  const primary = (o: Stream) => o.pod.includes('-primary-')
+  if (!gated && !all.some(primary)) return s.pod.slice(s.pod.lastIndexOf('-') + 1)
+  if (primary(s)) return 'primary'
+  // Each failed analysis leaves its own canary pod; the oldest is the first attempt.
+  const start = (o: Stream) => o.first ?? ''
+  const canaries = all.filter((o) => !primary(o)).sort((a, b) => start(a).localeCompare(start(b)))
+  return canaries.length > 1 ? `canary · attempt ${String(canaries.indexOf(s) + 1)}` : 'canary'
 }
 
 /** A log line: JSON lines split into level, message and fields. */

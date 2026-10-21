@@ -8,7 +8,7 @@ import { describeError } from '../../alerts/composables/useAlertHistory'
 import { hoursOf, isRunning, podName, readLine } from '../domain/logs'
 
 /** One Process's log lines, one pod at a time. */
-const props = defineProps<{ project: string; streams: Stream[] }>()
+const props = defineProps<{ project: string; streams: Stream[]; gated: boolean }>()
 const now = useNow()
 const pod = ref(props.streams[0]?.pod ?? '')
 const stream = computed(() => props.streams.find((s) => s.pod === pod.value) ?? props.streams[0])
@@ -50,7 +50,7 @@ watch(read, async () => {
 
 <template>
   <div class="flex h-full flex-col">
-    <!-- Each pod by its role or suffix; its full name is on hover. -->
+    <!-- Each pod by its role or suffix, and whether it stopped; its full name is on hover. -->
     <div
       v-if="streams.length > 1"
       role="group"
@@ -71,8 +71,9 @@ watch(read, async () => {
           :class="isRunning(s, now) ? 'bg-accent' : 'border border-dim'"
           aria-hidden="true"
         />
-        {{ podName(s, streams) }}
-        <span class="sr-only">{{ isRunning(s, now) ? ', running' : ', finished' }}</span>
+        {{ podName(s, streams, gated) }}
+        <span v-if="isRunning(s, now)" class="sr-only">, running</span>
+        <span v-else class="text-dim">stopped</span>
       </button>
     </div>
     <div
