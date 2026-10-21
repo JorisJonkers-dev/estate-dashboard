@@ -24,11 +24,20 @@ export interface InboxItem {
 
 const switching = new Set(['Waiting', 'Progressing', 'WaitingPromotion', 'Promoting', 'Finalising'])
 
+const bySeverity = { 'page': 'Critical', 'urgent': 'Warning', 'business-hours': 'Info' } as const
+
+/** An alert without a class is read by its `severity` label, which the cluster's rules carry. */
+function bySeverityLabel(severity: string | undefined): InboxItem['severity'] {
+  if (severity === 'critical') return 'Critical'
+  if (severity === 'warning') return 'Warning'
+  return 'Info'
+}
+
 /** Every alert, condition and release in flight, newest first. */
 export function inbox(alerts: Alert[], issues: Issue[], releases: Release[]): InboxItem[] {
   const out: InboxItem[] = []
   for (const a of alerts) {
-    const severity = a.class === 'page' ? 'Critical' : a.class === 'urgent' ? 'Warning' : 'Info'
+    const severity = a.class ? bySeverity[a.class] : bySeverityLabel(a.labels.severity)
     out.push({
       key: `alert-${a.fingerprint}`,
       class: 'Platform',
