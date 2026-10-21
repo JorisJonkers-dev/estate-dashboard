@@ -413,6 +413,67 @@ paths:
           $ref: "#/components/responses/Problem"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/events:
+    get:
+      operationId: streamEvents
+      summary: Stream what changes while it changes
+      description: >-
+        Server-sent events, one `rollout` event (its data a RolloutChange) each time the Reporter
+        records a stage of a Project's Rollout, and a comment every half minute to keep the stream
+        open. Served by its own handler, because each event is flushed as it happens.
+      tags: [estate]
+      responses:
+        "200":
+          description: The stream, open until the client goes.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                maxLength: 1048576
+        "401":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /hooks/github:
+    post:
+      operationId: receiveGitHubWebhook
+      summary: Take a webhook delivery from the Reporter GitHub App
+      description: >-
+        GitHub calls this, not a browser, so it needs no session: the delivery's
+        `X-Hub-Signature-256` is its proof, an HMAC-SHA256 of the raw body under the webhook secret.
+        A production `deployment_status` is passed on to every open event stream; any other signed
+        delivery is taken and ignored. Served by its own handler, because the signature covers the
+        body exactly as sent.
+      tags: [estate]
+      security:
+        - githubSignature: []
+      parameters:
+        - name: X-GitHub-Event
+          in: header
+          required: true
+          description: The kind of delivery.
+          schema:
+            type: string
+            maxLength: 64
+      requestBody:
+        required: true
+        description: The delivery, as GitHub sends it.
+        content:
+          application/json:
+            schema:
+              type: object
+              description: A GitHub webhook payload.
+      responses:
+        "204":
+          description: Taken.
+        "401":
+          $ref: "#/components/responses/Problem"
+        "413":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/estate/composition/runs:
     get:
       operationId: listCompositionRuns
@@ -811,6 +872,13 @@ paths:
           $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
+    githubSignature:
+      type: apiKey
+      in: header
+      name: X-Hub-Signature-256
+      description: >-
+        `sha256=` and the hex HMAC-SHA256 of the request's raw body, keyed with the webhook secret
+        the Reporter GitHub App and the dashboard share.
     sessionCookie:
       type: apiKey
       in: cookie
@@ -1159,6 +1227,28 @@ components:
           type: string
           maxLength: 2048
           description: The workflow run.
+    RolloutChange:
+      description: A stage the Reporter recorded on a Project's Rollout, the data of a `rollout` event.
+      type: object
+      additionalProperties: false
+      required: [repository, project, state]
+      properties:
+        repository:
+          type: string
+          maxLength: 140
+          description: The repository the Rollout is a GitHub Deployment of, owner/name.
+        project:
+          type: string
+          maxLength: 63
+          description: The Project.
+        version:
+          type: string
+          maxLength: 64
+          description: The release.
+        state:
+          type: string
+          maxLength: 32
+          description: The deployment status's state.
     CompositionRunList:
       description: Composition runs, newest first.
       type: object
