@@ -48,6 +48,41 @@ describe('the releases of a Project', () => {
     expect(live(views)).toBeUndefined()
   })
 
+  it('is judged by its newest stage, so a release that failed a check and then went ready is live and recovered', () => {
+    const stage = (state: string, at: string) => ({ state, description: state, at })
+    const jellyfin: Rollout = {
+      id: 9,
+      version: '10.11.11',
+      commit: 'c9',
+      at: '2026-10-21T09:12:00Z',
+      // Listed oldest first, so only the times say which stage is newest.
+      stages: [
+        stage('in_progress', '2026-10-21T09:12:00Z'),
+        stage('failure', '2026-10-21T09:25:00Z'),
+        stage('success', '2026-10-21T09:32:00Z'),
+      ],
+    }
+    const [view] = releases([jellyfin], unit('10.11.11'))
+    expect([view?.state, view?.recovered]).toEqual(['live', true])
+  })
+
+  it('is failed when its newest stage failed, wherever the stage is listed', () => {
+    const stage = (state: string, at: string) => ({ state, description: state, at })
+    const listedOldestFirst: Rollout = {
+      id: 9,
+      version: '1.1.0',
+      commit: 'c9',
+      at: '2026-10-21T09:12:00Z',
+      stages: [stage('in_progress', '2026-10-21T09:12:00Z'), stage('failure', '2026-10-21T09:25:00Z')],
+    }
+    expect(releases([listedOldestFirst], unit('1.0.0'))[0]?.state).toBe('failed')
+  })
+
+  it('is not recovered when no stage failed, nor when its newest stage did', () => {
+    expect(releases([rollout(2, '1.1.0', ['success', 'in_progress'])], unit('1.1.0'))[0]?.recovered).toBe(false)
+    expect(releases([rollout(2, '1.1.0', ['failure', 'success'])], unit('1.0.0'))[0]?.recovered).toBe(false)
+  })
+
   it('is served by the last good release while a newer one switches in', () => {
     const views = releases(
       [rollout(4, '1.2.0', ['in_progress']), rollout(3, '1.1.0', ['failure']), rollout(2, '1.0.0', [])],
