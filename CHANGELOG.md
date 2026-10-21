@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.8.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.7.0...v0.8.0) (2026-10-21)
+
+
+### Features
+
+* the Composition page reads each delivery's run artifact, so it shows production's runs ([#72](https://github.com/JorisJonkers-dev/estate-dashboard/issues/72)) ([4039805](https://github.com/JorisJonkers-dev/estate-dashboard/commit/40398059a15084e532aec8453eb5bcb707799b8d))
+* the images lock records the image's software version ([#73](https://github.com/JorisJonkers-dev/estate-dashboard/issues/73)) ([7b6cee8](https://github.com/JorisJonkers-dev/estate-dashboard/commit/7b6cee853e24330735428487038fcf039d595da2))
+
+
+### Bug Fixes
+
+* a Rollout leaves out the pods a Job ran, and a release that went ready after a failed check reads as recovered ([#74](https://github.com/JorisJonkers-dev/estate-dashboard/issues/74)) ([6babf5a](https://github.com/JorisJonkers-dev/estate-dashboard/commit/6babf5ad05de317cdcda9f045c2d213807a4d611))
+* name a canary pod by its role even when no primary pod is listed ([#65](https://github.com/JorisJonkers-dev/estate-dashboard/issues/65)) ([953708a](https://github.com/JorisJonkers-dev/estate-dashboard/commit/953708a8aa9ee7cbee206302d5805dde0bbd7f22))
+* read which Processes Flagger gates from the Release Gate, which production serves ([#69](https://github.com/JorisJonkers-dev/estate-dashboard/issues/69)) ([c20cc1c](https://github.com/JorisJonkers-dev/estate-dashboard/commit/c20cc1ca8ce592d969e46da9a3e3cc9f92355f6d))
+
 ## [0.7.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.6.0...v0.7.0) (2026-10-20)
 
 
