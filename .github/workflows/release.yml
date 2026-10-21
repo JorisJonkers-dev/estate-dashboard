@@ -79,6 +79,7 @@ jobs:
             --secret id=github_token,env=GITHUB_TOKEN \
             --platform linux/amd64,linux/arm64 \
             --build-arg VERSION="${TAG#v}" \
+            --label org.opencontainers.image.version="${TAG#v}" \
             --tag "${IMAGE}:${TAG}" \
             --metadata-file image.json \
             --push
@@ -101,6 +102,7 @@ jobs:
               digest: "${digest}"
               uid: ${user%%:*}
               gid: ${user##*:}
+              version: "${TAG#v}"
           LOCK
           cat images.lock.yml >> "$GITHUB_STEP_SUMMARY"
 
@@ -122,7 +124,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@362acd5420236edb73a797ece311c73c39510c25 # v0.27.0
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@79e57122f7ed1fb442c90a7487f861c5d1465ec6 # v0.34.0
     with:
       project-file: deploy/estate-dashboard.project.yml
       version: ${{ needs.release-please.outputs.tag_name }}
