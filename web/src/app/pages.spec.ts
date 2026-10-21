@@ -441,6 +441,28 @@ describe('the drawer when a read fails or holds nothing', () => {
     expect(body()).toContain('Loki did not answer.')
   })
 
+  it('names each canary of a gated Process by its attempt, and says which has stopped, when no primary is listed', async () => {
+    const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
+    const { wrapper } = await visit(
+      '/projects/auth',
+      failing(/\/logs\/streams$/, () =>
+        json({
+          items: [
+            { pod: 'auth-api-5b6c7d8e9-t8f8w', container: 'auth-api', first: minutesAgo(90), last: minutesAgo(60) },
+            { pod: 'auth-api-5b6c7d8e9-zpmh6', container: 'auth-api', first: minutesAgo(30), last: minutesAgo(1) },
+          ],
+        }),
+      ),
+    )
+    await button(wrapper, 'Logs of auth-api').trigger('click')
+    await settle()
+    const pods = [...document.querySelectorAll('[aria-label="Pod"] button')].map((b) => b.textContent.trim())
+    expect(pods).toEqual([
+      expect.stringMatching(/^canary · attempt 2\s*, running$/),
+      expect.stringMatching(/^canary · attempt 1\s*stopped$/),
+    ])
+  })
+
   it('says when a release has no changelog', async () => {
     const { wrapper } = await visit(
       '/projects/auth',

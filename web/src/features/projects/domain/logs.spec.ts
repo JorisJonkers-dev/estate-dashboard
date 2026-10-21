@@ -55,11 +55,28 @@ describe('a pod in the drawer', () => {
     expect(hoursOf({ pod: 'a', container: 'a' }, now)).toBe(168)
   })
 
-  it("is named by Flagger's role, or by its suffix", () => {
+  it("is named by Flagger's role when a primary and a canary are listed", () => {
     const flagger = [s('web-primary-7c9d8-abcde', 'web'), s('web-5b6c7-fghij', 'web')]
-    expect(flagger.map((x) => podName(x, flagger))).toEqual(['primary', 'canary'])
+    expect(flagger.map((x) => podName(x, flagger, true))).toEqual(['primary', 'canary'])
+    expect(flagger.map((x) => podName(x, flagger, false))).toEqual(['primary', 'canary'])
+  })
+
+  it('is named canary with its attempt, oldest first, when only canaries of a gated Process are listed', () => {
+    const newer = s('web-5b6c7-zpmh6', 'web', '0.5.0', 30)
+    const canaries = [newer, s('web-5b6c7-t8f8w', 'web', '0.5.0', 90)]
+    expect(canaries.map((x) => podName(x, canaries, true))).toEqual(['canary · attempt 2', 'canary · attempt 1'])
+    expect(podName(newer, [newer], true)).toBe('canary')
+    // One that never said when it started counts as the oldest.
+    const unknown = { pod: 'web-5b6c7-a1b2c', container: 'web' }
+    expect([newer, unknown].map((x) => podName(x, [newer, unknown], true))).toEqual([
+      'canary · attempt 2',
+      'canary · attempt 1',
+    ])
+  })
+
+  it('is named by its suffix when Flagger does not gate its Process', () => {
     const plain = [s('gate-6b7c8-g5h6i', 'gate'), s('gate-6b7c8-j7k8l', 'gate')]
-    expect(plain.map((x) => podName(x, plain))).toEqual(['g5h6i', 'j7k8l'])
+    expect(plain.map((x) => podName(x, plain, false))).toEqual(['g5h6i', 'j7k8l'])
   })
 })
 
