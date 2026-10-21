@@ -233,9 +233,9 @@ export type CompositionFragment = {
      */
     project: string;
     /**
-     * Its release.
+     * Its release; absent for a Project that published no fragment.
      */
-    version: string;
+    version?: string;
     /**
      * What the run did with it.
      */
@@ -245,9 +245,9 @@ export type CompositionFragment = {
      */
     reason?: string;
     /**
-     * When it was published.
+     * When it was published; absent for a Project that published no fragment.
      */
-    published: string;
+    published?: string;
 };
 
 /**
@@ -271,7 +271,7 @@ export type CompositionRun = {
      */
     outcome: 'composed' | 'isolated' | 'failed';
     /**
-     * The composition lock it published.
+     * The digest of the composition lock it published, sha256:<hex>.
      */
     lock?: string;
     /**

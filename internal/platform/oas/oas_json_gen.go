@@ -1430,8 +1430,10 @@ func (s *CompositionFragment) encodeFields(e *jx.Encoder) {
 		e.Str(s.Project)
 	}
 	{
-		e.FieldStart("version")
-		e.Str(s.Version)
+		if s.Version.Set {
+			e.FieldStart("version")
+			s.Version.Encode(e)
+		}
 	}
 	{
 		e.FieldStart("outcome")
@@ -1444,8 +1446,10 @@ func (s *CompositionFragment) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		e.FieldStart("published")
-		json.EncodeDateTime(e, s.Published)
+		if s.Published.Set {
+			e.FieldStart("published")
+			s.Published.Encode(e, json.EncodeDateTime)
+		}
 	}
 }
 
@@ -1479,11 +1483,9 @@ func (s *CompositionFragment) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"project\"")
 			}
 		case "version":
-			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				v, err := d.Str()
-				s.Version = string(v)
-				if err != nil {
+				s.Version.Reset()
+				if err := s.Version.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -1511,11 +1513,9 @@ func (s *CompositionFragment) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"reason\"")
 			}
 		case "published":
-			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
-				s.Published = v
-				if err != nil {
+				s.Published.Reset()
+				if err := s.Published.Decode(d, json.DecodeDateTime); err != nil {
 					return err
 				}
 				return nil
@@ -1532,7 +1532,7 @@ func (s *CompositionFragment) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00010111,
+		0b00000101,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

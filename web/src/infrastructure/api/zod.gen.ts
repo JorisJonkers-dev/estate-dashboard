@@ -122,7 +122,7 @@ export const zReleaseNotes = z.object({
  */
 export const zCompositionFragment = z.object({
     project: z.string().max(63),
-    version: z.string().max(64),
+    version: z.string().max(64).optional(),
     outcome: z.enum([
         'moved',
         'unchanged',
@@ -131,7 +131,7 @@ export const zCompositionFragment = z.object({
         'held'
     ]),
     reason: z.string().max(512).optional(),
-    published: z.iso.datetime({ offset: true }).max(64)
+    published: z.iso.datetime({ offset: true }).max(64).optional()
 });
 
 /**

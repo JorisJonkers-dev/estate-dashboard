@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/estate/domain"
 	"github.com/JorisJonkers-dev/estate-dashboard/internal/platform/httpx"
@@ -24,6 +25,7 @@ type UseCases interface {
 	Rollouts(ctx context.Context, repository, project string, limit int) ([]domain.Rollout, error)
 	Notes(ctx context.Context, repository, version string) (domain.Notes, error)
 	Updates(ctx context.Context) ([]domain.Update, error)
+	CompositionRuns(ctx context.Context) ([]domain.CompositionRun, error)
 }
 
 // Estate implements the estate operations.
@@ -139,11 +141,29 @@ func notYet(what string) oas.ProblemStatusCode {
 	return oas.ProblemStatusCode{StatusCode: http.StatusServiceUnavailable, Response: httpx.Problem(http.StatusServiceUnavailable, what+" are not read yet.")}
 }
 
-// ListCompositionRuns implements listCompositionRuns. The runs are read from each run's artifact,
-// which compose.yml does not upload yet (JorisJonkers-dev/estate-dashboard#30).
-func (h *Estate) ListCompositionRuns(context.Context) (oas.ListCompositionRunsRes, error) {
-	down := oas.ListCompositionRunsServiceUnavailable(notYet("Composition runs"))
-	return &down, nil
+// ListCompositionRuns implements listCompositionRuns.
+func (h *Estate) ListCompositionRuns(ctx context.Context) (oas.ListCompositionRunsRes, error) {
+	runs, err := h.uc.CompositionRuns(ctx)
+	if err != nil {
+		down := oas.ListCompositionRunsServiceUnavailable(h.unavailable(ctx, "composition runs", err))
+		return &down, nil //nolint:nilerr // the cause is logged; the contract's 503 is the answer
+	}
+	items := make([]oas.CompositionRun, 0, len(runs))
+	for _, r := range runs {
+		fragments := make([]oas.CompositionFragment, 0, len(r.Fragments))
+		for _, f := range r.Fragments {
+			fragments = append(fragments, oas.CompositionFragment{
+				Project: f.Project, Version: opt(f.Version), Outcome: oas.CompositionFragmentOutcome(f.Outcome),
+				Reason: opt(f.Reason), Published: optTime(f.Published),
+			})
+		}
+		items = append(items, oas.CompositionRun{
+			ID: r.ID, At: r.At, Trigger: r.Trigger, Outcome: oas.CompositionRunOutcome(r.Outcome()),
+			Lock: opt(r.Lock), Toolkit: opt(r.Toolkit), SnapshotAt: optTime(r.SnapshotAt),
+			Moved: append([]string{}, r.Moved...), Fragments: fragments, URL: r.URL,
+		})
+	}
+	return &oas.CompositionRunList{Items: items}, nil
 }
 
 // GetDeclaration implements getDeclaration. A declaration is read from the Project's fragment,
@@ -177,6 +197,14 @@ func opt(s string) oas.OptString {
 		return oas.OptString{}
 	}
 	return oas.NewOptString(s)
+}
+
+// optTime returns t as an optional field, absent when t is zero.
+func optTime(t time.Time) oas.OptDateTime {
+	if t.IsZero() {
+		return oas.OptDateTime{}
+	}
+	return oas.NewOptDateTime(t)
 }
 
 // ListUpdates implements listUpdates. A pull request whose address does not parse is left out.

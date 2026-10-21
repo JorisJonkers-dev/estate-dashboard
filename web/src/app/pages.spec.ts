@@ -386,6 +386,32 @@ describe('the composition runs', () => {
     expect(runs.at(-1)?.attributes('aria-pressed')).toBe('true')
   })
 
+  it('shows a run’s lock by its first twelve digits, and a Project that published nothing without a release or an age', async () => {
+    const at = new Date().toISOString()
+    const { wrapper } = await visit('/composition', (r) =>
+      new URL(r.url).pathname === '/api/v1/estate/composition/runs'
+        ? json({
+            items: [
+              {
+                id: 7,
+                at,
+                trigger: 'arr 1.2.0 released',
+                outcome: 'isolated',
+                lock: `sha256:422ebb5fc159${'e'.repeat(52)}`,
+                moved: [],
+                url: 'https://github.com/JorisJonkers-dev/estate/actions/runs/7',
+                fragments: [{ project: 'media', outcome: 'stale', reason: 'E_PARTICIPANT_MISSING' }],
+              },
+            ],
+          })
+        : undefined,
+    )
+    expect(wrapper.text()).toContain('422ebb5fc159')
+    expect(wrapper.text()).not.toContain('sha256:')
+    const media = wrapper.findAll('tbody tr').find((tr) => tr.text().startsWith('media'))
+    expect(media?.findAll('td').map((td) => td.text())).toEqual(['', 'StaleE_PARTICIPANT_MISSING', ''])
+  })
+
   it('says when runs are not read, or there are none', async () => {
     const path = '/api/v1/estate/composition/runs'
     const down = await visit('/composition', (r) =>

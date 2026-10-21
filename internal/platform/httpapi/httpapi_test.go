@@ -471,8 +471,13 @@ type repository struct {
 	deploys  []estatedomain.Deploy
 	issues   []estatedomain.Issue
 	updates  []estatedomain.Update
+	runs     []estatedomain.CompositionRun
 	err      error
 	asked    []string
+}
+
+func (r *repository) CompositionRuns(context.Context, int) ([]estatedomain.CompositionRun, error) {
+	return r.runs, r.err
 }
 
 func (r *repository) Updates(context.Context) ([]estatedomain.Update, error) { return r.updates, r.err }
@@ -554,13 +559,38 @@ func TestTheEstateRepositoryIsServedInTheContractsShape(t *testing.T) {
 
 func TestTheReadsNotMadeYetSaySo(t *testing.T) {
 	srv := serve(t, &memory{})
-	for path, want := range map[string]string{
-		"/api/v1/estate/composition/runs":          "Composition runs are not read yet.",
-		"/api/v1/estate/projects/auth/declaration": "Declarations are not read yet.",
-	} {
-		if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
-			t.Fatalf("%s = %d %v", path, got.code, got.body)
-		}
+	if got := call(t, srv, http.MethodGet, "/api/v1/estate/projects/auth/declaration", "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != "Declarations are not read yet." {
+		t.Fatalf("declaration = %d %v", got.code, got.body)
+	}
+}
+
+func TestEachCompositionRunIsServedWithItsOutcomeAndItsFragments(t *testing.T) {
+	at := time.Date(2026, 10, 21, 10, 6, 4, 0, time.UTC)
+	repo := &repository{runs: []estatedomain.CompositionRun{{
+		ID: 7, At: at, Trigger: "arr 1.2.0 released", Conclusion: "failure", URL: "https://github.com/x/runs/7",
+		Toolkit: "0.26.1", SnapshotAt: at, Lock: "sha256:42", Moved: []string{},
+		Fragments: []estatedomain.CompositionFragment{
+			{Project: "arr", Version: "1.2.0", Outcome: "isolated", Reason: "E_ENGINE_VERSION_MISSING", Published: at},
+			{Project: "media", Outcome: "stale", Reason: "E_PARTICIPANT_MISSING"},
+		},
+	}}}
+	srv := serveEstate(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), estateapp.New(repo))
+	got := call(t, srv, http.MethodGet, "/api/v1/estate/composition/runs", "", true)
+	if got.code != http.StatusOK {
+		t.Fatalf("runs = %d %v", got.code, got.body)
+	}
+	run := got.body["items"].([]any)[0].(map[string]any)
+	fragments := run["fragments"].([]any)
+	arr, media := fragments[0].(map[string]any), fragments[1].(map[string]any)
+	if run["outcome"] != "isolated" || run["trigger"] != "arr 1.2.0 released" || run["lock"] != "sha256:42" || run["toolkit"] != "0.26.1" ||
+		arr["version"] != "1.2.0" || arr["published"] != "2026-10-21T10:06:04Z" || arr["reason"] != "E_ENGINE_VERSION_MISSING" {
+		t.Fatalf("run = %v", run)
+	}
+	if _, hasVersion := media["version"]; hasVersion {
+		t.Fatalf("a Project that published nothing = %v", media)
+	}
+	if _, hasPublished := media["published"]; hasPublished {
+		t.Fatalf("a Project that published nothing = %v", media)
 	}
 }
 
@@ -570,7 +600,7 @@ func TestAnEstateRepositoryThatDoesNotAnswerOrIsNotThereIsA503(t *testing.T) {
 		"The dashboard runs without the Estate repository to read.": estateapp.New(github.Absent{}),
 	} {
 		srv := serveEstate(t, &memory{}, &live{}, deliveryapp.New(cluster.Absent{}), uc)
-		for _, path := range []string{"/api/v1/estate/pins", "/api/v1/estate/handover", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys", "/api/v1/estate/projects/auth/rollouts?repository=a/b", "/api/v1/estate/updates"} {
+		for _, path := range []string{"/api/v1/estate/pins", "/api/v1/estate/handover", "/api/v1/estate/issues", "/api/v1/estate/projects/auth/deploys", "/api/v1/estate/projects/auth/rollouts?repository=a/b", "/api/v1/estate/updates", "/api/v1/estate/composition/runs"} {
 			if got := call(t, srv, http.MethodGet, path, "", true); got.code != http.StatusServiceUnavailable || got.body["detail"] != want {
 				t.Fatalf("%s = %d %v", path, got.code, got.body)
 			}

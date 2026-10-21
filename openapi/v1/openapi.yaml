@@ -418,9 +418,10 @@ paths:
       operationId: listCompositionRuns
       summary: List the estate's composition runs, newest first
       description: >-
-        Each run of the estate's compose.yml: when, what started it, its outcome, and what it composed.
-        Read from each run's artifact (#30). A 503 means the runs are not read yet, or GitHub did not
-        answer.
+        Each run of the estate's compose.yml that recorded what it composed, as the run's `composition`
+        artifact: when, what started it, its outcome, and what it composed. A run whose artifact has
+        expired, or that ran before runs recorded one, is left out. A 503 means GitHub did not answer,
+        or the dashboard runs without the Estate repository.
       tags: [estate]
       responses:
         "200":
@@ -1080,7 +1081,7 @@ components:
       description: One fragment a run read.
       type: object
       additionalProperties: false
-      required: [project, version, outcome, published]
+      required: [project, outcome]
       properties:
         project:
           type: string
@@ -1089,7 +1090,7 @@ components:
         version:
           type: string
           maxLength: 64
-          description: Its release.
+          description: Its release; absent for a Project that published no fragment.
         outcome:
           type: string
           enum: [moved, unchanged, isolated, stale, held]
@@ -1102,7 +1103,7 @@ components:
           type: string
           format: date-time
           maxLength: 64
-          description: When it was published.
+          description: When it was published; absent for a Project that published no fragment.
     CompositionRun:
       description: One composition run.
       type: object
@@ -1131,7 +1132,7 @@ components:
         lock:
           type: string
           maxLength: 128
-          description: The composition lock it published.
+          description: The digest of the composition lock it published, sha256:<hex>.
         toolkit:
           type: string
           maxLength: 64
