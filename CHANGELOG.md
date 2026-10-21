@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.8.1...v0.8.2) (2026-10-21)
+
+
+### Bug Fixes
+
+* an alert with no class reads by its severity label, so critical alerts no longer show as info ([#79](https://github.com/JorisJonkers-dev/estate-dashboard/issues/79)) ([c84ddfd](https://github.com/JorisJonkers-dev/estate-dashboard/commit/c84ddfd10c3054d220c0799cb06b1a42aafba373))
+
 ## [0.8.1](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.8.0...v0.8.1) (2026-10-21)
 
 
