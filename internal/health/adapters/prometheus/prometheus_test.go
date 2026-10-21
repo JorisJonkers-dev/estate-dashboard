@@ -156,6 +156,17 @@ func TestARolloutIsEachPodsReadinessAndEachCanarysWeight(t *testing.T) {
 	}
 }
 
+func TestARolloutLeavesOutThePodsAJobRan(t *testing.T) {
+	f := &fake{status: http.StatusOK, answers: map[string]string{}}
+	if _, _, err := f.serve(t).Rollout(t.Context(), "jellyfin", start, end, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	want := `kube_pod_status_ready{namespace="jellyfin-system",condition="true"} unless on(namespace, pod) kube_pod_owner{namespace="jellyfin-system",owner_kind="Job"}`
+	if f.queries[0] != want {
+		t.Fatalf("readiness query = %q, want %q", f.queries[0], want)
+	}
+}
+
 func TestARolloutPrometheusRefusesIsAnError(t *testing.T) {
 	for name, f := range map[string]*fake{
 		"the readiness": {status: http.StatusOK, answers: map[string]string{"kube_pod": `{"status":"error"}`}},

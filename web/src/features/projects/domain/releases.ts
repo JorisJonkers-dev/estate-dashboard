@@ -9,6 +9,8 @@ export interface ReleaseView {
   version: string
   at: string
   state: ReleaseState
+  /** A stage failed, and a newer one did not: the release got there after all. */
+  recovered: boolean
   /** How many times composition pinned this version. */
   pins: number
   commit: string
@@ -17,6 +19,13 @@ export interface ReleaseView {
 }
 
 const failed = (s: Stage) => s.state === 'failure' || s.state === 'error'
+
+/** A release's newest stage, by when each was written; the first listed wins a tie, as GitHub lists the newest first. */
+const newest = (stages: Stage[]) =>
+  stages.reduce<Stage | undefined>(
+    (n, s) => (n === undefined || Date.parse(s.at) > Date.parse(n.at) ? s : n),
+    undefined,
+  )
 
 /** Each release, newest first. The newest is live once its unit runs it and is ready. */
 export function releases(rollouts: Rollout[], unit: Unit | undefined): ReleaseView[] {
@@ -32,6 +41,7 @@ export function releases(rollouts: Rollout[], unit: Unit | undefined): ReleaseVi
       version: r.version,
       at: r.at,
       state: 'past',
+      recovered: false,
       pins: 1,
       commit: r.commit,
       ...(r.run ? { run: r.run } : {}),
@@ -39,7 +49,9 @@ export function releases(rollouts: Rollout[], unit: Unit | undefined): ReleaseVi
     })
   }
   out.forEach((v, i) => {
-    if (v.stages.some(failed)) v.state = 'failed'
+    const last = newest(v.stages)
+    v.recovered = last !== undefined && !failed(last) && v.stages.some(failed)
+    if (last !== undefined && failed(last)) v.state = 'failed'
     else if (i === 0) v.state = unit?.version === v.version && unit.ready ? 'live' : 'rolling'
   })
   return out

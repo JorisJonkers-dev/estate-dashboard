@@ -254,6 +254,7 @@ export function ifItFails(project: string, from: string | undefined, release: Re
 export function rolloutState(view: ReleaseView): { word: string; tone: Tone } {
   if (view.state === 'rolling') return { word: 'Switching in', tone: 'info' }
   if (view.state === 'failed') return { word: 'Failed', tone: 'crit' }
+  if (view.recovered) return { word: 'Recovered', tone: 'warn' }
   return { word: 'Done', tone: 'ok' }
 }
 

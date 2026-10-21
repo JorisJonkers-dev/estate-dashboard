@@ -29,6 +29,7 @@ const view = (over: Partial<ReleaseView> = {}): ReleaseView => ({
   version: '1.0.4',
   at: at(0),
   state: 'past',
+  recovered: false,
   pins: 1,
   commit: 'abc',
   stages: [stage('success', 'every pod ready', 150), stage('in_progress', 'arr 1.0.4 pinned', 0)],
@@ -369,6 +370,7 @@ describe('a rollout', () => {
     expect(rolloutState(view({ state: 'rolling' }))).toEqual({ word: 'Switching in', tone: 'info' })
     expect(rolloutState(view({ state: 'failed' }))).toEqual({ word: 'Failed', tone: 'crit' })
     expect(rolloutState(view({ state: 'live' }))).toEqual({ word: 'Done', tone: 'ok' })
+    expect(rolloutState(view({ state: 'live', recovered: true }))).toEqual({ word: 'Recovered', tone: 'warn' })
   })
 
   it('counts its time in minutes and seconds', () => {

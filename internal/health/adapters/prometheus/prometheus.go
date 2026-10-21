@@ -109,7 +109,8 @@ func (p *Prometheus) series(ctx context.Context, query string, start, end time.T
 // Project's namespace.
 func (p *Prometheus) Rollout(ctx context.Context, project string, start, end time.Time, step time.Duration) (domain.Series, domain.Series, error) {
 	namespace := project + "-system"
-	readiness, err := p.matrix(ctx, fmt.Sprintf(`kube_pod_status_ready{namespace=%q,condition="true"}`, namespace), "pod", start, end, step)
+	// A Job's pod runs to completion and is never ready: it is no Process switching to a release.
+	readiness, err := p.matrix(ctx, fmt.Sprintf(`kube_pod_status_ready{namespace=%q,condition="true"} unless on(namespace, pod) kube_pod_owner{namespace=%q,owner_kind="Job"}`, namespace, namespace), "pod", start, end, step)
 	if err != nil {
 		return nil, nil, err
 	}
