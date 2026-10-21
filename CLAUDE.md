@@ -36,4 +36,4 @@ everything CI runs; `task` lists the targets. The toolchain is pinned in `mise.t
   and the silences mirror. Everything else is read where it lives, never copied.
 - The design is the prototype at https://claude.ai/artifact/Lx5Ktu3DpvPAQXrbQcVx4u, linked from
   `JorisJonkers-dev/workspace#140`; the earlier canvas is superseded. Read it with the Artifact tool,
-  not a web fetch. Its "Unchanged" pages are screenshots of 0.6.0: the shipped app is their design.
+  not a web fetch. Its "Unchanged" pages are screenshots of the shipped app, which is their design.
