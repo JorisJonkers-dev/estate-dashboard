@@ -32,9 +32,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Only main saves the mise cache; pull requests restore it and never evict it.
       - uses: jdx/mise-action@v5
         with:
           cache: true
+          cache_save: ${{ github.event_name == 'push' }}
 
       - name: Authenticate to GitHub Packages
         env:
@@ -56,6 +58,7 @@ jobs:
       - uses: jdx/mise-action@v5
         with:
           cache: true
+          cache_save: ${{ github.event_name == 'push' }}
 
       - name: Authenticate to GitHub Packages
         env:
