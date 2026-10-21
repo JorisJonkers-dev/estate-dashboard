@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query'
 import { computed } from 'vue'
-import { getDeclarationOptions, listLogStreamsOptions } from '../../../infrastructure/api/@tanstack/vue-query.gen'
+import { listLogStreamsOptions, listReleasesOptions } from '../../../infrastructure/api/@tanstack/vue-query.gen'
 import { window } from '../domain/logs'
 import LogView from './LogView.vue'
 
@@ -15,11 +15,12 @@ const of = computed(() =>
     .filter((s) => s.container === props.container && (props.pod === undefined || s.pod === props.pod))
     .sort((a, b) => (b.first ?? '').localeCompare(a.first ?? '')),
 )
-// Flagger gates a blue-green Process, so its pods are named by role even with no primary listed.
-const declaration = useQuery(computed(() => getDeclarationOptions({ path: { project: props.project } })))
+// A Process the Release Gate lists as a member is switched by Flagger, so its pods are named by role
+// even with no primary listed.
+const releases = useQuery(listReleasesOptions())
 const gated = computed(() =>
-  (declaration.data.value?.applications ?? []).some((a) =>
-    a.processes.some((p) => p.name === props.container && p.switchover === 'blue-green'),
+  (releases.data.value?.items ?? []).some(
+    (r) => r.namespace === `${props.project}-system` && r.members.some((m) => m.process === props.container),
   ),
 )
 </script>

@@ -443,17 +443,18 @@ describe('the drawer when a read fails or holds nothing', () => {
 
   it('names each canary of a gated Process by its attempt, and says which has stopped, when no primary is listed', async () => {
     const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
-    const { wrapper } = await visit(
-      '/projects/auth',
-      failing(/\/logs\/streams$/, () =>
-        json({
-          items: [
-            { pod: 'auth-api-5b6c7d8e9-t8f8w', container: 'auth-api', first: minutesAgo(90), last: minutesAgo(60) },
-            { pod: 'auth-api-5b6c7d8e9-zpmh6', container: 'auth-api', first: minutesAgo(30), last: minutesAgo(1) },
-          ],
-        }),
-      ),
-    )
+    // The Release Gate says which Processes Flagger switches; the declaration is not read yet.
+    const { wrapper } = await visit('/projects/auth', (r) => {
+      const path = new URL(r.url).pathname
+      if (path.endsWith('/declaration')) return unavailable('Declarations are not read yet.')
+      if (!path.endsWith('/logs/streams')) return undefined
+      return json({
+        items: [
+          { pod: 'auth-api-5b6c7d8e9-t8f8w', container: 'auth-api', first: minutesAgo(90), last: minutesAgo(60) },
+          { pod: 'auth-api-5b6c7d8e9-zpmh6', container: 'auth-api', first: minutesAgo(30), last: minutesAgo(1) },
+        ],
+      })
+    })
     await button(wrapper, 'Logs of auth-api').trigger('click')
     await settle()
     const pods = [...document.querySelectorAll('[aria-label="Pod"] button')].map((b) => b.textContent.trim())
@@ -461,6 +462,32 @@ describe('the drawer when a read fails or holds nothing', () => {
       expect.stringMatching(/^canary · attempt 2\s*, running$/),
       expect.stringMatching(/^canary · attempt 1\s*stopped$/),
     ])
+  })
+
+  it('names the pods of a Process the Release Gate does not switch by their suffix', async () => {
+    const { wrapper } = await visit('/projects/delivery', (r) => {
+      const path = new URL(r.url).pathname
+      if (path.endsWith('/delivery/releases'))
+        return json({
+          items: [
+            { namespace: 'delivery-system', application: 'delivery', members: [{ process: 'api', iterations: 0 }] },
+            // Another Project's member of the same name gates only that Project's pods.
+            { namespace: 'notes-system', application: 'notes', members: [{ process: 'collector', iterations: 0 }] },
+          ],
+          truncated: false,
+        })
+      if (!path.endsWith('/logs/streams')) return undefined
+      return json({
+        items: [
+          { pod: 'collector-6f8d9c7b5-7k2lp', container: 'collector', first: new Date().toISOString() },
+          { pod: 'collector-6f8d9c7b5-q9x4d', container: 'collector', first: new Date(0).toISOString() },
+        ],
+      })
+    })
+    await button(wrapper, 'Logs of collector').trigger('click')
+    await settle()
+    const pods = [...document.querySelectorAll('[aria-label="Pod"] button')].map((b) => b.textContent.trim())
+    expect(pods.map((p) => p.split(/\s/)[0])).toEqual(['7k2lp', 'q9x4d'])
   })
 
   it('says when a release has no changelog', async () => {
