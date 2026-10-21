@@ -34,4 +34,6 @@ everything CI runs; `task` lists the targets. The toolchain is pinned in `mise.t
   silence. It never holds a credential that can deploy, pause or roll back.
 - **Its own state is four tables** (`db/migrations/`): sessions, alert history, acknowledgements
   and the silences mirror. Everything else is read where it lives, never copied.
-- The design is the prototype linked from `JorisJonkers-dev/workspace#140`; the earlier canvas is superseded.
+- The design is the prototype at https://claude.ai/artifact/Lx5Ktu3DpvPAQXrbQcVx4u, linked from
+  `JorisJonkers-dev/workspace#140`; the earlier canvas is superseded. Read it with the Artifact tool,
+  not a web fetch. Its "Unchanged" pages are screenshots of 0.6.0: the shipped app is their design.
