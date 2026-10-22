@@ -710,10 +710,12 @@ paths:
       summary: What a Project's pods and canaries did over a release's window
       description: >-
         Every pod of the Project Prometheus saw from `from` to `to`: when it started, when it first
-        turned ready, when it was last seen, and its readiness every five seconds; and each
-        Process's canary weight as Flagger moved it. The dashboard joins this with the release's
-        stages and the Release Gate's record to show how the release rolled out. A 503 means
-        Prometheus did not answer, or the dashboard runs without one.
+        turned ready, when it was last seen, its readiness every five seconds, and how each of its
+        sidecars and init containers went; each Process's canary weight as Flagger moved it; and
+        every pod a Job ran in the window, the Vault policy Job, a migration or a backup, from when
+        it started to how it ended. The dashboard joins this with the release's stages and the
+        Release Gate's record to show how the release rolled out. A 503 means Prometheus did not
+        answer, or the dashboard runs without one.
       tags: [health]
       parameters:
         - name: project
@@ -1937,7 +1939,7 @@ components:
       description: One pod over a release's window.
       type: object
       additionalProperties: false
-      required: [pod, process, checks]
+      required: [pod, process, checks, containers]
       properties:
         pod:
           type: string
@@ -1968,6 +1970,87 @@ components:
           description: Its readiness every five seconds, oldest first.
           items:
             $ref: "#/components/schemas/ReadinessCheck"
+        containers:
+          type: array
+          maxItems: 32
+          description: >-
+            Its sidecars and init containers, by name; the container that is its Process is the pod's
+            own readiness above.
+          items:
+            $ref: "#/components/schemas/ContainerSpan"
+    ContainerChange:
+      description: The state a container went into at one moment.
+      type: object
+      additionalProperties: false
+      required: [at, state]
+      properties:
+        at:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When.
+        state:
+          type: string
+          enum: [waiting, running, ready, succeeded, failed]
+          description: >-
+            waiting to start; running but not ready; running and ready; or ended, having succeeded or
+            failed.
+    ContainerSpan:
+      description: One sidecar or init container of a pod over a release's window.
+      type: object
+      additionalProperties: false
+      required: [name, kind, changes]
+      properties:
+        name:
+          type: string
+          maxLength: 253
+          description: The container.
+        kind:
+          type: string
+          enum: [sidecar, init]
+          description: >-
+            A sidecar runs beside the Process for as long as its pod does; an init container runs
+            once, before it, and ends.
+        changes:
+          type: array
+          maxItems: 1440
+          description: Each change of its state, oldest first, its first state included.
+          items:
+            $ref: "#/components/schemas/ContainerChange"
+    Run:
+      description: One pod a Job ran over a release's window.
+      type: object
+      additionalProperties: false
+      required: [pod, job, start, outcome]
+      properties:
+        pod:
+          type: string
+          maxLength: 253
+          description: The pod.
+        job:
+          type: string
+          maxLength: 253
+          description: The Job that ran it.
+        cronJob:
+          type: string
+          maxLength: 253
+          description: The CronJob that made the Job, where one did.
+        start:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it started.
+        end:
+          type: string
+          format: date-time
+          maxLength: 64
+          description: When it ended; absent while it runs.
+        outcome:
+          type: string
+          enum: [running, succeeded, failed, unknown]
+          description: >-
+            How it ended: still running, succeeded, failed, or unknown where it was gone before it
+            was seen to end.
     CanaryWeight:
       description: The share of traffic Flagger sent a Process's canary at one moment.
       type: object
@@ -1990,10 +2073,10 @@ components:
           maximum: 100
           description: The canary's share, in percent.
     RolloutWindow:
-      description: What a Project's pods and canaries did over a window.
+      description: What a Project's pods, canaries and Jobs did over a window.
       type: object
       additionalProperties: false
-      required: [pods, weights]
+      required: [pods, weights, runs]
       properties:
         pods:
           type: array
@@ -2007,6 +2090,12 @@ components:
           description: Each change of a canary's weight, oldest first.
           items:
             $ref: "#/components/schemas/CanaryWeight"
+        runs:
+          type: array
+          maxItems: 200
+          description: Each pod a Job ran in the window, by when it started.
+          items:
+            $ref: "#/components/schemas/Run"
     CheckCondition:
       description: One condition a probe holds an answer to.
       type: object

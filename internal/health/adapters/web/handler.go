@@ -64,18 +64,39 @@ func (h *Health) GetRolloutWindow(ctx context.Context, params oas.GetRolloutWind
 		down := oas.GetRolloutWindowServiceUnavailable(h.unavailable(ctx, err))
 		return &down, nil
 	}
-	out := &oas.RolloutWindow{Pods: make([]oas.PodSpan, 0, len(window.Pods)), Weights: make([]oas.CanaryWeight, 0, len(window.Weights))}
+	out := &oas.RolloutWindow{Pods: make([]oas.PodSpan, 0, len(window.Pods)), Weights: make([]oas.CanaryWeight, 0, len(window.Weights)), Runs: make([]oas.Run, 0, len(window.Runs))}
 	for _, p := range window.Pods {
-		span := oas.PodSpan{Pod: p.Pod, Process: p.Process, Start: optTime(p.Start), Ready: optTime(p.Ready), End: optTime(p.End), Checks: make([]oas.ReadinessCheck, 0, len(p.Checks))}
-		for _, c := range p.Checks {
-			span.Checks = append(span.Checks, oas.ReadinessCheck{At: c.At, Ready: c.Ready})
-		}
-		out.Pods = append(out.Pods, span)
+		out.Pods = append(out.Pods, podSpan(p))
 	}
 	for _, w := range window.Weights {
 		out.Weights = append(out.Weights, oas.CanaryWeight{Process: w.Process, At: w.At, Weight: int32(min(max(w.Weight, 0), 100))}) //nolint:gosec // clamped to 0..100
 	}
+	for _, r := range window.Runs {
+		run := oas.Run{Pod: r.Pod, Job: r.Job, Start: r.Start, End: optTime(r.End), Outcome: oas.RunOutcome(r.Outcome)}
+		if r.CronJob != "" {
+			run.CronJob = oas.NewOptString(r.CronJob)
+		}
+		out.Runs = append(out.Runs, run)
+	}
 	return out, nil
+}
+
+func podSpan(p domain.PodSpan) oas.PodSpan {
+	span := oas.PodSpan{
+		Pod: p.Pod, Process: p.Process, Start: optTime(p.Start), Ready: optTime(p.Ready), End: optTime(p.End),
+		Checks: make([]oas.ReadinessCheck, 0, len(p.Checks)), Containers: make([]oas.ContainerSpan, 0, len(p.Containers)),
+	}
+	for _, c := range p.Checks {
+		span.Checks = append(span.Checks, oas.ReadinessCheck{At: c.At, Ready: c.Ready})
+	}
+	for _, c := range p.Containers {
+		container := oas.ContainerSpan{Name: c.Name, Kind: oas.ContainerSpanKind(c.Kind), Changes: make([]oas.ContainerChange, 0, len(c.Changes))}
+		for _, change := range c.Changes {
+			container.Changes = append(container.Changes, oas.ContainerChange{At: change.At, State: oas.ContainerChangeState(change.State)})
+		}
+		span.Containers = append(span.Containers, container)
+	}
+	return span
 }
 
 func optTime(t *time.Time) oas.OptDateTime {

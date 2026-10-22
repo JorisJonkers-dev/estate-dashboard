@@ -75,7 +75,7 @@ var ErrNoMetrics = errors.New("no metrics are configured")
 // Project, by the step's start. It only ever reads.
 type Metrics interface {
 	Samples(ctx context.Context, project string, checks []string, start, end time.Time, step time.Duration) (map[time.Time]Sample, error)
-	// Rollout returns each pod's readiness by pod, and each canary's weight by Process, from start
-	// to end.
-	Rollout(ctx context.Context, project string, start, end time.Time, step time.Duration) (readiness, weights Series, err error)
+	// Rollout returns what the metrics say of the Project's pods from start to end: each pod's
+	// readiness and containers, each canary's weight, and each pod a Job ran.
+	Rollout(ctx context.Context, project string, start, end time.Time, step time.Duration) (Observed, error)
 }

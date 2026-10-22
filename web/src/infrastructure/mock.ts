@@ -506,7 +506,9 @@ const histories: Record<string, unknown[]> = {
 }
 
 // A release's window: each Process's old pod hands over to a new one a minute in; auth's switch
-// through canaries, and notes' new pods never turn ready.
+// through canaries, and notes' new pods never turn ready. Each pod first runs its Vault agent once,
+// notes' beside its backup sidecar; and the release's Jobs run: the Vault policy, a migration that
+// fails for notes, and an hourly backup.
 function rolloutWindow(project: string, from: string, to: string) {
   const start = Date.parse(from)
   const end = Date.parse(to)
@@ -522,6 +524,30 @@ function rolloutWindow(project: string, from: string, to: string) {
     ...new Set((streams[project] ?? []).filter((x) => !x.pod.includes('migration')).map((x) => x.container)),
   ]
   const failing = project === 'notes'
+  const containers = (begin: number, ready?: number) => [
+    {
+      name: 'vault-agent-init',
+      kind: 'init',
+      changes: [
+        { at: iso(begin), state: 'waiting' },
+        { at: iso(begin + 1000), state: 'running' },
+        { at: iso(begin + 4000), state: 'succeeded' },
+      ],
+    },
+    ...(project === 'notes'
+      ? [
+          {
+            name: 'file-backup',
+            kind: 'sidecar',
+            changes: [
+              { at: iso(begin), state: 'waiting' },
+              { at: iso(begin + 5000), state: 'running' },
+              ...(ready === undefined ? [] : [{ at: iso(ready), state: 'ready' }]),
+            ],
+          },
+        ]
+      : []),
+  ]
   const pods = processes.flatMap((process, i) => {
     const begin = t0 + 30_000 + i * 120_000
     const ready = failing ? undefined : begin + 30_000
@@ -534,6 +560,7 @@ function rolloutWindow(project: string, from: string, to: string) {
         ready: iso(start),
         ...(failing ? {} : { end: iso(handover + 20_000) }),
         checks: checks(start, failing ? end : handover + 20_000, start),
+        containers: containers(start, start),
       },
       {
         pod: `${process}-new00000b-bbbbb`,
@@ -541,6 +568,7 @@ function rolloutWindow(project: string, from: string, to: string) {
         start: iso(begin),
         ...(ready ? { ready: iso(ready) } : {}),
         checks: checks(begin, end, ready),
+        containers: containers(begin, failing ? undefined : begin + 10_000),
       },
     ]
   })
@@ -548,7 +576,41 @@ function rolloutWindow(project: string, from: string, to: string) {
     project === 'auth'
       ? [0, 20, 40].map((weight, i) => ({ process: 'auth-api', at: iso(t0 + 90_000 + i * 15_000), weight }))
       : []
-  return { pods, weights }
+  // A run that has not started by the window's end is not in it; one that ends after is still running.
+  const run = (pod: string, job: string, from: number, to: number, outcome: string, cronJob?: string) =>
+    from > end
+      ? []
+      : [
+          {
+            pod,
+            job,
+            ...(cronJob ? { cronJob } : {}),
+            start: iso(from),
+            ...(to <= end ? { end: iso(to), outcome } : { outcome: 'running' }),
+          },
+        ]
+  const runs =
+    processes.length === 0
+      ? []
+      : [
+          ...run('vault-policy-2acd37c8-d4gcj', 'vault-policy-2acd37c89500', t0 + 10_000, t0 + 13_000, 'succeeded'),
+          ...run(
+            `${project}-migration-up-x7k2p`,
+            `${project}-migration-up`,
+            t0 + 15_000,
+            t0 + 45_000,
+            failing ? 'failed' : 'succeeded',
+          ),
+          ...run(
+            'postgres-data-backup-29877195-7bm4z',
+            'postgres-data-backup-29877195',
+            t0 + 70_000,
+            t0 + 130_000,
+            'succeeded',
+            'postgres-data-backup',
+          ),
+        ]
+  return { pods, weights, runs }
 }
 
 // A Project's last hour: healthy, but for a minute around its latest release.

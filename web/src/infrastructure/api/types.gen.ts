@@ -1029,6 +1029,72 @@ export type PodSpan = {
      * Its readiness every five seconds, oldest first.
      */
     checks: Array<ReadinessCheck>;
+    /**
+     * Its sidecars and init containers, by name; the container that is its Process is the pod's own readiness above.
+     */
+    containers: Array<ContainerSpan>;
+};
+
+/**
+ * The state a container went into at one moment.
+ */
+export type ContainerChange = {
+    /**
+     * When.
+     */
+    at: string;
+    /**
+     * waiting to start; running but not ready; running and ready; or ended, having succeeded or failed.
+     */
+    state: 'waiting' | 'running' | 'ready' | 'succeeded' | 'failed';
+};
+
+/**
+ * One sidecar or init container of a pod over a release's window.
+ */
+export type ContainerSpan = {
+    /**
+     * The container.
+     */
+    name: string;
+    /**
+     * A sidecar runs beside the Process for as long as its pod does; an init container runs once, before it, and ends.
+     */
+    kind: 'sidecar' | 'init';
+    /**
+     * Each change of its state, oldest first, its first state included.
+     */
+    changes: Array<ContainerChange>;
+};
+
+/**
+ * One pod a Job ran over a release's window.
+ */
+export type Run = {
+    /**
+     * The pod.
+     */
+    pod: string;
+    /**
+     * The Job that ran it.
+     */
+    job: string;
+    /**
+     * The CronJob that made the Job, where one did.
+     */
+    cronJob?: string;
+    /**
+     * When it started.
+     */
+    start: string;
+    /**
+     * When it ended; absent while it runs.
+     */
+    end?: string;
+    /**
+     * How it ended: still running, succeeded, failed, or unknown where it was gone before it was seen to end.
+     */
+    outcome: 'running' | 'succeeded' | 'failed' | 'unknown';
 };
 
 /**
@@ -1050,7 +1116,7 @@ export type CanaryWeight = {
 };
 
 /**
- * What a Project's pods and canaries did over a window.
+ * What a Project's pods, canaries and Jobs did over a window.
  */
 export type RolloutWindow = {
     /**
@@ -1061,6 +1127,10 @@ export type RolloutWindow = {
      * Each change of a canary's weight, oldest first.
      */
     weights: Array<CanaryWeight>;
+    /**
+     * Each pod a Job ran in the window, by when it started.
+     */
+    runs: Array<Run>;
 };
 
 /**

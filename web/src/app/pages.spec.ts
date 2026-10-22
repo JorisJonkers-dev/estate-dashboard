@@ -299,19 +299,79 @@ describe('a rollout', () => {
     expect(lane).toContain('never turned ready · the old pod keeps all traffic')
   })
 
-  it('shows its sidecars under their Process, running with their pod', async () => {
+  it('shows its sidecars and init containers under their Process, each with its own state and no health checks or traffic', async () => {
     const { wrapper } = await visit('/projects/notes/rollout')
-    const sidecar = wrapper.get('table[aria-label="Containers"]').findAll('tbody tr')[1]?.text() ?? ''
-    expect(sidecar).toContain('file-backup')
-    expect(sidecar).toContain('runs with its pod')
-    expect(sidecar).toContain('takes no traffic')
+    const rows = wrapper.get('table[aria-label="Containers"]').findAll('tbody')[0]?.findAll('tr') ?? []
+    const [sidecar, init] = [rows[1], rows[2]]
+    expect(sidecar?.text()).toMatch(/file-backup\s*sidecar/)
+    expect(sidecar?.text()).toContain('Starting, not ready')
+    expect(sidecar?.text()).toContain('takes no traffic')
+    expect(sidecar?.get('[role="img"]').attributes('aria-label')).toBe('file-backup: Starting, not ready')
+    expect(init?.text()).toMatch(/vault-agent-init\s*init, runs once/)
+    expect(init?.text()).toContain('Done')
+    expect(init?.find('[data-mark][data-outcome="succeeded"]').exists()).toBe(true)
+    for (const row of [sidecar, init]) {
+      expect(row?.find('[role="toolbar"]').exists()).toBe(false)
+      expect(row?.find('[aria-label^="Traffic"]').exists()).toBe(false)
+    }
+  })
+
+  it('shows each Job’s runs apart from the Processes: a span while it works, then how it ended', async () => {
+    const { wrapper } = await visit('/projects/auth/rollout')
+    const runs = wrapper.get('ul[aria-label="Runs"]').findAll('li')
+    expect(runs.map((r) => r.text().split(/(?<=Job)/)[0])).toEqual([
+      'vault-policy-2acd37c89500Job',
+      'auth-migration-upJob',
+      'postgres-data-backupCronJob',
+    ])
+    expect(runs[0]?.text()).toContain('Succeeded')
+    expect(runs[0]?.text()).toContain('1 run · last 0:10–0:13, 3s')
+    expect(runs[0]?.find('[data-mark][data-outcome="succeeded"]').exists()).toBe(true)
+    expect(runs[0]?.find('[data-segment][data-state="running"]').classes()).not.toContain('motion-safe:animate-pulse')
+    expect(wrapper.get('#runs-h').element.parentElement?.querySelector('[role="toolbar"]')).toBeNull()
+  })
+
+  it('replays a run as running while it works, and nothing before it starts', async () => {
+    const { wrapper } = await visit('/projects/auth/rollout')
+    await wrapper.get('#scrub').setValue('20')
+    const runs = wrapper.get('ul[aria-label="Runs"]').findAll('li')
+    expect(runs[1]?.text()).toContain('Running')
+    expect(runs[1]?.text()).toContain('running since 0:15')
+    expect(runs[1]?.get('[data-segment]').classes()).toContain('motion-safe:animate-pulse')
+    expect(runs[1]?.find('[data-mark]').exists()).toBe(false)
+    expect(runs[2]?.text()).toContain('Not run yet')
+    expect(runs[2]?.find('[data-segment]').exists()).toBe(false)
+  })
+
+  it('shows a run that failed as failed and gone, not as an unhealthy pod', async () => {
+    const { wrapper } = await visit('/projects/notes/rollout?version=0.10.0')
+    const migration = wrapper.get('ul[aria-label="Runs"]').findAll('li')[1]
+    expect(migration?.text()).toContain('notes-migration-up')
+    expect(migration?.text()).toContain('Failed')
+    expect(migration?.find('[data-mark][data-outcome="failed"]').exists()).toBe(true)
+  })
+
+  it('says when no Job ran in the window', async () => {
+    const { wrapper } = await visit('/projects/auth/rollout', (r) =>
+      new URL(r.url).pathname.endsWith('/rollout')
+        ? Promise.resolve(
+            new Response(JSON.stringify({ pods: [], weights: [], runs: [] }), {
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
+        : undefined,
+    )
+    expect(wrapper.get('#runs-h').element.parentElement?.textContent).toContain(
+      "No Job ran in auth's namespace in this release's window.",
+    )
   })
 
   it('says when Prometheus cannot be read, and when there is no release', async () => {
     const { wrapper } = await visit('/projects/auth/rollout', (r) =>
       new URL(r.url).pathname.endsWith('/rollout') ? unavailable('down') : undefined,
     )
-    expect(wrapper.text()).toContain('Not read: Prometheus did not answer.')
+    expect(wrapper.get('#lanes-h').element.parentElement?.textContent).toContain('Not read: Prometheus did not answer.')
+    expect(wrapper.get('#runs-h').element.parentElement?.textContent).toContain('Not read: Prometheus did not answer.')
     expect(wrapper.find('#order-h').exists()).toBe(true)
     document.body.innerHTML = ''
     expect((await visit('/projects/agents/rollout')).wrapper.text()).toContain('agents has no release to show yet.')

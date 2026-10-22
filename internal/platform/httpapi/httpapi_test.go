@@ -820,9 +820,21 @@ func (m metrics) Samples(_ context.Context, _ string, _ []string, start, end tim
 	return out, m.err
 }
 
-func (m metrics) Rollout(_ context.Context, _ string, start, _ time.Time, _ time.Duration) (healthdomain.Series, healthdomain.Series, error) {
-	return healthdomain.Series{"auth-api-7f8c9d6b5-kq2lm": {start: 0, start.Add(5 * time.Second): 1}},
-		healthdomain.Series{"auth-api": {start: 20}}, m.err
+func (m metrics) Rollout(_ context.Context, _ string, start, _ time.Time, _ time.Duration) (healthdomain.Observed, error) {
+	pod := "auth-api-7f8c9d6b5-kq2lm"
+	ended := start.Add(8 * time.Second)
+	return healthdomain.Observed{
+		Readiness: healthdomain.Series{pod: {start: 0, start.Add(5 * time.Second): 1}},
+		Weights:   healthdomain.Series{"auth-api": {start: 20}},
+		Containers: []healthdomain.ContainerSeries{
+			{Pod: pod, Name: "auth-api", Samples: map[time.Time]healthdomain.ContainerSample{start: {Running: true}}},
+			{Pod: pod, Name: "vault-agent-init", Init: true, Samples: map[time.Time]healthdomain.ContainerSample{start: {}, start.Add(5 * time.Second): {Ended: "Completed"}}},
+		},
+		Jobs: []healthdomain.JobPod{
+			{Pod: "vault-policy-29877720-q8w2n", Job: "vault-policy-29877720", CronJob: "vault-policy", End: &ended, Phases: map[time.Time]string{start.Add(5 * time.Second): "Running", start.Add(10 * time.Second): "Succeeded"}},
+			{Pod: "auth-migration-up-h3j4k", Job: "auth-migration-up", Phases: map[time.Time]string{start.Add(5 * time.Second): "Running", start.Add(10 * time.Minute): "Running"}},
+		},
+	}, m.err
 }
 
 func serveMetrics(t *testing.T, m healthdomain.Metrics) *httptest.Server {
@@ -863,6 +875,28 @@ func TestAReleasesWindowIsServedAsItsPodsAndCanaries(t *testing.T) {
 	}
 	if w := weights[0].(map[string]any); w["process"] != "auth-api" || w["weight"] != float64(20) {
 		t.Fatalf("weight = %v", w)
+	}
+	containers := pod["containers"].([]any)
+	if len(containers) != 1 {
+		t.Fatalf("containers = %v", containers)
+	}
+	if c := containers[0].(map[string]any); c["name"] != "vault-agent-init" || c["kind"] != "init" || len(c["changes"].([]any)) != 2 || c["changes"].([]any)[1].(map[string]any)["state"] != "succeeded" {
+		t.Fatalf("container = %v", c)
+	}
+}
+
+func TestAReleasesWindowCarriesEachRunOfAJobAndHowItEnded(t *testing.T) {
+	got := call(t, serveMetrics(t, metrics{}), http.MethodGet, "/api/v1/health/projects/auth/rollout?from=2026-10-20T09:00:00Z&to=2026-10-20T09:10:00Z", "", true)
+	runs, _ := got.body["runs"].([]any)
+	if got.code != http.StatusOK || len(runs) != 2 {
+		t.Fatalf("window = %d %v", got.code, got.body)
+	}
+	migration, policy := runs[0].(map[string]any), runs[1].(map[string]any)
+	if policy["job"] != "vault-policy-29877720" || policy["cronJob"] != "vault-policy" || policy["start"] != "2026-10-20T09:00:05Z" || policy["end"] != "2026-10-20T09:00:08Z" || policy["outcome"] != "succeeded" {
+		t.Fatalf("policy run = %v", policy)
+	}
+	if _, cron := migration["cronJob"]; cron || migration["job"] != "auth-migration-up" || migration["end"] != nil || migration["outcome"] != "running" {
+		t.Fatalf("migration run = %v", migration)
 	}
 }
 
