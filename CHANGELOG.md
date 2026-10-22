@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.3](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.8.2...v0.8.3) (2026-10-22)
+
+
+### Bug Fixes
+
+* **health:** leave out the pods a Job ran, so a Project with a Job is not marked degraded ([#85](https://github.com/JorisJonkers-dev/estate-dashboard/issues/85)) ([e3207b2](https://github.com/JorisJonkers-dev/estate-dashboard/commit/e3207b2cf33ac56bb54cb895ced1491d625512eb))
+
 ## [0.8.2](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.8.1...v0.8.2) (2026-10-21)
 
 
