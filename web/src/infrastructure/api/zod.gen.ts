@@ -487,6 +487,29 @@ export const zReadinessCheck = z.object({
 });
 
 /**
+ * The state a container went into at one moment.
+ */
+export const zContainerChange = z.object({
+    at: z.iso.datetime({ offset: true }).max(64),
+    state: z.enum([
+        'waiting',
+        'running',
+        'ready',
+        'succeeded',
+        'failed'
+    ])
+});
+
+/**
+ * One sidecar or init container of a pod over a release's window.
+ */
+export const zContainerSpan = z.object({
+    name: z.string().max(253),
+    kind: z.enum(['sidecar', 'init']),
+    changes: z.array(zContainerChange).max(1440)
+});
+
+/**
  * One pod over a release's window.
  */
 export const zPodSpan = z.object({
@@ -495,7 +518,25 @@ export const zPodSpan = z.object({
     start: z.iso.datetime({ offset: true }).max(64).optional(),
     ready: z.iso.datetime({ offset: true }).max(64).optional(),
     end: z.iso.datetime({ offset: true }).max(64).optional(),
-    checks: z.array(zReadinessCheck).max(1440)
+    checks: z.array(zReadinessCheck).max(1440),
+    containers: z.array(zContainerSpan).max(32)
+});
+
+/**
+ * One pod a Job ran over a release's window.
+ */
+export const zRun = z.object({
+    pod: z.string().max(253),
+    job: z.string().max(253),
+    cronJob: z.string().max(253).optional(),
+    start: z.iso.datetime({ offset: true }).max(64),
+    end: z.iso.datetime({ offset: true }).max(64).optional(),
+    outcome: z.enum([
+        'running',
+        'succeeded',
+        'failed',
+        'unknown'
+    ])
 });
 
 /**
@@ -508,11 +549,12 @@ export const zCanaryWeight = z.object({
 });
 
 /**
- * What a Project's pods and canaries did over a window.
+ * What a Project's pods, canaries and Jobs did over a window.
  */
 export const zRolloutWindow = z.object({
     pods: z.array(zPodSpan).max(200),
-    weights: z.array(zCanaryWeight).max(10000)
+    weights: z.array(zCanaryWeight).max(10000),
+    runs: z.array(zRun).max(200)
 });
 
 /**

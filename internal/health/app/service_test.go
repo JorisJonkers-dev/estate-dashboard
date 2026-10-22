@@ -16,6 +16,7 @@ import (
 type metrics struct {
 	readiness domain.Series
 	weights   domain.Series
+	jobs      []domain.JobPod
 	samples   map[time.Time]domain.Sample
 	err       error
 	asked     []string
@@ -29,10 +30,10 @@ func (m *metrics) Samples(_ context.Context, project string, checks []string, st
 	return m.samples, m.err
 }
 
-func (m *metrics) Rollout(_ context.Context, project string, start, end time.Time, _ time.Duration) (domain.Series, domain.Series, error) {
+func (m *metrics) Rollout(_ context.Context, project string, start, end time.Time, _ time.Duration) (domain.Observed, error) {
 	m.asked = []string{project}
 	m.from, m.to = start, end
-	return m.readiness, m.weights, m.err
+	return domain.Observed{Readiness: m.readiness, Weights: m.weights, Jobs: m.jobs}, m.err
 }
 
 var now = time.Date(2026, 10, 20, 12, 0, 17, 0, time.UTC)
@@ -198,5 +199,15 @@ func TestAWindowThatEndsBeforeItStartsOrLastsTooLongIsRefused(t *testing.T) {
 func TestMetricsThatDoNotAnswerHaveNoRollout(t *testing.T) {
 	if _, err := app.New(&metrics{err: domain.ErrNoMetrics}, time.Now).Rollout(t.Context(), "auth", at(0), at(60)); !errors.Is(err, domain.ErrNoMetrics) {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestARolloutCarriesTheRunsOfItsJobsInTheWindow(t *testing.T) {
+	w := rollout(t, &metrics{jobs: []domain.JobPod{
+		{Pod: "vault-policy-1a2b-x7k2p", Job: "vault-policy-1a2b", Phases: map[time.Time]string{at(10): "Running", at(15): "Succeeded"}},
+		{Pod: "vault-policy-29877720-q8w2n", Job: "vault-policy-29877720", CronJob: "vault-policy", Phases: map[time.Time]string{at(0): "Succeeded"}},
+	}})
+	if len(w.Runs) != 1 || w.Runs[0].Job != "vault-policy-1a2b" || w.Runs[0].Outcome != domain.RunSucceeded || !w.Runs[0].End.Equal(at(15)) {
+		t.Fatalf("runs = %+v", w.Runs)
 	}
 }

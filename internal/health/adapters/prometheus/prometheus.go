@@ -1,5 +1,5 @@
-// Package prometheus implements the health context's Metrics port on Prometheus's HTTP API: three
-// range queries, one per source of a Project's health.
+// Package prometheus implements the health context's Metrics port on Prometheus's HTTP API: range
+// queries over what kube-state-metrics, Flagger, Flux and Gatus write.
 package prometheus
 
 import (
@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -104,31 +105,198 @@ type rangeAnswer struct {
 
 // series runs one range query whose answer is one series, by the second each value is at.
 func (p *Prometheus) series(ctx context.Context, query string, start, end time.Time, step time.Duration) (map[time.Time]float64, error) {
-	all, err := p.matrix(ctx, query, "", start, end, step)
+	answer, err := p.query(ctx, query, start, end, step)
 	if err != nil {
 		return nil, err
 	}
-	return all[""], nil
+	return by(answer, "")[""], nil
 }
 
-// Rollout implements domain.Metrics: each pod's readiness and each canary's weight in the
-// Project's namespace.
-func (p *Prometheus) Rollout(ctx context.Context, project string, start, end time.Time, step time.Duration) (domain.Series, domain.Series, error) {
+// jobPods is each pod a Job ran in the namespace.
+func jobPods(namespace string) string {
+	return fmt.Sprintf(`kube_pod_owner{namespace=%q,owner_kind="Job"}`, namespace)
+}
+
+// eachContainer is a query of both kinds of container of the pods that serve, each series
+// labelled with its kind, container or init: of names its kube_pod_container_ metric with %[1]s,
+// and the namespace with %[2]q.
+func eachContainer(namespace, of string) string {
+	kind := func(family, kind string) string {
+		return fmt.Sprintf(`label_replace(%s, "kind", %q, "", "")`, fmt.Sprintf(of, family, namespace), kind)
+	}
+	return fmt.Sprintf(`(%s or %s) unless on(pod) %s`, kind("kube_pod_container", "container"), kind("kube_pod_init_container", "init"), jobPods(namespace))
+}
+
+// Rollout implements domain.Metrics: each pod's readiness and containers, each canary's weight,
+// and each pod a Job ran in the Project's namespace.
+func (p *Prometheus) Rollout(ctx context.Context, project string, start, end time.Time, step time.Duration) (domain.Observed, error) {
 	namespace := project + "-system"
-	// A Job's pod runs to completion and is never ready: it is no Process switching to a release.
-	readiness, err := p.matrix(ctx, running(namespace), "pod", start, end, step)
+	read := func(query string) ([]labelled, error) { return p.query(ctx, query, start, end, step) }
+	// A Job's pod runs to completion and is never ready: it is no Process switching to a release,
+	// but a run of its Job.
+	readiness, err := read(running(namespace))
 	if err != nil {
-		return nil, nil, err
+		return domain.Observed{}, err
 	}
-	weights, err := p.matrix(ctx, fmt.Sprintf(`flagger_canary_weight{namespace=%q}`, namespace), "name", start, end, step)
+	weights, err := read(fmt.Sprintf(`flagger_canary_weight{namespace=%q}`, namespace))
 	if err != nil {
-		return nil, nil, err
+		return domain.Observed{}, err
 	}
-	return readiness, weights, nil
+	containers, err := containersIn(namespace, read)
+	if err != nil {
+		return domain.Observed{}, err
+	}
+	jobs, err := jobsIn(namespace, read)
+	if err != nil {
+		return domain.Observed{}, err
+	}
+	return domain.Observed{Readiness: by(readiness, "pod"), Weights: by(weights, "name"), Containers: containers, Jobs: jobs}, nil
 }
 
-// matrix runs one range query, its series by the value of label; every series under "" without one.
-func (p *Prometheus) matrix(ctx context.Context, query, label string, start, end time.Time, step time.Duration) (domain.Series, error) {
+// readAll runs each query in turn, its answer the series it returned.
+func readAll(read func(string) ([]labelled, error), queries ...string) ([][]labelled, error) {
+	out := make([][]labelled, 0, len(queries))
+	for _, q := range queries {
+		answer, err := read(q)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, answer)
+	}
+	return out, nil
+}
+
+// containersIn is each container of the pods that serve: whether it ran and was ready each step,
+// the reason it had ended with, when it started, and whether an init container restarts with its
+// pod.
+func containersIn(namespace string, read func(string) ([]labelled, error)) ([]domain.ContainerSeries, error) {
+	answers, err := readAll(read,
+		eachContainer(namespace, `max by (pod, container) (%[1]s_status_running{namespace=%[2]q} * 2 + %[1]s_status_ready{namespace=%[2]q})`),
+		eachContainer(namespace, `max by (pod, container, reason) (%[1]s_status_terminated_reason{namespace=%[2]q} == 1)`),
+		eachContainer(namespace, `max by (pod, container) (%[1]s_state_started{namespace=%[2]q})`),
+		fmt.Sprintf(`max by (pod, container) (kube_pod_init_container_info{namespace=%q,restart_policy="Always"})`, namespace),
+	)
+	if err != nil {
+		return nil, err
+	}
+	all := map[string]*domain.ContainerSeries{}
+	of := func(l map[string]string) *domain.ContainerSeries {
+		key := l["pod"] + "/" + l["container"] + "/" + l["kind"]
+		if all[key] == nil {
+			all[key] = &domain.ContainerSeries{Pod: l["pod"], Name: l["container"], Init: l["kind"] == "init", Samples: map[time.Time]domain.ContainerSample{}}
+		}
+		return all[key]
+	}
+	for _, s := range answers[0] {
+		c := of(s.labels)
+		for at, v := range s.points {
+			sample := c.Samples[at]
+			sample.Running, sample.Ready = v >= 2, int(v)%2 == 1
+			c.Samples[at] = sample
+		}
+	}
+	for _, s := range answers[1] {
+		c := of(s.labels)
+		for at := range s.points {
+			sample := c.Samples[at]
+			sample.Ended = s.labels["reason"]
+			c.Samples[at] = sample
+		}
+	}
+	for _, s := range answers[2] {
+		c := of(s.labels)
+		c.Started = latest(s.points)
+	}
+	for _, s := range answers[3] {
+		s.labels["kind"] = "init"
+		of(s.labels).Restarts = true
+	}
+	out := make([]domain.ContainerSeries, 0, len(all))
+	for _, c := range all {
+		out = append(out, *c)
+	}
+	return out, nil
+}
+
+// jobsIn is each pod a Job ran: its phase each step, when it started and finished by its own
+// record, and the CronJob that made its Job, where one did.
+func jobsIn(namespace string, read func(string) ([]labelled, error)) ([]domain.JobPod, error) {
+	answers, err := readAll(read,
+		fmt.Sprintf(`max by (namespace, pod, phase) (kube_pod_status_phase{namespace=%q} == 1) * on(namespace, pod) group_left(owner_name) max by (namespace, pod, owner_name) (%s)`, namespace, jobPods(namespace)),
+		fmt.Sprintf(`(label_replace(max by (pod) (kube_pod_start_time{namespace=%q}), "time", "start", "", "") or label_replace(max by (pod) (kube_pod_completion_time{namespace=%q}), "time", "end", "", "")) and on(pod) %s`, namespace, namespace, jobPods(namespace)),
+		fmt.Sprintf(`max by (job_name, owner_name) (kube_job_owner{namespace=%q,owner_kind="CronJob"})`, namespace),
+	)
+	if err != nil {
+		return nil, err
+	}
+	cronJobs := map[string]string{}
+	for _, s := range answers[2] {
+		cronJobs[s.labels["job_name"]] = s.labels["owner_name"]
+	}
+	pods := map[string]*domain.JobPod{}
+	for _, s := range answers[0] {
+		pod := s.labels["pod"]
+		if pods[pod] == nil {
+			job := s.labels["owner_name"]
+			pods[pod] = &domain.JobPod{Pod: pod, Job: job, CronJob: cronJobs[job], Phases: map[time.Time]string{}}
+		}
+		for at := range s.points {
+			pods[pod].Phases[at] = s.labels["phase"]
+		}
+	}
+	for _, s := range answers[1] {
+		if j := pods[s.labels["pod"]]; j != nil {
+			if s.labels["time"] == "start" {
+				j.Start = latest(s.points)
+			} else {
+				j.End = latest(s.points)
+			}
+		}
+	}
+	out := make([]domain.JobPod, 0, len(pods))
+	for _, j := range pods {
+		out = append(out, *j)
+	}
+	return out, nil
+}
+
+// latest is the moment the last sample of a timestamp metric names.
+func latest(points map[time.Time]float64) *time.Time {
+	var last time.Time
+	var value float64
+	for at, v := range points {
+		if at.After(last) {
+			last, value = at, v
+		}
+	}
+	if last.IsZero() {
+		return nil
+	}
+	t := time.Unix(int64(value), 0).UTC()
+	return &t
+}
+
+// labelled is one series of an answer: its labels, and its values by when each was sampled.
+type labelled struct {
+	labels map[string]string
+	points map[time.Time]float64
+}
+
+// by is the series of an answer by the value of label; every series under "" without one.
+func by(answer []labelled, label string) domain.Series {
+	out := domain.Series{}
+	for _, s := range answer {
+		key := s.labels[label]
+		if out[key] == nil {
+			out[key] = map[time.Time]float64{}
+		}
+		maps.Copy(out[key], s.points)
+	}
+	return out
+}
+
+// query runs one range query, its answer each series it returned.
+func (p *Prometheus) query(ctx context.Context, query string, start, end time.Time, step time.Duration) ([]labelled, error) {
 	u := p.base.JoinPath("/api/v1/query_range")
 	u.RawQuery = url.Values{
 		"query": {query},
@@ -152,11 +320,11 @@ func (p *Prometheus) matrix(ctx context.Context, query, label string, start, end
 	if err := json.NewDecoder(io.LimitReader(res.Body, maxBody)).Decode(&answer); err != nil || answer.Status != "success" {
 		return nil, fmt.Errorf("prometheus: read the answer: %w", errors.Join(err, errStatus))
 	}
-	out := domain.Series{}
+	out := make([]labelled, 0, len(answer.Data.Result))
 	for _, r := range answer.Data.Result {
-		key := r.Metric[label]
-		if out[key] == nil {
-			out[key] = map[time.Time]float64{}
+		s := labelled{labels: r.Metric, points: map[time.Time]float64{}}
+		if s.labels == nil {
+			s.labels = map[string]string{}
 		}
 		for _, pair := range r.Values {
 			at, okAt := pair[0].(float64)
@@ -165,8 +333,9 @@ func (p *Prometheus) matrix(ctx context.Context, query, label string, start, end
 			if !okAt || !okValue || err != nil {
 				continue
 			}
-			out[key][time.Unix(int64(at), 0).UTC()] = v
+			s.points[time.Unix(int64(at), 0).UTC()] = v
 		}
+		out = append(out, s)
 	}
 	return out, nil
 }
@@ -178,8 +347,8 @@ type Absent struct{}
 var _ domain.Metrics = Absent{}
 
 // Rollout implements domain.Metrics.
-func (Absent) Rollout(context.Context, string, time.Time, time.Time, time.Duration) (domain.Series, domain.Series, error) {
-	return nil, nil, domain.ErrNoMetrics
+func (Absent) Rollout(context.Context, string, time.Time, time.Time, time.Duration) (domain.Observed, error) {
+	return domain.Observed{}, domain.ErrNoMetrics
 }
 
 // Samples implements domain.Metrics.

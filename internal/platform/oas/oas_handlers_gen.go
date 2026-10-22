@@ -839,10 +839,11 @@ func (s *Server) handleGetReleaseNotesRequest(args [0]string, argsEscaped bool, 
 // handleGetRolloutWindowRequest handles getRolloutWindow operation.
 //
 // Every pod of the Project Prometheus saw from `from` to `to`: when it started, when it first turned
-// ready, when it was last seen, and its readiness every five seconds; and each Process's canary weight
-// as Flagger moved it. The dashboard joins this with the release's stages and the Release Gate's
-// record to show how the release rolled out. A 503 means Prometheus did not answer, or the dashboard
-// runs without one.
+// ready, when it was last seen, its readiness every five seconds, and how each of its sidecars and
+// init containers went; each Process's canary weight as Flagger moved it; and every pod a Job ran in
+// the window, the Vault policy Job, a migration or a backup, from when it started to how it ended. The
+// dashboard joins this with the release's stages and the Release Gate's record to show how the release
+// rolled out. A 503 means Prometheus did not answer, or the dashboard runs without one.
 //
 // GET /api/v1/health/projects/{project}/rollout
 func (s *Server) handleGetRolloutWindowRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

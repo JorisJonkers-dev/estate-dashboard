@@ -970,6 +970,98 @@ func (s *Container) SetInstances(val []ContainerInstance) {
 	s.Instances = val
 }
 
+// The state a container went into at one moment.
+// Ref: #/components/schemas/ContainerChange
+type ContainerChange struct {
+	// When.
+	At time.Time `json:"at"`
+	// Waiting to start; running but not ready; running and ready; or ended, having succeeded or failed.
+	State ContainerChangeState `json:"state"`
+}
+
+// GetAt returns the value of At.
+func (s *ContainerChange) GetAt() time.Time {
+	return s.At
+}
+
+// GetState returns the value of State.
+func (s *ContainerChange) GetState() ContainerChangeState {
+	return s.State
+}
+
+// SetAt sets the value of At.
+func (s *ContainerChange) SetAt(val time.Time) {
+	s.At = val
+}
+
+// SetState sets the value of State.
+func (s *ContainerChange) SetState(val ContainerChangeState) {
+	s.State = val
+}
+
+// Waiting to start; running but not ready; running and ready; or ended, having succeeded or failed.
+type ContainerChangeState string
+
+const (
+	ContainerChangeStateWaiting   ContainerChangeState = "waiting"
+	ContainerChangeStateRunning   ContainerChangeState = "running"
+	ContainerChangeStateReady     ContainerChangeState = "ready"
+	ContainerChangeStateSucceeded ContainerChangeState = "succeeded"
+	ContainerChangeStateFailed    ContainerChangeState = "failed"
+)
+
+// AllValues returns all ContainerChangeState values.
+func (ContainerChangeState) AllValues() []ContainerChangeState {
+	return []ContainerChangeState{
+		ContainerChangeStateWaiting,
+		ContainerChangeStateRunning,
+		ContainerChangeStateReady,
+		ContainerChangeStateSucceeded,
+		ContainerChangeStateFailed,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ContainerChangeState) MarshalText() ([]byte, error) {
+	switch s {
+	case ContainerChangeStateWaiting:
+		return []byte(s), nil
+	case ContainerChangeStateRunning:
+		return []byte(s), nil
+	case ContainerChangeStateReady:
+		return []byte(s), nil
+	case ContainerChangeStateSucceeded:
+		return []byte(s), nil
+	case ContainerChangeStateFailed:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ContainerChangeState) UnmarshalText(data []byte) error {
+	switch ContainerChangeState(data) {
+	case ContainerChangeStateWaiting:
+		*s = ContainerChangeStateWaiting
+		return nil
+	case ContainerChangeStateRunning:
+		*s = ContainerChangeStateRunning
+		return nil
+	case ContainerChangeStateReady:
+		*s = ContainerChangeStateReady
+		return nil
+	case ContainerChangeStateSucceeded:
+		*s = ContainerChangeStateSucceeded
+		return nil
+	case ContainerChangeStateFailed:
+		*s = ContainerChangeStateFailed
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // One container that runs an image.
 // Ref: #/components/schemas/ContainerInstance
 type ContainerInstance struct {
@@ -1220,6 +1312,91 @@ func (s *ContainerList) SetItems(val []Container) {
 }
 
 func (*ContainerList) listContainersRes() {}
+
+// One sidecar or init container of a pod over a release's window.
+// Ref: #/components/schemas/ContainerSpan
+type ContainerSpan struct {
+	// The container.
+	Name string `json:"name"`
+	// A sidecar runs beside the Process for as long as its pod does; an init container runs once, before
+	// it, and ends.
+	Kind ContainerSpanKind `json:"kind"`
+	// Each change of its state, oldest first, its first state included.
+	Changes []ContainerChange `json:"changes"`
+}
+
+// GetName returns the value of Name.
+func (s *ContainerSpan) GetName() string {
+	return s.Name
+}
+
+// GetKind returns the value of Kind.
+func (s *ContainerSpan) GetKind() ContainerSpanKind {
+	return s.Kind
+}
+
+// GetChanges returns the value of Changes.
+func (s *ContainerSpan) GetChanges() []ContainerChange {
+	return s.Changes
+}
+
+// SetName sets the value of Name.
+func (s *ContainerSpan) SetName(val string) {
+	s.Name = val
+}
+
+// SetKind sets the value of Kind.
+func (s *ContainerSpan) SetKind(val ContainerSpanKind) {
+	s.Kind = val
+}
+
+// SetChanges sets the value of Changes.
+func (s *ContainerSpan) SetChanges(val []ContainerChange) {
+	s.Changes = val
+}
+
+// A sidecar runs beside the Process for as long as its pod does; an init container runs once, before
+// it, and ends.
+type ContainerSpanKind string
+
+const (
+	ContainerSpanKindSidecar ContainerSpanKind = "sidecar"
+	ContainerSpanKindInit    ContainerSpanKind = "init"
+)
+
+// AllValues returns all ContainerSpanKind values.
+func (ContainerSpanKind) AllValues() []ContainerSpanKind {
+	return []ContainerSpanKind{
+		ContainerSpanKindSidecar,
+		ContainerSpanKindInit,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ContainerSpanKind) MarshalText() ([]byte, error) {
+	switch s {
+	case ContainerSpanKindSidecar:
+		return []byte(s), nil
+	case ContainerSpanKindInit:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ContainerSpanKind) UnmarshalText(data []byte) error {
+	switch ContainerSpanKind(data) {
+	case ContainerSpanKindSidecar:
+		*s = ContainerSpanKindSidecar
+		return nil
+	case ContainerSpanKindInit:
+		*s = ContainerSpanKindInit
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // What a Project declares at its pinned release.
 // Ref: #/components/schemas/Declaration
@@ -3260,6 +3437,9 @@ type PodSpan struct {
 	End OptDateTime `json:"end"`
 	// Its readiness every five seconds, oldest first.
 	Checks []ReadinessCheck `json:"checks"`
+	// Its sidecars and init containers, by name; the container that is its Process is the pod's own
+	// readiness above.
+	Containers []ContainerSpan `json:"containers"`
 }
 
 // GetPod returns the value of Pod.
@@ -3292,6 +3472,11 @@ func (s *PodSpan) GetChecks() []ReadinessCheck {
 	return s.Checks
 }
 
+// GetContainers returns the value of Containers.
+func (s *PodSpan) GetContainers() []ContainerSpan {
+	return s.Containers
+}
+
 // SetPod sets the value of Pod.
 func (s *PodSpan) SetPod(val string) {
 	s.Pod = val
@@ -3320,6 +3505,11 @@ func (s *PodSpan) SetEnd(val OptDateTime) {
 // SetChecks sets the value of Checks.
 func (s *PodSpan) SetChecks(val []ReadinessCheck) {
 	s.Checks = val
+}
+
+// SetContainers sets the value of Containers.
+func (s *PodSpan) SetContainers(val []ContainerSpan) {
+	s.Containers = val
 }
 
 // Which checks the kubelet runs on a container.
@@ -3840,13 +4030,15 @@ func (s *RolloutList) SetItems(val []Rollout) {
 
 func (*RolloutList) listRolloutsRes() {}
 
-// What a Project's pods and canaries did over a window.
+// What a Project's pods, canaries and Jobs did over a window.
 // Ref: #/components/schemas/RolloutWindow
 type RolloutWindow struct {
 	// The pods, by Process then start.
 	Pods []PodSpan `json:"pods"`
 	// Each change of a canary's weight, oldest first.
 	Weights []CanaryWeight `json:"weights"`
+	// Each pod a Job ran in the window, by when it started.
+	Runs []Run `json:"runs"`
 }
 
 // GetPods returns the value of Pods.
@@ -3859,6 +4051,11 @@ func (s *RolloutWindow) GetWeights() []CanaryWeight {
 	return s.Weights
 }
 
+// GetRuns returns the value of Runs.
+func (s *RolloutWindow) GetRuns() []Run {
+	return s.Runs
+}
+
 // SetPods sets the value of Pods.
 func (s *RolloutWindow) SetPods(val []PodSpan) {
 	s.Pods = val
@@ -3869,7 +4066,147 @@ func (s *RolloutWindow) SetWeights(val []CanaryWeight) {
 	s.Weights = val
 }
 
+// SetRuns sets the value of Runs.
+func (s *RolloutWindow) SetRuns(val []Run) {
+	s.Runs = val
+}
+
 func (*RolloutWindow) getRolloutWindowRes() {}
+
+// One pod a Job ran over a release's window.
+// Ref: #/components/schemas/Run
+type Run struct {
+	// The pod.
+	Pod string `json:"pod"`
+	// The Job that ran it.
+	Job string `json:"job"`
+	// The CronJob that made the Job, where one did.
+	CronJob OptString `json:"cronJob"`
+	// When it started.
+	Start time.Time `json:"start"`
+	// When it ended; absent while it runs.
+	End OptDateTime `json:"end"`
+	// How it ended: still running, succeeded, failed, or unknown where it was gone before it was seen to
+	// end.
+	Outcome RunOutcome `json:"outcome"`
+}
+
+// GetPod returns the value of Pod.
+func (s *Run) GetPod() string {
+	return s.Pod
+}
+
+// GetJob returns the value of Job.
+func (s *Run) GetJob() string {
+	return s.Job
+}
+
+// GetCronJob returns the value of CronJob.
+func (s *Run) GetCronJob() OptString {
+	return s.CronJob
+}
+
+// GetStart returns the value of Start.
+func (s *Run) GetStart() time.Time {
+	return s.Start
+}
+
+// GetEnd returns the value of End.
+func (s *Run) GetEnd() OptDateTime {
+	return s.End
+}
+
+// GetOutcome returns the value of Outcome.
+func (s *Run) GetOutcome() RunOutcome {
+	return s.Outcome
+}
+
+// SetPod sets the value of Pod.
+func (s *Run) SetPod(val string) {
+	s.Pod = val
+}
+
+// SetJob sets the value of Job.
+func (s *Run) SetJob(val string) {
+	s.Job = val
+}
+
+// SetCronJob sets the value of CronJob.
+func (s *Run) SetCronJob(val OptString) {
+	s.CronJob = val
+}
+
+// SetStart sets the value of Start.
+func (s *Run) SetStart(val time.Time) {
+	s.Start = val
+}
+
+// SetEnd sets the value of End.
+func (s *Run) SetEnd(val OptDateTime) {
+	s.End = val
+}
+
+// SetOutcome sets the value of Outcome.
+func (s *Run) SetOutcome(val RunOutcome) {
+	s.Outcome = val
+}
+
+// How it ended: still running, succeeded, failed, or unknown where it was gone before it was seen to
+// end.
+type RunOutcome string
+
+const (
+	RunOutcomeRunning   RunOutcome = "running"
+	RunOutcomeSucceeded RunOutcome = "succeeded"
+	RunOutcomeFailed    RunOutcome = "failed"
+	RunOutcomeUnknown   RunOutcome = "unknown"
+)
+
+// AllValues returns all RunOutcome values.
+func (RunOutcome) AllValues() []RunOutcome {
+	return []RunOutcome{
+		RunOutcomeRunning,
+		RunOutcomeSucceeded,
+		RunOutcomeFailed,
+		RunOutcomeUnknown,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s RunOutcome) MarshalText() ([]byte, error) {
+	switch s {
+	case RunOutcomeRunning:
+		return []byte(s), nil
+	case RunOutcomeSucceeded:
+		return []byte(s), nil
+	case RunOutcomeFailed:
+		return []byte(s), nil
+	case RunOutcomeUnknown:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *RunOutcome) UnmarshalText(data []byte) error {
+	switch RunOutcome(data) {
+	case RunOutcomeRunning:
+		*s = RunOutcomeRunning
+		return nil
+	case RunOutcomeSucceeded:
+		*s = RunOutcomeSucceeded
+		return nil
+	case RunOutcomeFailed:
+		*s = RunOutcomeFailed
+		return nil
+	case RunOutcomeUnknown:
+		*s = RunOutcomeUnknown
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // The signed-in admin.
 // Ref: #/components/schemas/Session

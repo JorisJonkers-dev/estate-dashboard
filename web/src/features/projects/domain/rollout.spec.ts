@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { Pod, Release, RolloutWindow, Stage } from '../../../infrastructure/api/types.gen'
+import type { Pod, Release, RolloutWindow, Run, Stage } from '../../../infrastructure/api/types.gen'
 import type { ReleaseView } from './releases'
 import {
   clock,
+  containerAt,
+  containerTrack,
   gateConditions,
   ifItFails,
   laneAt,
@@ -10,9 +12,14 @@ import {
   lastMoment,
   orderAt,
   rolloutState,
+  runAt,
+  runsOf,
+  runTrack,
   slots,
   windowOf,
   type Lane,
+  type LaneContainer,
+  type RunGroup,
 } from './rollout'
 
 const t0 = Date.parse('2026-10-20T09:00:00Z')
@@ -65,10 +72,28 @@ const continuous: RolloutWindow = {
       ready: at(-60),
       end: at(170),
       checks: checks(-60, 170, -60).map((c, i, all) => ({ ...c, ready: i < all.length - 4 })),
+      containers: [],
     },
-    { pod: 'sonarr-new', process: 'sonarr', start: at(55), ready: at(140), checks: checks(55, 200, 140) },
+    {
+      pod: 'sonarr-new',
+      process: 'sonarr',
+      start: at(55),
+      ready: at(140),
+      checks: checks(55, 200, 140),
+      containers: [
+        {
+          name: 'backup',
+          kind: 'sidecar',
+          changes: [
+            { at: at(55), state: 'running' },
+            { at: at(60), state: 'ready' },
+          ],
+        },
+      ],
+    },
   ],
   weights: [],
+  runs: [],
 }
 
 const lane = (over: Partial<Parameters<typeof lanesOf>[0]> = {}) =>
@@ -92,12 +117,27 @@ describe('a lane', () => {
       stop: 150,
       gone: 170,
       weights: [],
-      sidecars: [{ name: 'backup', oldVersion: '0.9.1', newVersion: '0.9.2' }],
+      containers: [
+        {
+          name: 'backup',
+          kind: 'sidecar',
+          oldVersion: '0.9.1',
+          newVersion: '0.9.2',
+          changes: [
+            { at: 55, state: 'running' },
+            { at: 60, state: 'ready' },
+          ],
+        },
+      ],
     })
   })
 
   it('names the releases where no pod says which container versions ran', () => {
-    expect(lane({ pods: [] })).toMatchObject({ oldVersion: '1.0.3', newVersion: '1.0.4', sidecars: [] })
+    expect(lane({ pods: [], window: { ...continuous, pods: continuous.pods.slice(0, 1) } })).toMatchObject({
+      oldVersion: '1.0.3',
+      newVersion: '1.0.4',
+      containers: [],
+    })
     expect(lane({ pods: [], from: undefined }).oldVersion).toBeUndefined()
   })
 
@@ -110,16 +150,20 @@ describe('a lane', () => {
     }
     expect(lane({ pods: [fresh, pod('1.0.3', '4.0.18', '0.9.1')] })).toMatchObject({
       newVersion: '4.0.19',
-      sidecars: [
-        { name: 'backup', oldVersion: '0.9.1' },
-        { name: 'exporter', newVersion: '0.1.0' },
+      containers: [
+        { name: 'backup', kind: 'sidecar', oldVersion: '0.9.1' },
+        { name: 'exporter', kind: 'sidecar', newVersion: '0.1.0', changes: [] },
       ],
     })
   })
 
   it('has no stop or end while an old pod still runs, and nothing new before a new pod starts', () => {
     const l = lane({
-      window: { pods: [{ pod: 'sonarr-old', process: 'sonarr', start: at(-60), checks: [] }], weights: [] },
+      window: {
+        pods: [{ pod: 'sonarr-old', process: 'sonarr', start: at(-60), checks: [], containers: [] }],
+        weights: [],
+        runs: [],
+      },
     })
     expect(l.start).toBeUndefined()
     expect(l.ready).toBeUndefined()
@@ -129,8 +173,9 @@ describe('a lane', () => {
 
   it('fails with its release when its new pod never turned ready', () => {
     const window: RolloutWindow = {
-      pods: [{ pod: 'sonarr-new', process: 'sonarr', start: at(50), checks: checks(50, 100) }],
+      pods: [{ pod: 'sonarr-new', process: 'sonarr', start: at(50), checks: checks(50, 100), containers: [] }],
       weights: [],
+      runs: [],
     }
     expect(lane({ view: view({ state: 'failed' }), window, failedAt: 650 }).fail).toBe(650)
     expect(lane({ view: view({ state: 'failed' }), window }).fail).toBeUndefined()
@@ -199,7 +244,7 @@ describe('a lane', () => {
       promote: 160,
       gone: 175,
       checks: [],
-      sidecars: [],
+      containers: [],
     }
     expect(laneAt(l, 10).next).toBe('waits its turn')
     expect(laneAt(l, 95)).toMatchObject({
@@ -216,8 +261,8 @@ describe('a lane', () => {
   })
 
   it('waits while no new pod has started, and drains for as long as an old pod is not seen to end', () => {
-    expect(laneAt({ process: 'x', weights: [], checks: [], sidecars: [] }, 500).new.word).toBe('Waiting')
-    const l: Lane = { process: 'x', start: 0, ready: 10, stop: 20, weights: [], checks: [], sidecars: [] }
+    expect(laneAt({ process: 'x', weights: [], checks: [], containers: [] }, 500).new.word).toBe('Waiting')
+    const l: Lane = { process: 'x', start: 0, ready: 10, stop: 20, weights: [], checks: [], containers: [] }
     expect(laneAt(l, 500)).toMatchObject({
       share: 100,
       old: { word: 'Draining' },
@@ -232,7 +277,7 @@ describe('a lane', () => {
       fail: 650,
       weights: [],
       checks: [{ at: 50, ready: false }],
-      sidecars: [],
+      containers: [],
     }
     expect(laneAt(l, 700)).toMatchObject({
       share: 0,
@@ -256,7 +301,7 @@ describe('a lane', () => {
         { at: 15, ready: false },
         { at: 300, ready: true },
       ],
-      sidecars: [],
+      containers: [],
     }
     const blocks = laneAt(l, 20).blocks
     expect(blocks).toHaveLength(slots)
@@ -266,6 +311,221 @@ describe('a lane', () => {
       { tone: 'warn', label: '0:15 · check failed' },
       { tone: 'empty', label: 'no check yet' },
     ])
+  })
+})
+
+describe('a lane’s containers', () => {
+  const initPod: Pod = {
+    ...pod('1.0.4', '4.0.19', '0.9.2'),
+    containers: [
+      container('sonarr', '4.0.19'),
+      container('backup', '0.9.2', true),
+      { ...container('vault-agent-init', '1.18.0'), init: true },
+      { ...container('vpn', '3.41.3'), init: true },
+    ],
+  }
+  const window: RolloutWindow = {
+    pods: [
+      {
+        pod: 'sonarr-new',
+        process: 'sonarr',
+        start: at(55),
+        checks: [],
+        containers: [
+          { name: 'vpn', kind: 'sidecar', changes: [{ at: at(55), state: 'ready' }] },
+          {
+            name: 'vault-agent-init',
+            kind: 'init',
+            changes: [
+              { at: at(50), state: 'waiting' },
+              { at: at(52), state: 'running' },
+              { at: at(55), state: 'succeeded' },
+            ],
+          },
+        ],
+      },
+    ],
+    weights: [],
+    runs: [],
+  }
+
+  it('are its sidecars then its init containers, a sidecar the kubelet starts first still a sidecar', () => {
+    const l = lane({ window, pods: [initPod] })
+    expect(l.containers.map((c) => `${c.name} ${c.kind}`)).toEqual([
+      'backup sidecar',
+      'vpn sidecar',
+      'vault-agent-init init',
+    ])
+    expect(l.containers[2]).toMatchObject({ newVersion: '1.18.0', changes: [{ at: 50 }, { at: 52 }, { at: 55 }] })
+  })
+
+  const sidecar: LaneContainer = {
+    name: 'backup',
+    kind: 'sidecar',
+    changes: [
+      { at: 10, state: 'waiting' },
+      { at: 20, state: 'running' },
+      { at: 30, state: 'ready' },
+      { at: 90, state: 'failed' },
+      { at: 95, state: 'succeeded' },
+    ],
+  }
+  const init: LaneContainer = {
+    name: 'migrate',
+    kind: 'init',
+    changes: [
+      { at: 10, state: 'waiting' },
+      { at: 20, state: 'running' },
+      { at: 25, state: 'ready' },
+      { at: 30, state: 'succeeded' },
+    ],
+  }
+
+  it('say what a sidecar is doing: waiting, starting, ready, or down', () => {
+    expect([5, 10, 20, 30, 90, 95].map((t) => containerAt(sidecar, t))).toEqual([
+      { word: 'Not started', tone: 'gone' },
+      { word: 'Waiting', tone: 'gone' },
+      { word: 'Starting, not ready', tone: 'info' },
+      { word: 'Ready', tone: 'ok' },
+      { word: 'Failed', tone: 'crit' },
+      { word: 'Stopped', tone: 'gone' },
+    ])
+    expect(containerAt({ ...sidecar, changes: [] }, 50)).toEqual({ word: 'No data', tone: 'gone' })
+  })
+
+  it('say an init container runs once and is done, or failed', () => {
+    expect([20, 25, 30].map((t) => containerAt(init, t).word)).toEqual(['Running', 'Running', 'Done'])
+    expect(containerAt({ ...init, changes: [{ at: 0, state: 'failed' }] }, 5).word).toBe('Failed')
+  })
+
+  it('draw a sidecar as each state it held, the last open, and as down once it ended', () => {
+    expect(containerTrack(sidecar, 40)).toEqual({
+      segments: [
+        { from: 10, to: 20, state: 'waiting', open: false },
+        { from: 20, to: 30, state: 'running', open: false },
+        { from: 30, to: 40, state: 'ready', open: true },
+      ],
+      marks: [],
+    })
+    expect(containerTrack(sidecar, 100).segments.slice(-2)).toEqual([
+      { from: 90, to: 95, state: 'down', open: false },
+      { from: 95, to: 100, state: 'down', open: true },
+    ])
+  })
+
+  it('draw an init container at work, then where it ended, and nothing after: it is gone', () => {
+    expect(containerTrack(init, 100)).toEqual({
+      segments: [
+        { from: 10, to: 20, state: 'waiting', open: false },
+        { from: 20, to: 25, state: 'running', open: false },
+        { from: 25, to: 30, state: 'running', open: false },
+      ],
+      marks: [{ at: 30, outcome: 'succeeded' }],
+    })
+    expect(containerTrack({ ...init, changes: [{ at: 0, state: 'failed' }] }, 5).marks).toEqual([
+      { at: 0, outcome: 'failed' },
+    ])
+  })
+})
+
+describe('a release’s runs', () => {
+  const run = (over: Partial<Run>): Run => ({
+    pod: 'p',
+    job: 'vault-policy-29877720',
+    cronJob: 'vault-policy',
+    start: at(0),
+    end: at(5),
+    outcome: 'succeeded',
+    ...over,
+  })
+  const window: RolloutWindow = {
+    pods: [],
+    weights: [],
+    runs: [
+      run({ pod: 'b', job: 'vault-policy-29877780', start: at(3600), end: at(3606) }),
+      run({ pod: 'a', start: at(40), end: at(44) }),
+      run({ pod: 'm', job: 'auth-migration-up', cronJob: undefined, start: at(20), end: at(80), outcome: 'failed' }),
+      run({
+        pod: 'n',
+        job: 'auth-migration-up',
+        cronJob: undefined,
+        start: at(90),
+        end: undefined,
+        outcome: 'running',
+      }),
+    ],
+  }
+
+  it('are each under the CronJob that made its Job, else the Job, first run first', () => {
+    const groups = runsOf(window, t0)
+    expect(groups.map((g) => `${g.kind} ${g.name} ${g.runs.map((r) => r.pod).join('')}`)).toEqual([
+      'Job auth-migration-up mn',
+      'CronJob vault-policy ab',
+    ])
+    expect(groups[0]?.runs[1]).toEqual({ pod: 'n', job: 'auth-migration-up', start: 90, outcome: 'running' })
+    expect(groups[1]?.runs[0]).toEqual({
+      pod: 'a',
+      job: 'vault-policy-29877720',
+      start: 40,
+      end: 44,
+      outcome: 'succeeded',
+    })
+  })
+
+  const migration = runsOf(window, t0)[0] as RunGroup
+
+  it('draw each run as a span while it works and a mark where it ended, nothing before it starts', () => {
+    expect(runTrack(migration, 10)).toEqual({ segments: [], marks: [] })
+    expect(runTrack(migration, 50)).toEqual({
+      segments: [{ from: 20, to: 50, state: 'running', open: true }],
+      marks: [],
+    })
+    expect(runTrack(migration, 100)).toEqual({
+      segments: [
+        { from: 20, to: 80, state: 'running', open: false },
+        { from: 90, to: 100, state: 'running', open: true },
+      ],
+      marks: [{ at: 80, outcome: 'failed' }],
+    })
+  })
+
+  it('mark a run whose end nobody saw as unknown', () => {
+    const lost: RunGroup = {
+      name: 'x',
+      kind: 'Job',
+      runs: [{ pod: 'x', job: 'x', start: 0, end: 5, outcome: 'unknown' }],
+    }
+    expect(runTrack(lost, 10).marks).toEqual([{ at: 5, outcome: 'unknown' }])
+    expect(
+      runTrack({ ...lost, runs: [{ ...lost.runs[0], outcome: 'running' } as RunGroup['runs'][number]] }, 10).marks,
+    ).toEqual([{ at: 5, outcome: 'unknown' }])
+  })
+
+  it('say where the latest run stands, and what it did', () => {
+    expect(runAt(migration, 10)).toEqual({ word: 'Not run yet', tone: 'gone', detail: 'first run at 0:20' })
+    expect(runAt(migration, 50)).toEqual({ word: 'Running', tone: 'info', detail: '1 run · running since 0:20' })
+    expect(runAt(migration, 85)).toEqual({ word: 'Failed', tone: 'crit', detail: '1 run · last 0:20–1:20, 1:00' })
+    expect(runAt(migration, 95).detail).toBe('2 runs · running since 1:30')
+    const policy = runsOf(window, t0)[1] as RunGroup
+    expect(runAt(policy, 50)).toEqual({ word: 'Succeeded', tone: 'ok', detail: '1 run · last 0:40–0:44, 4s' })
+    const gone: RunGroup = {
+      name: 'x',
+      kind: 'Job',
+      runs: [{ pod: 'x', job: 'x', start: 0, end: 5, outcome: 'unknown' }],
+    }
+    expect(runAt(gone, 10)).toEqual({
+      word: 'Gone',
+      tone: 'gone',
+      detail: '1 run · last 0:00–0:05, 5s, how it ended unknown',
+    })
+    expect(
+      runAt({ ...gone, runs: [{ ...gone.runs[0], outcome: 'running' } as RunGroup['runs'][number]] }, 10).detail,
+    ).toContain('how it ended unknown')
+    expect(runAt({ name: 'x', kind: 'Job', runs: [] }, 10).detail).toBe('first run at 0:00')
+  })
+
+  it('carry a release on to the last run’s end', () => {
+    expect(lastMoment([], 150, runsOf(window, t0))).toBe(3606)
   })
 })
 

@@ -64,7 +64,7 @@ const (
 // ErrBadWindow is returned for a window that ends before it starts, or lasts too long.
 var ErrBadWindow = errors.New("not a window")
 
-// Rollout returns what a Project's pods and canaries did from start to end.
+// Rollout returns what a Project's pods, canaries and Jobs did from start to end.
 func (s *Service) Rollout(ctx context.Context, proj string, start, end time.Time) (domain.Window, error) {
 	if !project.MatchString(proj) {
 		return domain.Window{}, fmt.Errorf("%w: %q", ErrNotAProject, proj)
@@ -72,9 +72,9 @@ func (s *Service) Rollout(ctx context.Context, proj string, start, end time.Time
 	if !end.After(start) || end.Sub(start) > MaxRollout {
 		return domain.Window{}, fmt.Errorf("%w: %s to %s", ErrBadWindow, start, end)
 	}
-	readiness, weights, err := s.metrics.Rollout(ctx, proj, start, end, RolloutStep)
+	observed, err := s.metrics.Rollout(ctx, proj, start, end, RolloutStep)
 	if err != nil {
 		return domain.Window{}, fmt.Errorf("read the rollout of %s: %w", proj, err)
 	}
-	return domain.WindowOf(readiness, weights, end, RolloutStep), nil
+	return domain.WindowOf(observed, start, end, RolloutStep), nil
 }

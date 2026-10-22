@@ -8,7 +8,22 @@ import { toneText } from '../../../shared/tone'
 import StatusStrip from '../../../shared/ui/StatusStrip.vue'
 import { age } from '../../overview/domain/overview'
 import { useProject } from '../composables/useProject'
-import { clock, ifItFails, laneAt, lanesOf, lastMoment, orderAt, rolloutState, windowOf } from '../domain/rollout'
+import {
+  clock,
+  containerAt,
+  containerTrack,
+  ifItFails,
+  laneAt,
+  lanesOf,
+  lastMoment,
+  orderAt,
+  rolloutState,
+  runAt,
+  runsOf,
+  runTrack,
+  windowOf,
+} from '../domain/rollout'
+import TimeTrack from './TimeTrack.vue'
 
 const route = useRoute()
 const name = computed(() => String(route.params.name))
@@ -53,7 +68,10 @@ const lanes = computed(() =>
       })
     : [],
 )
-const end = computed(() => (rolling.value ? (span.value?.end ?? 1) : lastMoment(lanes.value, span.value?.end ?? 1)))
+const runs = computed(() => (span.value && window.data.value ? runsOf(window.data.value, span.value.t0) : []))
+const end = computed(() =>
+  rolling.value ? (span.value?.end ?? 1) : lastMoment(lanes.value, span.value?.end ?? 1, runs.value),
+)
 
 // Replay: a finished release starts at its end, a release in flight follows live until scrubbed.
 const t = ref<number | null>(null)
@@ -189,107 +207,177 @@ const stepIcon: Record<string, string> = {
       v-else
       class="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:items-start lg:gap-12"
     >
-      <section aria-labelledby="lanes-h" class="min-w-0">
-        <h2 id="lanes-h" class="m-0 mb-3 text-xl font-semibold">Containers</h2>
-        <p v-if="window.isPending.value" class="m-0 text-text-muted">Loading…</p>
-        <p v-else-if="window.isError.value" class="m-0 text-text-muted">Not read: Prometheus did not answer.</p>
-        <p v-else-if="lanes.length === 0" class="m-0 text-text-muted">
-          No pod of {{ name }} ran in this release's window.
-        </p>
-        <template v-else>
-          <table aria-label="Containers" class="w-full table-fixed border-collapse">
-            <colgroup class="hidden md:table-column-group">
-              <col class="w-[20%]" />
-              <col class="w-[18%]" />
-              <col class="w-[18%]" />
-              <col class="w-[22%]" />
-              <col class="w-[22%]" />
-            </colgroup>
-            <thead class="hidden md:table-header-group">
-              <tr class="border-b border-line">
-                <th scope="col" :class="head">Process</th>
-                <th scope="col" :class="head">Old</th>
-                <th scope="col" :class="head">New</th>
-                <th scope="col" :class="head">Health checks</th>
-                <th scope="col" :class="head">Traffic</th>
-              </tr>
-            </thead>
-            <tbody v-for="l in lanes" :key="l.process" class="border-b border-line">
-              <tr class="grid grid-cols-2 gap-x-4 gap-y-2 py-3 md:table-row md:py-0">
-                <th scope="row" class="col-span-2 text-left font-semibold md:py-3 md:pr-4">{{ l.process }}</th>
-                <td class="md:py-3 md:pr-4">
-                  <span class="block font-mono text-sm break-all">{{ l.oldVersion ?? '—' }}</span>
-                  <span class="text-sm" :class="podTone[laneAt(l, at).old.tone]">{{ laneAt(l, at).old.word }}</span>
-                </td>
-                <td class="md:py-3 md:pr-4">
-                  <span class="block font-mono text-sm break-all">{{ l.newVersion ?? '—' }}</span>
-                  <span class="text-sm" :class="podTone[laneAt(l, at).new.tone]">{{ laneAt(l, at).new.word }}</span>
-                </td>
-                <td class="col-span-2 md:py-3 md:pr-4">
-                  <StatusStrip :blocks="laneAt(l, at).blocks" :label="`Health checks of the new ${l.process} pod`" />
-                </td>
-                <td class="col-span-2 md:py-3">
-                  <div
-                    role="img"
-                    :aria-label="`Traffic: new ${String(laneAt(l, at).share)}%, old ${String(100 - laneAt(l, at).share)}%`"
-                    class="flex h-2.5 w-full overflow-hidden rounded-sm bg-line"
-                  >
-                    <span
-                      class="h-full transition-[width]"
-                      :class="laneAt(l, at).failed ? 'bg-crit' : 'bg-accent'"
-                      :style="{ width: `${String(laneAt(l, at).share)}%` }"
-                    />
-                    <span
-                      class="h-full bg-dim"
-                      :class="{ 'opacity-30': laneAt(l, at).old.word === 'Stopped' }"
-                      :style="{ width: `${String(100 - laneAt(l, at).share)}%` }"
-                    />
-                  </div>
-                  <span class="mt-1 flex justify-between text-xs text-text-muted"
-                    ><span>new {{ laneAt(l, at).share }}%</span><span>old {{ 100 - laneAt(l, at).share }}%</span></span
-                  >
-                  <small class="text-xs" :class="laneAt(l, at).failed ? 'text-crit' : 'text-text-muted'">{{
-                    laneAt(l, at).next
-                  }}</small>
-                </td>
-              </tr>
-              <tr
-                v-for="s in l.sidecars"
-                :key="s.name"
-                class="grid grid-cols-2 gap-x-4 pb-3 pl-5 text-sm text-text-muted md:table-row md:pb-0 md:pl-0"
-              >
-                <th scope="row" class="col-span-2 text-left font-normal md:py-2 md:pr-4">
-                  <span class="flex items-center gap-1.5 md:pl-1">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 14 14"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      aria-hidden="true"
-                    >
-                      <path d="M3 0v8h9" />
-                    </svg>
-                    {{ s.name }} <em class="text-xs not-italic text-dim">sidecar</em>
-                  </span>
-                </th>
-                <td class="font-mono md:py-2 md:pr-4">{{ s.oldVersion ?? '—' }}</td>
-                <td class="font-mono md:py-2 md:pr-4">{{ s.newVersion ?? '—' }}</td>
-                <td class="md:py-2 md:pr-4">runs with its pod</td>
-                <td class="md:py-2">takes no traffic</td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="m-0 mt-3 text-sm text-text-muted">
-            {{
-              canary
-                ? 'A canary takes more of the traffic each round its checks pass; a failed round sends all of it back to the old pod.'
-                : 'A new pod shares traffic with the old one once its readiness check passes; then the old pod stops taking requests, drains, and stops.'
-            }}
+      <div class="flex min-w-0 flex-col gap-10">
+        <section aria-labelledby="lanes-h" class="min-w-0">
+          <h2 id="lanes-h" class="m-0 mb-3 text-xl font-semibold">Containers</h2>
+          <p v-if="window.isPending.value" class="m-0 text-text-muted">Loading…</p>
+          <p v-else-if="window.isError.value" class="m-0 text-text-muted">Not read: Prometheus did not answer.</p>
+          <p v-else-if="lanes.length === 0" class="m-0 text-text-muted">
+            No pod of {{ name }} ran in this release's window.
           </p>
-        </template>
-      </section>
+          <template v-else>
+            <table aria-label="Containers" class="w-full table-fixed border-collapse">
+              <colgroup class="hidden md:table-column-group">
+                <col class="w-[20%]" />
+                <col class="w-[18%]" />
+                <col class="w-[18%]" />
+                <col class="w-[22%]" />
+                <col class="w-[22%]" />
+              </colgroup>
+              <thead class="hidden md:table-header-group">
+                <tr class="border-b border-line">
+                  <th scope="col" :class="head">Process</th>
+                  <th scope="col" :class="head">Old</th>
+                  <th scope="col" :class="head">New</th>
+                  <th scope="col" :class="head">Health checks</th>
+                  <th scope="col" :class="head">Traffic</th>
+                </tr>
+              </thead>
+              <tbody v-for="l in lanes" :key="l.process" class="border-b border-line">
+                <tr class="grid grid-cols-2 gap-x-4 gap-y-2 py-3 md:table-row md:py-0">
+                  <th scope="row" class="col-span-2 text-left font-semibold md:py-3 md:pr-4">{{ l.process }}</th>
+                  <td class="md:py-3 md:pr-4">
+                    <span class="block font-mono text-sm break-all">{{ l.oldVersion ?? '—' }}</span>
+                    <span class="text-sm" :class="podTone[laneAt(l, at).old.tone]">{{ laneAt(l, at).old.word }}</span>
+                  </td>
+                  <td class="md:py-3 md:pr-4">
+                    <span class="block font-mono text-sm break-all">{{ l.newVersion ?? '—' }}</span>
+                    <span class="text-sm" :class="podTone[laneAt(l, at).new.tone]">{{ laneAt(l, at).new.word }}</span>
+                  </td>
+                  <td class="col-span-2 md:py-3 md:pr-4">
+                    <StatusStrip :blocks="laneAt(l, at).blocks" :label="`Health checks of the new ${l.process} pod`" />
+                  </td>
+                  <td class="col-span-2 md:py-3">
+                    <div
+                      role="img"
+                      :aria-label="`Traffic: new ${String(laneAt(l, at).share)}%, old ${String(100 - laneAt(l, at).share)}%`"
+                      class="flex h-2.5 w-full overflow-hidden rounded-sm bg-line"
+                    >
+                      <span
+                        class="h-full transition-[width]"
+                        :class="laneAt(l, at).failed ? 'bg-crit' : 'bg-accent'"
+                        :style="{ width: `${String(laneAt(l, at).share)}%` }"
+                      />
+                      <span
+                        class="h-full bg-dim"
+                        :class="{ 'opacity-30': laneAt(l, at).old.word === 'Stopped' }"
+                        :style="{ width: `${String(100 - laneAt(l, at).share)}%` }"
+                      />
+                    </div>
+                    <span class="mt-1 flex justify-between text-xs text-text-muted"
+                      ><span>new {{ laneAt(l, at).share }}%</span
+                      ><span>old {{ 100 - laneAt(l, at).share }}%</span></span
+                    >
+                    <small class="text-xs" :class="laneAt(l, at).failed ? 'text-crit' : 'text-text-muted'">{{
+                      laneAt(l, at).next
+                    }}</small>
+                  </td>
+                </tr>
+                <tr
+                  v-for="c in l.containers"
+                  :key="c.name"
+                  class="grid grid-cols-2 gap-x-4 gap-y-1.5 pb-3 pl-5 text-sm text-text-muted md:table-row md:pb-0 md:pl-0"
+                >
+                  <th scope="row" class="col-span-2 text-left font-normal md:py-2 md:pr-4">
+                    <span class="flex items-start gap-1.5 md:pl-1">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        aria-hidden="true"
+                        class="mt-0.5 shrink-0"
+                      >
+                        <path d="M3 0v8h9" />
+                      </svg>
+                      <span class="min-w-0">
+                        <span class="break-words">{{ c.name }}</span>
+                        <em class="block text-xs not-italic text-dim">{{
+                          c.kind === 'init' ? 'init, runs once' : 'sidecar'
+                        }}</em>
+                      </span>
+                    </span>
+                  </th>
+                  <td class="font-mono break-all md:py-2 md:pr-4">{{ c.oldVersion ?? '—' }}</td>
+                  <td class="font-mono break-all md:py-2 md:pr-4">{{ c.newVersion ?? '—' }}</td>
+                  <td class="col-span-2 md:py-2 md:pr-4">
+                    <TimeTrack
+                      v-if="c.changes.length > 0"
+                      :track="containerTrack(c, at)"
+                      :length="end"
+                      :label="`${c.name}: ${containerAt(c, at).word}`"
+                    />
+                    <template v-else>runs with its pod</template>
+                  </td>
+                  <td class="col-span-2 md:py-2">
+                    <span v-if="c.changes.length > 0" class="block" :class="podTone[containerAt(c, at).tone]">{{
+                      containerAt(c, at).word
+                    }}</span>
+                    <small class="text-xs">{{
+                      c.kind === 'init' ? 'runs before the Process starts' : 'takes no traffic'
+                    }}</small>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="m-0 mt-3 text-sm text-text-muted">
+              {{
+                canary
+                  ? 'A canary takes more of the traffic each round its checks pass; a failed round sends all of it back to the old pod.'
+                  : 'A new pod shares traffic with the old one once its readiness check passes; then the old pod stops taking requests, drains, and stops.'
+              }}
+            </p>
+          </template>
+        </section>
+
+        <section aria-labelledby="runs-h" class="min-w-0">
+          <h2 id="runs-h" class="m-0 mb-3 text-xl font-semibold">Runs</h2>
+          <p v-if="window.isPending.value" class="m-0 text-text-muted">Loading…</p>
+          <p v-else-if="window.isError.value" class="m-0 text-text-muted">Not read: Prometheus did not answer.</p>
+          <p v-else-if="runs.length === 0" class="m-0 text-text-muted">
+            No Job ran in {{ name }}'s namespace in this release's window.
+          </p>
+          <template v-else>
+            <p class="m-0 mb-2 text-sm text-text-muted">
+              One-shot work, each pod a Job ran: it starts, does its work and ends. It has no health checks and takes no
+              traffic, so once it ends it is done and gone, not down.
+            </p>
+            <ul aria-label="Runs" class="m-0 list-none border-t border-line p-0">
+              <li
+                v-for="g in runs"
+                :key="`${g.kind}/${g.name}`"
+                class="grid grid-cols-[minmax(0,1fr)] gap-y-1.5 border-b border-line py-3 md:grid-cols-[24%_minmax(0,1fr)_12rem] md:items-center md:gap-x-4"
+              >
+                <span class="min-w-0">
+                  <span class="block font-semibold break-words">{{ g.name }}</span>
+                  <em class="text-xs not-italic text-dim">{{ g.kind }}</em>
+                </span>
+                <TimeTrack
+                  :track="runTrack(g, at)"
+                  :length="end"
+                  :label="`${g.name}: ${runAt(g, at).word}, ${runAt(g, at).detail}`"
+                />
+                <span class="text-sm">
+                  <span :class="podTone[runAt(g, at).tone]">{{ runAt(g, at).word }}</span>
+                  <small class="block text-xs text-text-muted">{{ runAt(g, at).detail }}</small>
+                </span>
+              </li>
+            </ul>
+            <p class="m-0 mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-text-muted" aria-hidden="true">
+              <span class="flex items-center gap-1.5"
+                ><span
+                  class="inline-block h-2.5 w-5 rounded-sm bg-info/60 [background-image:repeating-linear-gradient(-45deg,transparent_0_3px,rgb(0_0_0/0.35)_3px_6px)]"
+                />at work</span
+              >
+              <span class="flex items-center gap-1.5"><span class="text-ok">✓</span>succeeded</span>
+              <span class="flex items-center gap-1.5"><span class="text-crit">✕</span>failed</span>
+              <span class="flex items-center gap-1.5"><span class="text-dim">•</span>gone, how it ended unknown</span>
+            </p>
+          </template>
+        </section>
+      </div>
 
       <aside class="flex min-w-0 flex-col gap-10">
         <section aria-labelledby="order-h">

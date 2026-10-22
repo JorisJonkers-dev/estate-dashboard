@@ -1,4 +1,4 @@
-import type { Pod, Release, RolloutWindow, Stage } from '../../../infrastructure/api/types.gen'
+import type { ContainerChange, Pod, Release, RolloutWindow, Run, Stage } from '../../../infrastructure/api/types.gen'
 import type { StripBlock } from '../../../shared/strip'
 import type { Tone } from '../../../shared/tone'
 import type { ReleaseView } from './releases'
@@ -23,19 +23,62 @@ export interface Lane {
   promote?: number
   /** The new pod's readiness every five seconds. */
   checks: { at: number; ready: boolean }[]
-  sidecars: { name: string; oldVersion?: string; newVersion?: string }[]
+  /** Its sidecars, then its init containers, each with the versions it ran and how it went. */
+  containers: LaneContainer[]
+}
+
+/** One sidecar or init container of a lane's pod: each change of its state, in seconds from the release's start. */
+export interface LaneContainer {
+  name: string
+  kind: 'sidecar' | 'init'
+  oldVersion?: string
+  newVersion?: string
+  changes: { at: number; state: ContainerChange['state'] }[]
 }
 
 const seconds = (at: string, t0: number) => Math.round((Date.parse(at) - t0) / 1000)
 
-/** The version of a Process's own container, and its sidecars', in the pods of one release. */
+/** The version of a Process's own container, and its sidecars' and init containers', in the pods of one release. */
 function versionsOf(pods: Pod[], process: string, release: string | undefined) {
   const of = pods.find((p) => p.version === release && (p.process || p.name).replace(/-primary$/, '') === process)
   const main = of?.containers.find((c) => !c.sidecar && !c.init)
   return {
     main: main?.version,
-    sidecars: new Map((of?.containers ?? []).filter((c) => c.sidecar).map((c) => [c.name, c.version] as const)),
+    others: new Map(
+      (of?.containers ?? [])
+        .filter((c) => c.sidecar || c.init)
+        .map((c) => [c.name, { version: c.version, kind: c.init ? ('init' as const) : ('sidecar' as const) }]),
+    ),
   }
+}
+
+/**
+ * A lane's sidecars and init containers: every one either release's pods name, or the watched pod
+ * ran, sidecars first. The window says best what kind each is: a sidecar the kubelet starts as an
+ * init container is still a sidecar.
+ */
+function containersOf(
+  spans: RolloutWindow['pods'][number]['containers'],
+  before: ReturnType<typeof versionsOf>['others'],
+  after: ReturnType<typeof versionsOf>['others'],
+  t0: number,
+): LaneContainer[] {
+  const kinds = new Map<string, LaneContainer['kind']>()
+  for (const [name, c] of [...before, ...after]) kinds.set(name, c.kind)
+  for (const c of spans) kinds.set(c.name, c.kind)
+  const containers = [...kinds].map(([name, kind]): LaneContainer => {
+    const span = spans.find((c) => c.name === name)
+    const oldVersion = before.get(name)?.version
+    const newVersion = after.get(name)?.version
+    return {
+      name,
+      kind,
+      ...(oldVersion ? { oldVersion } : {}),
+      ...(newVersion ? { newVersion } : {}),
+      changes: (span?.changes ?? []).map((c) => ({ at: seconds(c.at, t0), state: c.state })),
+    }
+  })
+  return containers.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'sidecar' ? -1 : 1))
 }
 
 /**
@@ -79,7 +122,8 @@ export function lanesOf(input: {
     const promote = canary ? weights.findLast((w) => w.weight === 0 && w.at > firstRound)?.at : undefined
     const newVersions = versionsOf(pods, process, view.version)
     const oldVersions = versionsOf(pods, process, input.from)
-    const sidecars = [...new Set([...newVersions.sidecars.keys(), ...oldVersions.sidecars.keys()])].sort()
+    // The new pod's containers once one started, the old one's until then.
+    const watched = (fresh.length > 0 ? fresh : old).slice(0, 1).flatMap((p) => p.containers)
     return {
       process,
       ...(oldVersions.main ? { oldVersion: oldVersions.main } : input.from ? { oldVersion: input.from } : {}),
@@ -94,13 +138,147 @@ export function lanesOf(input: {
       weights: canary ? weights : [],
       ...(promote === undefined ? {} : { promote }),
       checks: (fresh[0]?.checks ?? []).map((c) => ({ at: seconds(c.at, t0), ready: c.ready })),
-      sidecars: sidecars.map((name) => {
-        const before = oldVersions.sidecars.get(name)
-        const after = newVersions.sidecars.get(name)
-        return { name, ...(before ? { oldVersion: before } : {}), ...(after ? { newVersion: after } : {}) }
-      }),
+      containers: containersOf(watched, oldVersions.others, newVersions.others, t0),
     }
   })
+}
+
+/**
+ * A stretch of time drawn on a track, in seconds from the release's start: a container or a run
+ * waiting, at work, ready, or down; open while it still goes on.
+ */
+export interface Segment {
+  from: number
+  to: number
+  state: 'waiting' | 'running' | 'ready' | 'down'
+  open: boolean
+}
+
+/** How one-shot work ended, marked where it did. */
+export interface Mark {
+  at: number
+  outcome: 'succeeded' | 'failed' | 'unknown'
+}
+
+/** What a track draws up to a moment: one-shot work as spans that end, never as health checks. */
+export interface Track {
+  segments: Segment[]
+  marks: Mark[]
+}
+
+/** What a sidecar or an init container was doing at t, in words. */
+export function containerAt(c: LaneContainer, t: number): PodState {
+  const state = c.changes.findLast((ch) => ch.at <= t)?.state
+  if (state === undefined)
+    return c.changes.length > 0 ? { word: 'Not started', tone: 'gone' } : { word: 'No data', tone: 'gone' }
+  const init = c.kind === 'init'
+  switch (state) {
+    case 'waiting':
+      return { word: 'Waiting', tone: 'gone' }
+    case 'running':
+      return init ? { word: 'Running', tone: 'info' } : { word: 'Starting, not ready', tone: 'info' }
+    case 'ready':
+      return init ? { word: 'Running', tone: 'info' } : { word: 'Ready', tone: 'ok' }
+    case 'succeeded':
+      return init ? { word: 'Done', tone: 'ok' } : { word: 'Stopped', tone: 'gone' }
+    case 'failed':
+      return { word: 'Failed', tone: 'crit' }
+  }
+}
+
+/**
+ * A sidecar's or init container's track up to t: each state it held as a segment, and where an
+ * init container ended, a mark. An init container that ended draws nothing after: it is gone, not
+ * down. A sidecar that ended is down.
+ */
+export function containerTrack(c: LaneContainer, t: number): Track {
+  const segments: Segment[] = []
+  const marks: Mark[] = []
+  const seen = c.changes.filter((ch) => ch.at <= t)
+  seen.forEach((ch, i) => {
+    const next = seen[i + 1]?.at
+    const to = next ?? t
+    const ended = ch.state === 'succeeded' || ch.state === 'failed'
+    if (c.kind === 'init' && ended) {
+      marks.push({ at: ch.at, outcome: ch.state === 'succeeded' ? 'succeeded' : 'failed' })
+      return
+    }
+    segments.push({ from: ch.at, to, state: segmentOf(ch.state, c.kind), open: next === undefined })
+  })
+  return { segments, marks }
+}
+
+/** What a segment of a container's track is: an init container at work is running, ready or not; a sidecar that ended is down. */
+function segmentOf(state: ContainerChange['state'], kind: LaneContainer['kind']): Segment['state'] {
+  if (state === 'waiting' || state === 'running') return state
+  if (state === 'ready') return kind === 'init' ? 'running' : 'ready'
+  return 'down'
+}
+
+/** One Job, or the CronJob that made it, and each run of it in the window, in seconds from the release's start. */
+export interface RunGroup {
+  name: string
+  kind: 'CronJob' | 'Job'
+  runs: { pod: string; job: string; start: number; end?: number; outcome: Run['outcome'] }[]
+}
+
+/** The window's runs, each under the CronJob that made its Job, else its Job: first run first. */
+export function runsOf(window: RolloutWindow, t0: number): RunGroup[] {
+  const groups = new Map<string, RunGroup>()
+  for (const r of [...window.runs].sort((a, b) => Date.parse(a.start) - Date.parse(b.start))) {
+    const name = r.cronJob ?? r.job
+    const key = `${r.cronJob ? 'CronJob' : 'Job'}/${name}`
+    const group = groups.get(key) ?? { name, kind: r.cronJob ? 'CronJob' : 'Job', runs: [] }
+    group.runs.push({
+      pod: r.pod,
+      job: r.job,
+      start: seconds(r.start, t0),
+      ...(r.end ? { end: seconds(r.end, t0) } : {}),
+      outcome: r.outcome,
+    })
+    groups.set(key, group)
+  }
+  return [...groups.values()]
+}
+
+/** A group's runs up to t: each a span while it works, and a mark where it ended. */
+export function runTrack(group: RunGroup, t: number): Track {
+  const started = group.runs.filter((r) => r.start <= t)
+  const ended = (r: RunGroup['runs'][number]) => (r.end !== undefined && r.end <= t ? r.end : undefined)
+  return {
+    segments: started.map((r) => {
+      const end = ended(r)
+      return { from: r.start, to: end ?? t, state: 'running', open: end === undefined }
+    }),
+    marks: started.flatMap((r) => {
+      const at = ended(r)
+      if (at === undefined) return []
+      return [{ at, outcome: r.outcome === 'succeeded' || r.outcome === 'failed' ? r.outcome : 'unknown' }]
+    }),
+  }
+}
+
+const lasted = (s: number) => (s < 60 ? `${String(Math.max(0, s))}s` : clock(s))
+
+/** Where a group's latest run stands at t, and what it did, in words. */
+export function runAt(group: RunGroup, t: number): PodState & { detail: string } {
+  const started = group.runs.filter((r) => r.start <= t)
+  const last = started.at(-1)
+  const count = started.length === 1 ? '1 run' : `${String(started.length)} runs`
+  if (!last) return { word: 'Not run yet', tone: 'gone', detail: `first run at ${clock(group.runs[0]?.start ?? 0)}` }
+  if (last.end === undefined || last.end > t)
+    return { word: 'Running', tone: 'info', detail: `${count} · running since ${clock(last.start)}` }
+  const took = `${clock(last.start)}–${clock(last.end)}, ${lasted(last.end - last.start)}`
+  const word: PodState =
+    last.outcome === 'succeeded'
+      ? { word: 'Succeeded', tone: 'ok' }
+      : last.outcome === 'failed'
+        ? { word: 'Failed', tone: 'crit' }
+        : { word: 'Gone', tone: 'gone' }
+  return {
+    ...word,
+    detail: `${count} · last ${took}${last.outcome === 'unknown' || last.outcome === 'running' ? ', how it ended unknown' : ''}`,
+  }
 }
 
 /** A state a pod of a lane is in, and its colour. */
@@ -274,11 +452,12 @@ export function windowOf(view: ReleaseView, now: number): { from: string; to: st
   }
 }
 
-/** How long a release ran: to its last stage, or to the last thing a lane did after it. */
-export function lastMoment(lanes: Lane[], end: number): number {
+/** How long a release ran: to its last stage, or to the last thing a lane or a run did after it. */
+export function lastMoment(lanes: Lane[], end: number, runs: RunGroup[] = []): number {
   return Math.max(
     end,
     ...lanes.flatMap((l) => [l.ready, l.stop, l.gone, l.promote, l.fail].filter((x) => x !== undefined)),
+    ...runs.flatMap((g) => g.runs.map((r) => r.end ?? r.start)),
   )
 }
 
