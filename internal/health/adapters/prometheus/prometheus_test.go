@@ -156,6 +156,20 @@ func TestARolloutIsEachPodsReadinessAndEachCanarysWeight(t *testing.T) {
 	}
 }
 
+// A Job's pod ends Completed and never ready, so counting it would mark every Project that runs
+// a Job, its Vault policy job or a backup, as degraded while each of its Processes serves.
+func TestASampleLeavesOutThePodsAJobRan(t *testing.T) {
+	f := &fake{status: http.StatusOK, answers: map[string]string{}}
+	if _, err := f.serve(t).Samples(t.Context(), "jellyfin", nil, start, end, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	running := `kube_pod_status_ready{namespace="jellyfin-system",condition="true"} unless on(namespace, pod) kube_pod_owner{namespace="jellyfin-system",owner_kind="Job"}`
+	want := `sum(` + running + `) / count(` + running + `)`
+	if f.queries[0] != want {
+		t.Fatalf("pods query = %q, want %q", f.queries[0], want)
+	}
+}
+
 func TestARolloutLeavesOutThePodsAJobRan(t *testing.T) {
 	f := &fake{status: http.StatusOK, answers: map[string]string{}}
 	if _, _, err := f.serve(t).Rollout(t.Context(), "jellyfin", start, end, 30*time.Second); err != nil {

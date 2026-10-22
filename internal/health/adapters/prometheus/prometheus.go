@@ -40,10 +40,16 @@ func New(base string, client *http.Client) (*Prometheus, error) {
 
 var errStatus = errors.New("prometheus: unexpected status")
 
+// running is each pod of the namespace that serves, by whether it is ready: every pod but those
+// a Job ran, which end Completed and never ready.
+func running(namespace string) string {
+	return fmt.Sprintf(`kube_pod_status_ready{namespace=%q,condition="true"} unless on(namespace, pod) kube_pod_owner{namespace=%q,owner_kind="Job"}`, namespace, namespace)
+}
+
 // Samples implements domain.Metrics. A check whose key is not one Gatus writes is left out.
 func (p *Prometheus) Samples(ctx context.Context, project string, checks []string, start, end time.Time, step time.Duration) (map[time.Time]domain.Sample, error) {
 	namespace := project + "-system"
-	pods := fmt.Sprintf(`sum(kube_pod_status_ready{namespace=%q,condition="true"}) / count(kube_pod_status_ready{namespace=%q,condition="true"})`, namespace, namespace)
+	pods := fmt.Sprintf(`sum(%s) / count(%s)`, running(namespace), running(namespace))
 	unit := fmt.Sprintf(`min(gotk_resource_ready{customresource_kind="Kustomization",name=%q,type="Ready"})`, "apps-"+project)
 	samples := map[time.Time]domain.Sample{}
 	set := func(query string, into func(*domain.Sample, float64)) error {
@@ -110,7 +116,7 @@ func (p *Prometheus) series(ctx context.Context, query string, start, end time.T
 func (p *Prometheus) Rollout(ctx context.Context, project string, start, end time.Time, step time.Duration) (domain.Series, domain.Series, error) {
 	namespace := project + "-system"
 	// A Job's pod runs to completion and is never ready: it is no Process switching to a release.
-	readiness, err := p.matrix(ctx, fmt.Sprintf(`kube_pod_status_ready{namespace=%q,condition="true"} unless on(namespace, pod) kube_pod_owner{namespace=%q,owner_kind="Job"}`, namespace, namespace), "pod", start, end, step)
+	readiness, err := p.matrix(ctx, running(namespace), "pod", start, end, step)
 	if err != nil {
 		return nil, nil, err
 	}
