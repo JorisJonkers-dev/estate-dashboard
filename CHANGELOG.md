@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.8.3...v0.9.0) (2026-10-22)
+
+
+### Features
+
+* **health:** show each Job's runs, and each pod's sidecars and init containers, in the rollout view ([#87](https://github.com/JorisJonkers-dev/estate-dashboard/issues/87)) ([99c6276](https://github.com/JorisJonkers-dev/estate-dashboard/commit/99c62764a00c3de385443d924de52f2a0a9dee65))
+
 ## [0.8.3](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.8.2...v0.8.3) (2026-10-22)
 
 
