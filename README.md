@@ -37,7 +37,7 @@ template's [`docs/blueprints/`](https://github.com/JorisJonkers-dev/template-go-
 | `web/tests/e2e/` | Playwright with axe, on a desktop and a phone, against the built binary |
 | `mise.toml`, `Taskfile.yml` | The pinned toolchain, and every command: `task` lists them |
 | `Dockerfile` | Builds the web app, embeds it, ships a static binary on `distroless/static:nonroot` |
-| `.github/workflows/ci.yml` | One parallel job per `task check` task, one for `task e2e` and one for `docker build`; `Pipeline Complete`, the one required check, passes when all do |
+| `.github/workflows/ci.yml` | One parallel job per `task check` task; the e2e suite as one build of the binary, then `task e2e:ci` per device and shard in the Playwright image with Postgres and Alertmanager services, merged into one HTML report; one job for `docker build`; `Pipeline Complete`, the one required check, passes when all but the report do |
 | `.github/workflows/release.yml`, `release-please-config.json` | release-please, as in the rest of the estate |
 | `deploy/estate-dashboard.project.yml` | The dashboard's [deploy-kit](https://github.com/JorisJonkers-dev/deploy-kit) Project Intent: one Process, `estate.jorisjonkers.dev`, a Postgres edge, an edge to auth, the sign-in secrets and the database URL; `deploy/env/` is its environment. Each release publishes the image and this fragment (`.github/workflows/release.yml`) |
 

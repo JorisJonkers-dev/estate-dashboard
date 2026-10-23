@@ -114,6 +114,11 @@ tasks:
       DATABASE_URL: "{{.DATABASE_URL}}"
       ALERTMANAGER_URL: "{{.ALERTMANAGER_URL}}"
 
+  e2e:ci:
+    desc: "The e2e suite alone, as CI runs it in the Playwright image: the binary already built, the browsers installed, DATABASE_URL and ALERTMANAGER_URL set. Playwright options go after --, e.g. task e2e:ci -- --project=phone --shard=1/2"
+    deps: [install]
+    cmd: pnpm --filter @{{.APP}}/web e2e {{.CLI_ARGS}}
+
   secrets:
     desc: Scan the working tree for secrets
     cmd: gitleaks dir --no-banner --redact .
