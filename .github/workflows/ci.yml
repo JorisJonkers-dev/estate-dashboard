@@ -111,7 +111,7 @@ jobs:
           --health-interval 2s
           --health-retries 30
       alertmanager:
-        image: prom/alertmanager:v0.28.1
+        image: prom/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
     env:
       # Firefox refuses a HOME the container's root user does not own; mise installs under it too.
       HOME: /root
