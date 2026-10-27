@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.1](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.9.0...v0.9.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deploy:** give the dashboard 256Mi, which 96Mi ran out of ([#94](https://github.com/JorisJonkers-dev/estate-dashboard/issues/94)) ([8ab49e2](https://github.com/JorisJonkers-dev/estate-dashboard/commit/8ab49e24dfb303b4090bea47c885d009b1642e3c))
+* read a gated release's state from the Release Gate and Flagger, and follow it live ([#92](https://github.com/JorisJonkers-dev/estate-dashboard/issues/92)) ([ed9cb1f](https://github.com/JorisJonkers-dev/estate-dashboard/commit/ed9cb1f9b1cdb9ed58a412591fa37623da99db09))
+
 ## [0.9.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.8.3...v0.9.0) (2026-10-22)
 
 
