@@ -3681,7 +3681,8 @@ type Release struct {
 	// When the gate first saw the pinned revision.
 	Since OptDateTime `json:"since"`
 	// Why the rest of this release could not be read, where it could not: no inputs, inputs or a record
-	// that do not parse, or more members than an Application has. Absent when it was read whole.
+	// that do not parse, more members than an Application has, or no Release Gate that answered. Its
+	// members are then only what their Canaries say. Absent when it was read whole.
 	Unreadable OptString `json:"unreadable"`
 }
 

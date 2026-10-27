@@ -1,4 +1,12 @@
-import type { ContainerChange, Pod, Release, RolloutWindow, Run, Stage } from '../../../infrastructure/api/types.gen'
+import type {
+  ContainerChange,
+  Member,
+  Pod,
+  Release,
+  RolloutWindow,
+  Run,
+  Stage,
+} from '../../../infrastructure/api/types.gen'
 import type { StripBlock } from '../../../shared/strip'
 import type { Tone } from '../../../shared/tone'
 import type { ReleaseView } from './releases'
@@ -18,13 +26,24 @@ export interface Lane {
   gone?: number
   /** When the new pod failed: a failed release whose new pod never turned ready. */
   fail?: number
-  /** Each moment Flagger moved the canary's weight, and when it promoted; none where nothing is a canary. */
+  /** Each moment Flagger moved a progressive canary's weight, and when it promoted; none where no weight moved. */
   weights: { at: number; weight: number }[]
   promote?: number
+  /** The Flagger Canary that switches the Process, where one does, blue-green ones included. */
+  canary?: CanaryOutcome
   /** The new pod's readiness every five seconds. */
   checks: { at: number; ready: boolean }[]
   /** Its sidecars, then its init containers, each with the versions it ran and how it went. */
   containers: LaneContainer[]
+}
+
+/**
+ * How a lane's Canary went: its phase and the analysis iterations it reached, read only for the
+ * release its Canary switches now; an older release knows only that it went through one.
+ */
+export interface CanaryOutcome {
+  phase?: string
+  iterations?: number
 }
 
 /** One sidecar or init container of a lane's pod: each change of its state, in seconds from the release's start. */
@@ -83,8 +102,11 @@ function containersOf(
 
 /**
  * Each Process's lane over a release's window: the pods that started after the release began are
- * its new ones, the rest its old ones. A failed release whose new pod never turned ready failed when
- * its last stage did.
+ * its new ones, the rest its old ones. A Process is a canary where a Canary switches it, which is
+ * what `members` says; its weight shows one only where the canary is progressive, as a blue-green
+ * one runs at weight 0 throughout. `current` says the members' Canaries switch this release now.
+ * A failed release whose new pod never turned ready failed when its last stage did; one Flagger
+ * rolled back failed then too, or else when its new pods were scaled away.
  */
 export function lanesOf(input: {
   view: ReleaseView
@@ -93,6 +115,8 @@ export function lanesOf(input: {
   pods: Pod[]
   t0: number
   failedAt?: number | undefined
+  members?: Member[] | undefined
+  current?: boolean | undefined
 }): Lane[] {
   const { view, window, pods, t0 } = input
   const processes = [...new Set(window.pods.map((p) => p.process))].sort()
@@ -116,8 +140,23 @@ export function lanesOf(input: {
     const weights = window.weights
       .filter((w) => w.process === process)
       .map((w) => ({ at: seconds(w.at, t0), weight: w.weight }))
-    // A canary's weight steps up each round it passes; it falls back to 0 once Flagger promotes it.
+    // A progressive canary's weight steps up each round it passes; it falls back to 0 once Flagger promotes it.
     const canary = weights.some((w) => w.weight > 0)
+    const member = input.members?.find((m) => m.process === process)
+    const outcome: CanaryOutcome | undefined =
+      member === undefined
+        ? undefined
+        : input.current
+          ? { ...(member.phase ? { phase: member.phase } : {}), iterations: member.iterations }
+          : {}
+    const fail =
+      view.state !== 'failed'
+        ? undefined
+        : outcome?.phase === 'Failed'
+          ? (input.failedAt ?? last(fresh.map((p) => p.end)) ?? ready ?? start)
+          : ready === undefined
+            ? input.failedAt
+            : undefined
     const firstRound = weights.find((w) => w.weight > 0)?.at ?? 0
     const promote = canary ? weights.findLast((w) => w.weight === 0 && w.at > firstRound)?.at : undefined
     const newVersions = versionsOf(pods, process, view.version)
@@ -132,11 +171,10 @@ export function lanesOf(input: {
       ...(ready === undefined ? {} : { ready }),
       ...(stop === undefined ? {} : { stop }),
       ...(gone === undefined ? {} : { gone }),
-      ...(view.state === 'failed' && ready === undefined && input.failedAt !== undefined
-        ? { fail: input.failedAt }
-        : {}),
+      ...(fail === undefined ? {} : { fail }),
       weights: canary ? weights : [],
       ...(promote === undefined ? {} : { promote }),
+      ...(outcome === undefined ? {} : { canary: outcome }),
       checks: (fresh[0]?.checks ?? []).map((c) => ({ at: seconds(c.at, t0), ready: c.ready })),
       containers: containersOf(watched, oldVersions.others, newVersions.others, t0),
     }
@@ -299,6 +337,28 @@ export interface LaneAt {
   blocks: StripBlock[]
 }
 
+const iterations = (n: number) => `${String(n)} ${n === 1 ? 'iteration' : 'iterations'}`
+
+/** How a lane's canary went, in words; nothing where no Canary switches its Process. */
+export function canaryWords(lane: Lane): string | undefined {
+  const c = lane.canary
+  if (c === undefined) return undefined
+  if (c.iterations === undefined) return 'canary'
+  if (c.phase === undefined) return 'canary · not seen by Flagger yet'
+  if (c.phase === 'Failed') return `canary · rolled back after ${iterations(c.iterations)}`
+  if (c.phase === 'Succeeded') return `canary · promoted after ${iterations(c.iterations)}`
+  return `canary · ${c.phase}, ${iterations(c.iterations)} so far`
+}
+
+/** How a release's lanes switch, in words: a progressive canary, a blue-green one, or a plain handover. */
+export function howItSwitches(lanes: Lane[]): string {
+  if (lanes.some((l) => l.weights.length > 0))
+    return 'A canary takes more of the traffic each round its checks pass; a failed round sends all of it back to the old pod.'
+  if (lanes.some((l) => l.canary !== undefined))
+    return 'A blue-green canary runs its analysis while the old pod keeps all traffic; once every iteration passes Flagger switches all of it, and a failed analysis rolls it back.'
+  return 'A new pod shares traffic with the old one once its readiness check passes; then the old pod stops taking requests, drains, and stops.'
+}
+
 const clock = (s: number) =>
   `${String(Math.floor(Math.max(0, s) / 60))}:${String(Math.max(0, s) % 60).padStart(2, '0')}`
 
@@ -308,17 +368,30 @@ export function laneAt(lane: Lane, t: number): LaneAt {
   const ready = lane.ready ?? Infinity
   const start = lane.start ?? Infinity
   const canary = lane.weights.length > 0
+  const phase = lane.canary?.phase
+  // A blue-green canary under analysis takes no traffic until Flagger promotes it.
+  const analysing = !canary && phase !== undefined && phase !== 'Succeeded' && phase !== 'Failed'
+  const reached = iterations(lane.canary?.iterations ?? 0)
   const promote = lane.promote ?? Infinity
   const weight = lane.weights.findLast((w) => w.at <= t)?.weight ?? 0
   const rounds = lane.weights.filter((w) => w.at <= t && w.weight > 0).length
-  const share = failed || t < ready ? 0 : canary ? (t < promote ? weight : 100) : t < (lane.stop ?? Infinity) ? 50 : 100
+  const share =
+    failed || t < ready || analysing
+      ? 0
+      : canary
+        ? t < promote
+          ? weight
+          : 100
+        : t < (lane.stop ?? Infinity)
+          ? 50
+          : 100
   const fresh: PodState = failed
     ? { word: 'Failed', tone: 'crit' }
     : t < start
       ? { word: 'Waiting', tone: 'gone' }
       : t < ready
         ? { word: 'Starting', tone: 'info' }
-        : canary && t < promote
+        : (canary && t < promote) || analysing
           ? { word: share > 0 ? `Canary · ${String(share)}%` : 'Ready, no traffic', tone: 'warn' }
           : { word: 'Serving', tone: 'ok' }
   const old: PodState =
@@ -328,22 +401,26 @@ export function laneAt(lane: Lane, t: number): LaneAt {
         ? { word: 'Draining', tone: 'back' }
         : { word: 'Stopped', tone: 'gone' }
   const next = failed
-    ? 'never turned ready · the old pod keeps all traffic'
+    ? phase === 'Failed'
+      ? `Flagger rolled it back after ${reached} · the old pod keeps all traffic`
+      : 'never turned ready · the old pod keeps all traffic'
     : t < start
-      ? canary
+      ? canary || lane.canary !== undefined
         ? 'waits its turn'
         : 'waits for the unit'
       : t < ready
         ? 'starting · waits for its readiness check'
-        : canary && t < promote
-          ? rounds > 0
-            ? `canary round ${String(rounds)} · checks passing`
-            : 'ready · first canary round next'
-          : share < 100
-            ? 'both pods serving · the old pod stops next'
-            : t < (lane.gone ?? Infinity)
-              ? 'all traffic on the new pod · the old pod drains'
-              : 'switched'
+        : analysing
+          ? `Flagger ${phase} · ${reached} so far · the old pod keeps all traffic`
+          : canary && t < promote
+            ? rounds > 0
+              ? `canary round ${String(rounds)} · checks passing`
+              : 'ready · first canary round next'
+            : share < 100
+              ? 'both pods serving · the old pod stops next'
+              : t < (lane.gone ?? Infinity)
+                ? 'all traffic on the new pod · the old pod drains'
+                : 'switched'
   const seen = lane.checks.filter((c) => c.at <= t).slice(-slots)
   const blocks: StripBlock[] = seen.map((c) => ({
     tone: lane.fail !== undefined && !c.ready ? 'crit' : c.at < ready ? 'info' : c.ready ? 'ok' : 'warn',

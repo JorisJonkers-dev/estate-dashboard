@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/vue-query'
-import { computed, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import {
   getHandoverOptions,
   getHealthOptions,
@@ -21,17 +21,24 @@ import { projectRows } from '../../overview/domain/overview'
 import { window } from '../domain/logs'
 import { checksOf } from '../domain/health'
 import { deliveryFacts } from '../domain/delivery'
-import { releases as releaseViews } from '../domain/releases'
+import { inFlight, releases as releaseViews } from '../domain/releases'
 
 const live = { refetchInterval: 30_000 }
 
+/** How often what drives a release is read while one is in flight. */
+export const flyingInterval = 5_000
+
 /** What the dashboard knows about one Project. */
 export function useProject(name: Ref<string>) {
+  // Set once the reads below say a release is in flight; until then, and once it settles, read slowly.
+  const flying = ref(false)
+  const pace = (slow: number) => computed(() => (flying.value ? flyingInterval : slow))
+  const often = pace(30_000)
   const handover = useQuery({ ...getHandoverOptions(), ...live })
   const pins = useQuery({ ...listPinsOptions(), ...live })
-  const units = useQuery({ ...listUnitsOptions(), ...live })
+  const units = useQuery(computed(() => ({ ...listUnitsOptions(), refetchInterval: often.value })))
   const sources = useQuery({ ...listSourcesOptions(), ...live })
-  const releases = useQuery({ ...listReleasesOptions(), ...live })
+  const releases = useQuery(computed(() => ({ ...listReleasesOptions(), refetchInterval: often.value })))
   const issues = useQuery({ ...listIssuesOptions(), ...live })
   const alerts = useQuery({ ...listAlertsOptions(), ...live })
   const deploys = useQuery(
@@ -49,7 +56,7 @@ export function useProject(name: Ref<string>) {
         query: { repository: repository.value ?? '', limit: 10 },
       }),
       enabled: repository.value !== undefined,
-      ...live,
+      refetchInterval: often.value,
     })),
   )
 
@@ -60,8 +67,9 @@ export function useProject(name: Ref<string>) {
     })),
   )
   // Live state reads more often: a container that stops answering should show within seconds.
+  const podsEvery = pace(10_000)
   const pods = useQuery(
-    computed(() => ({ ...listPodsOptions({ path: { project: name.value } }), refetchInterval: 10_000 })),
+    computed(() => ({ ...listPodsOptions({ path: { project: name.value } }), refetchInterval: podsEvery.value })),
   )
   const checks = useQuery({ ...listChecksOptions(), refetchInterval: 30_000 })
   const updates = useQuery({ ...listUpdatesOptions(), refetchInterval: 300_000 })
@@ -82,6 +90,16 @@ export function useProject(name: Ref<string>) {
     })),
   )
   const unitOf = computed(() => (units.data.value?.items ?? []).find((u) => u.source === `project-${name.value}`))
+  /** The Project's gated Applications: each one's Canaries, and the gate's record of what it serves. */
+  const gates = computed(() => (releases.data.value?.items ?? []).filter((r) => r.namespace === `${name.value}-system`))
+  const views = computed(() => releaseViews(rollouts.data.value?.items ?? [], unitOf.value, gates.value))
+  watch(
+    () => inFlight(views.value, gates.value),
+    (now) => {
+      flying.value = now
+    },
+    { immediate: true },
+  )
 
   const row = computed(() =>
     projectRows({
@@ -109,7 +127,8 @@ export function useProject(name: Ref<string>) {
       ),
     ),
     health: computed(() => health.data.value),
-    gate: computed(() => (releases.data.value?.items ?? []).find((r) => r.namespace === `${name.value}-system`)),
+    gate: computed(() => gates.value[0]),
+    gates,
     healthUnreadable: computed(() => health.isError.value),
     updates: computed(() => updates.data.value?.items ?? []),
     alerts: computed(() =>
@@ -117,7 +136,7 @@ export function useProject(name: Ref<string>) {
         (i) => i.project === name.value,
       ),
     ),
-    releases: computed(() => releaseViews(rollouts.data.value?.items ?? [], unitOf.value)),
+    releases: views,
     streams: computed(() => streams.data.value?.items ?? []),
     pods: computed(() => pods.data.value?.items ?? []),
     podsLoading: computed(() => pods.isPending.value),

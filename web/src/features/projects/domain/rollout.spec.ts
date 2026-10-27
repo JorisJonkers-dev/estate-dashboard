@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import type { Pod, Release, RolloutWindow, Run, Stage } from '../../../infrastructure/api/types.gen'
+import type { Member, Pod, Release, RolloutWindow, Run, Stage } from '../../../infrastructure/api/types.gen'
 import type { ReleaseView } from './releases'
 import {
   clock,
   containerAt,
   containerTrack,
+  canaryWords,
   gateConditions,
+  howItSwitches,
   ifItFails,
   laneAt,
   lanesOf,
@@ -197,10 +199,93 @@ describe('a lane', () => {
     expect(l.promote).toBe(160)
   })
 
-  it('is no canary where Flagger never moved its weight', () => {
-    expect(lane({ window: { ...continuous, weights: [{ process: 'sonarr', at: at(0), weight: 0 }] } }).weights).toEqual(
-      [],
-    )
+  it('is no canary where Flagger never moved its weight and no Canary switches its Process', () => {
+    const l = lane({ window: { ...continuous, weights: [{ process: 'sonarr', at: at(0), weight: 0 }] } })
+    expect(l.weights).toEqual([])
+    expect(l.canary).toBeUndefined()
+  })
+
+  // Blue-green: Flagger runs every iteration at weight 0, so its weight never shows a canary.
+  const blueGreen: RolloutWindow = {
+    pods: [
+      {
+        pod: 'fe-primary-old',
+        process: 'sonarr',
+        start: at(-60),
+        ready: at(-60),
+        checks: checks(-60, 300, -60),
+        containers: [],
+      },
+      {
+        pod: 'fe-new',
+        process: 'sonarr',
+        start: at(30),
+        ready: at(60),
+        end: at(240),
+        checks: checks(30, 240, 60),
+        containers: [],
+      },
+    ],
+    weights: [
+      { process: 'sonarr', at: at(60), weight: 0 },
+      { process: 'sonarr', at: at(120), weight: 0 },
+    ],
+    runs: [],
+  }
+  const member = (over: Partial<Member> = {}): Member => ({ process: 'sonarr', iterations: 1, ...over })
+
+  it('is a canary where its Process has a Canary, its weight 0 throughout, with the analysis it reached', () => {
+    const l = lane({ window: blueGreen, members: [member({ phase: 'Progressing' })], current: true })
+    expect(l.canary).toEqual({ phase: 'Progressing', iterations: 1 })
+    expect(l.weights).toEqual([])
+    expect(lane({ window: blueGreen, members: [member({ process: 'other' })], current: true }).canary).toBeUndefined()
+    // A Canary Flagger has not seen yet has no phase.
+    expect(lane({ window: blueGreen, members: [member()], current: true }).canary).toEqual({ iterations: 1 })
+  })
+
+  it('knows only that an older release went through a canary: its Canary now switches another', () => {
+    expect(lane({ window: blueGreen, members: [member({ phase: 'Failed' })] }).canary).toEqual({})
+  })
+
+  it('fails where Flagger rolled the canary back, when its pods were scaled away, though it turned ready', () => {
+    const failed = { view: view({ state: 'failed' }), window: blueGreen, current: true }
+    const l = lane({ ...failed, members: [member({ phase: 'Failed', iterations: 3 })] })
+    expect(l.fail).toBe(240)
+    expect(laneAt(l, 250)).toMatchObject({
+      share: 0,
+      failed: true,
+      new: { word: 'Failed', tone: 'crit' },
+      old: { word: 'Serving' },
+      next: 'Flagger rolled it back after 3 iterations · the old pod keeps all traffic',
+    })
+    // The stage that failed says when, where one did; else when it turned ready, else started.
+    expect(lane({ ...failed, members: [member({ phase: 'Failed' })], failedAt: 200 }).fail).toBe(200)
+    const running: RolloutWindow = { ...blueGreen, pods: blueGreen.pods.map((p) => ({ ...p, end: undefined })) }
+    expect(lane({ ...failed, window: running, members: [member({ phase: 'Failed' })] }).fail).toBe(60)
+    const starting: RolloutWindow = { ...running, pods: running.pods.map((p) => ({ ...p, ready: undefined })) }
+    expect(lane({ ...failed, window: starting, members: [member({ phase: 'Failed' })] }).fail).toBe(30)
+  })
+
+  it('in a blue-green analysis keeps all traffic on the old pod, and says where Flagger is', () => {
+    const l = lane({
+      window: blueGreen,
+      members: [member({ phase: 'WaitingPromotion', iterations: 4 })],
+      current: true,
+    })
+    expect(laneAt(l, 10).next).toBe('waits its turn')
+    expect(laneAt(l, 100)).toMatchObject({
+      share: 0,
+      new: { word: 'Ready, no traffic', tone: 'warn' },
+      old: { word: 'Serving' },
+      next: 'Flagger WaitingPromotion · 4 iterations so far · the old pod keeps all traffic',
+    })
+    const one = lane({ window: blueGreen, members: [member({ phase: 'Progressing' })], current: true })
+    expect(laneAt(one, 100).next).toBe('Flagger Progressing · 1 iteration so far · the old pod keeps all traffic')
+  })
+
+  it('once Flagger promoted a blue-green canary, hands over as any switch does', () => {
+    const l = lane({ window: blueGreen, members: [member({ phase: 'Succeeded', iterations: 4 })], current: true })
+    expect(laneAt(l, 100)).toMatchObject({ share: 50, new: { word: 'Serving' } })
   })
 
   it('at each moment has its share, its pods’ states and what happens next, for a continuous switch', () => {
@@ -622,6 +707,35 @@ describe('a release’s window', () => {
   it('ends at the last thing a lane did, where that came after the last stage', () => {
     expect(lastMoment([lane()], 150)).toBe(170)
     expect(lastMoment([], 150)).toBe(150)
+  })
+})
+
+describe('a canary', () => {
+  const bare: Lane = { process: 'x', weights: [], checks: [], containers: [] }
+
+  it('says how its analysis went: rolled back, promoted, or how far it got', () => {
+    expect(canaryWords(bare)).toBeUndefined()
+    expect(canaryWords({ ...bare, canary: {} })).toBe('canary')
+    expect(canaryWords({ ...bare, canary: { phase: 'Failed', iterations: 3 } })).toBe(
+      'canary · rolled back after 3 iterations',
+    )
+    expect(canaryWords({ ...bare, canary: { phase: 'Succeeded', iterations: 1 } })).toBe(
+      'canary · promoted after 1 iteration',
+    )
+    expect(canaryWords({ ...bare, canary: { phase: 'Progressing', iterations: 0 } })).toBe(
+      'canary · Progressing, 0 iterations so far',
+    )
+    expect(canaryWords({ ...bare, canary: { iterations: 0 } })).toBe('canary · not seen by Flagger yet')
+  })
+
+  it('switches progressively, blue-green, or not at all, in words', () => {
+    expect(howItSwitches([{ ...bare, weights: [{ at: 0, weight: 20 }] }, bare])).toContain(
+      'takes more of the traffic each round',
+    )
+    expect(howItSwitches([bare, { ...bare, canary: {} }])).toBe(
+      'A blue-green canary runs its analysis while the old pod keeps all traffic; once every iteration passes Flagger switches all of it, and a failed analysis rolls it back.',
+    )
+    expect(howItSwitches([bare])).toContain('A new pod shares traffic with the old one')
   })
 })
 

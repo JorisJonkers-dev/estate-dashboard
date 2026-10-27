@@ -216,7 +216,8 @@ func TestOneReleaseThatDoesNotReadKeepsNoOtherFromBeingRead(t *testing.T) {
 		"forged/forged":   "a release record the gate did not write for it",
 		"orphan/orphan":   "no release-gate inputs",
 	} {
-		if r := got[at]; r.Unreadable != why || r.Serving != "" || len(r.Members) != 0 {
+		// The gate's part is unread; the Canaries are the cluster's, and still say how each switches.
+		if r := got[at]; r.Unreadable != why || r.Serving != "" || len(r.Members) != 1 {
 			t.Errorf("%s = %+v", at, r)
 		}
 	}
@@ -251,8 +252,8 @@ func TestNoReadGrowsWithWhatAnyoneCanCreate(t *testing.T) {
 	}
 	// An answer of the gate is read up to a bound, so a gate cannot make the dashboard hold more.
 	huge := serveGate(t, http.StatusOK, `{"releases":[`+strings.Repeat(authServed+",", 40000)+authServed+`]}`)
-	if _, err := kubeAsking(huge, canary("auth-system", "auth", "auth-api", "", nil)).Releases(t.Context()); err == nil {
-		t.Fatal("an answer past the bound was read whole")
+	if r := byApplication(t, kubeAsking(huge, canary("auth-system", "auth", "auth-api", "", nil)))["auth-system/auth"]; r.Serving != "" || r.Unreadable == "" {
+		t.Fatalf("an answer past the bound was read whole: %+v", r)
 	}
 }
 
@@ -270,7 +271,16 @@ func TestAClusterOrAGateThatRefusesIsAnError(t *testing.T) {
 			t.Fatal("a refusal read as an answer")
 		}
 	}
-	// What the gate will not hand over is the cluster's failure, not a release's data.
+}
+
+// 2026-10-27: the Release Gate was not running, Flagger rolled findability-explorer 1.8.0 back,
+// and the dashboard, reading no release at all, showed none in flight and no canary.
+func TestAGateThatDoesNotAnswerLeavesEachReleaseItsCanaries(t *testing.T) {
+	failed := map[string]any{"phase": "Failed", "iterations": int64(3)}
+	canaries := []runtime.Object{
+		canary("findability-explorer-system", "findability-explorer", "findability-explorer-ui", "sha256:n", failed),
+		canary("findability-explorer-system", "findability-explorer", "findability-explorer-api", "sha256:n", failed),
+	}
 	gone := serveGate(t, http.StatusOK, "")
 	gone.Close()
 	for name, g := range map[string]*gate{
@@ -278,21 +288,27 @@ func TestAClusterOrAGateThatRefusesIsAnError(t *testing.T) {
 		"an answer not JSON":  serveGate(t, http.StatusOK, "<html>"),
 		"a gate that is gone": gone,
 	} {
-		if _, err := kubeAsking(g, canary("auth-system", "auth", "auth-api", "", nil)).Releases(t.Context()); err == nil {
-			t.Errorf("%s read as an answer", name)
+		got := byApplication(t, kubeAsking(g, canaries...))["findability-explorer-system/findability-explorer"]
+		want := []domain.Member{
+			{Process: "findability-explorer-api", Phase: "Failed", Revision: "sha256:n", Iterations: 3},
+			{Process: "findability-explorer-ui", Phase: "Failed", Revision: "sha256:n", Iterations: 3},
+		}
+		if !strings.HasPrefix(got.Unreadable, "the Release Gate did not answer: ") || len(got.Unreadable) > 256 ||
+			got.Serving != "" || !reflect.DeepEqual(got.Members, want) {
+			t.Errorf("%s: %+v", name, got)
 		}
 	}
-	// A dashboard that knows no gate reads no release.
-	none := kube(t, "")
+	// A dashboard that knows no gate still reads the Canaries, and says why it has no record.
+	none := kubeAsking(serveGate(t, http.StatusOK, ""), canaries...)
 	none.Gate = nil
-	if _, err := none.Releases(t.Context()); !errors.Is(err, cluster.ErrNoGate) {
-		t.Fatalf("without a gate: %v", err)
+	if got := byApplication(t, none)["findability-explorer-system/findability-explorer"]; got.Unreadable != "no Release Gate is configured" || len(got.Members) != 2 {
+		t.Fatalf("without a gate: %+v", got)
 	}
-	// An address that does not make a request is the dashboard's failure, read as one.
-	broken := kube(t, "")
+	// An address that does not make a request is a gate that did not answer.
+	broken := kubeAsking(serveGate(t, http.StatusOK, ""), canaries...)
 	broken.Gate = &url.URL{Scheme: "http", Host: "bad host"}
-	if _, err := broken.Releases(t.Context()); err == nil {
-		t.Fatal("a gate address that is not one was asked")
+	if got := byApplication(t, broken)["findability-explorer-system/findability-explorer"]; !strings.HasPrefix(got.Unreadable, "the Release Gate did not answer: ") {
+		t.Fatalf("a gate address that is not one: %+v", got)
 	}
 }
 

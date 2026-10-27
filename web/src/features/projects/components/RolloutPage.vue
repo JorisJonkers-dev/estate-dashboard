@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useQuery } from '@tanstack/vue-query'
+import { keepPreviousData, useQuery } from '@tanstack/vue-query'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRolloutWindowOptions } from '../../../infrastructure/api/@tanstack/vue-query.gen'
@@ -7,9 +7,11 @@ import { useNow } from '../../../infrastructure/useNow'
 import { toneText } from '../../../shared/tone'
 import StatusStrip from '../../../shared/ui/StatusStrip.vue'
 import { age } from '../../overview/domain/overview'
-import { useProject } from '../composables/useProject'
+import { flyingInterval, useProject } from '../composables/useProject'
 import {
+  canaryWords,
   clock,
+  howItSwitches,
   containerAt,
   containerTrack,
   ifItFails,
@@ -27,8 +29,9 @@ import TimeTrack from './TimeTrack.vue'
 
 const route = useRoute()
 const name = computed(() => String(route.params.name))
-const { releases, rolloutsLoading, pods, gate, pin } = useProject(name)
-const now = useNow()
+const { releases, rolloutsLoading, pods, gate, gates, pin, unit } = useProject(name)
+// A release in flight is followed live, so its end moves at the pace its reads do.
+const now = useNow(flyingInterval)
 
 const index = computed(() => {
   const asked = route.query.version
@@ -39,7 +42,10 @@ const view = computed(() => releases.value[index.value])
 const from = computed(() => releases.value[index.value + 1]?.version)
 const span = computed(() => (view.value ? windowOf(view.value, now.value) : undefined))
 const rolling = computed(() => view.value?.state === 'rolling')
+/** Whether the Canaries switch the release shown: the newest, once Flux applied it. */
+const current = computed(() => index.value === 0 && unit.value?.version === view.value?.version)
 
+// While a release is in flight its window grows with every read; the last one shows until the next answers.
 const window = useQuery(
   computed(() => ({
     ...getRolloutWindowOptions({
@@ -47,7 +53,8 @@ const window = useQuery(
       query: { from: span.value?.from ?? '', to: span.value?.to ?? '' },
     }),
     enabled: span.value !== undefined,
-    refetchInterval: rolling.value ? 10_000 : false,
+    refetchInterval: rolling.value ? flyingInterval : false,
+    placeholderData: rolling.value ? keepPreviousData : undefined,
     retry: false,
   })),
 )
@@ -65,6 +72,8 @@ const lanes = computed(() =>
         pods: pods.value,
         t0: span.value.t0,
         failedAt: failedAt.value,
+        members: gates.value.flatMap((g) => g.members),
+        current: current.value,
       })
     : [],
 )
@@ -103,18 +112,24 @@ function restart() {
   stop()
   t.value = 0
 }
+/** Follows the release live again: where it is in flight, the page keeps up with it on its own. */
+function follow() {
+  stop()
+  t.value = null
+}
 function scrub(event: Event) {
   stop()
   const value = Number((event.target as HTMLInputElement).value)
   t.value = rolling.value && value >= end.value ? null : value
 }
-watch(() => route.fullPath, restart)
+// Opening a release follows it live while it is in flight, and shows a finished one at its end.
+watch(() => route.fullPath, follow)
 onBeforeUnmount(stop)
 
 const order = computed(() => (view.value && span.value ? orderAt(view.value, gate.value, span.value.t0, at.value) : []))
 const undo = computed(() => ifItFails(name.value, from.value, gate.value))
 const state = computed(() => (view.value ? rolloutState(view.value) : undefined))
-const canary = computed(() => lanes.value.some((l) => l.weights.length > 0))
+const switching = computed(() => howItSwitches(lanes.value))
 const podTone: Record<string, string> = { ...toneText, gone: 'text-dim' }
 
 const label = 'text-xs font-semibold tracking-[0.12em] text-text-muted uppercase'
@@ -151,6 +166,14 @@ const stepIcon: Record<string, string> = {
             <span v-if="following" class="flex items-center gap-1.5 text-sm text-accent"
               ><span class="size-2 animate-pulse rounded-full bg-accent" aria-hidden="true" />Live</span
             >
+            <button
+              v-else-if="rolling"
+              type="button"
+              class="flex cursor-pointer items-center gap-1.5 rounded-full border border-accent bg-transparent px-2.5 py-0.5 font-sans text-sm text-accent"
+              @click="follow"
+            >
+              <span class="size-2 rounded-full bg-accent" aria-hidden="true" />Back to live
+            </button>
           </div>
           <dl v-if="view" class="m-0 mt-5 flex flex-wrap gap-x-10 gap-y-3">
             <div>
@@ -162,7 +185,9 @@ const stepIcon: Record<string, string> = {
             <div>
               <dt :class="label">Switches</dt>
               <dd class="m-0 text-sm">
-                {{ (gate?.members.length ?? 0) > 0 ? 'blue-green, through a canary' : 'continuously, no canary' }}
+                {{
+                  gates.some((g) => g.members.length > 0) ? 'blue-green, through a canary' : 'continuously, no canary'
+                }}
               </dd>
             </div>
             <div v-if="pin">
@@ -235,7 +260,15 @@ const stepIcon: Record<string, string> = {
               </thead>
               <tbody v-for="l in lanes" :key="l.process" class="border-b border-line">
                 <tr class="grid grid-cols-2 gap-x-4 gap-y-2 py-3 md:table-row md:py-0">
-                  <th scope="row" class="col-span-2 text-left font-semibold md:py-3 md:pr-4">{{ l.process }}</th>
+                  <th scope="row" class="col-span-2 text-left font-semibold md:py-3 md:pr-4">
+                    {{ l.process }}
+                    <em
+                      v-if="canaryWords(l)"
+                      class="block text-xs font-normal not-italic"
+                      :class="l.canary?.phase === 'Failed' ? 'text-crit' : 'text-text-muted'"
+                      >{{ canaryWords(l) }}</em
+                    >
+                  </th>
                   <td class="md:py-3 md:pr-4">
                     <span class="block font-mono text-sm break-all">{{ l.oldVersion ?? '—' }}</span>
                     <span class="text-sm" :class="podTone[laneAt(l, at).old.tone]">{{ laneAt(l, at).old.word }}</span>
@@ -322,13 +355,7 @@ const stepIcon: Record<string, string> = {
                 </tr>
               </tbody>
             </table>
-            <p class="m-0 mt-3 text-sm text-text-muted">
-              {{
-                canary
-                  ? 'A canary takes more of the traffic each round its checks pass; a failed round sends all of it back to the old pod.'
-                  : 'A new pod shares traffic with the old one once its readiness check passes; then the old pod stops taking requests, drains, and stops.'
-              }}
-            </p>
+            <p class="m-0 mt-3 text-sm text-text-muted">{{ switching }}</p>
           </template>
         </section>
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Rollout, Unit } from '../../../infrastructure/api/types.gen'
-import { live, serving, releases } from './releases'
+import type { Member, Release, Rollout, Unit } from '../../../infrastructure/api/types.gen'
+import { inFlight, live, serving, releases } from './releases'
 
 const rollout = (id: number, version: string, states: string[]): Rollout => ({
   id,
@@ -106,5 +106,120 @@ describe('the releases of a Project', () => {
     const [odd, even] = releases([rollout(1, '1.0.0', []), rollout(2, '0.9.0', [])], undefined)
     expect(odd?.run).toBe('https://run/1')
     expect(even).not.toHaveProperty('run')
+  })
+})
+
+/** A gated Application: its members' Canaries, and what the Release Gate recorded it serves. */
+const gated = (members: Partial<Member>[], over: Partial<Release> = {}): Release => ({
+  namespace: 'findability-explorer-system',
+  application: 'findability-explorer',
+  members: members.map((m, i) => ({ process: `p${String(i)}`, iterations: 0, revision: 'sha256:new', ...m })),
+  ...over,
+})
+
+describe('the releases of a gated Project', () => {
+  const incident = [rollout(8, '1.8.0', ['success']), rollout(7, '1.7.0', ['success'])]
+
+  it('is failed, not live, when Flagger rolled the new release back, and the old one still serves', () => {
+    // 2026-10-27: Flux applied 1.8.0 and went Ready, the gate's checks failed, Flagger rolled back.
+    const gate = gated([{ phase: 'Failed', iterations: 3 }], { serving: 'sha256:old', pinned: 'sha256:new' })
+    const views = releases(incident, unit('1.8.0'), [gate])
+    expect(views.map((v) => [v.version, v.state])).toEqual([
+      ['1.8.0', 'failed'],
+      ['1.7.0', 'past'],
+    ])
+    expect(live(views)).toBeUndefined()
+    expect(serving(views)?.version).toBe('1.7.0')
+  })
+
+  it('is failed from Flagger alone where the gate answered nothing', () => {
+    const gate = gated([{ phase: 'Failed', iterations: 3 }], { unreadable: 'the Release Gate did not answer' })
+    expect(releases(incident, unit('1.8.0'), [gate]).map((v) => v.state)).toEqual(['failed', 'past'])
+  })
+
+  it('is live once the gate records it serves the revision every Canary carries', () => {
+    const gate = gated([{ phase: 'Succeeded' }, { phase: 'Succeeded' }], { serving: 'sha256:new' })
+    const views = releases(incident, unit('1.8.0'), [gate])
+    expect(views[0]?.state).toBe('live')
+    expect(serving(views)?.version).toBe('1.8.0')
+  })
+
+  it('takes the gate’s record over Flagger: serving it is live, not serving it yet is still rolling', () => {
+    expect(
+      releases(incident, unit('1.8.0'), [gated([{ phase: 'Initialized' }], { serving: 'sha256:new' })])[0]?.state,
+    ).toBe('live')
+    const notYet = gated([{ phase: 'Succeeded' }], { serving: 'sha256:old', pinned: 'sha256:new' })
+    expect(releases(incident, unit('1.8.0'), [notYet])[0]?.state).toBe('rolling')
+  })
+
+  it('is rolling while any Canary is in any phase but Succeeded or Failed', () => {
+    for (const phase of [
+      'Initializing',
+      'Initialized',
+      'Waiting',
+      'Progressing',
+      'WaitingPromotion',
+      'Promoting',
+      'Finalising',
+      'Terminating',
+      undefined,
+    ]) {
+      const gate = gated([{ phase: 'Succeeded' }, phase === undefined ? {} : { phase }], {
+        unreadable: 'the Release Gate did not answer',
+      })
+      const views = releases(incident, unit('1.8.0'), [gate])
+      expect([phase, views[0]?.state]).toEqual([phase, 'rolling'])
+      expect(serving(views)?.version).toBe('1.7.0')
+    }
+  })
+
+  it('falls back to Flagger where the gate’s record says nothing: every Canary Succeeded is live', () => {
+    expect(releases(incident, unit('1.8.0'), [gated([{ phase: 'Succeeded' }])])[0]?.state).toBe('live')
+    // A record that names no revision a Canary carries cannot say which release serves.
+    const unnamed = gated([{ phase: 'Succeeded', revision: undefined }], { serving: 'sha256:new' })
+    expect(releases(incident, unit('1.8.0'), [unnamed])[0]?.state).toBe('live')
+  })
+
+  it('is live only when every gated Application of the Project is', () => {
+    const done = gated([{ phase: 'Succeeded' }], { serving: 'sha256:new' })
+    const busy = gated([{ phase: 'Progressing' }], { application: 'other', serving: 'sha256:old' })
+    expect(releases(incident, unit('1.8.0'), [done, busy])[0]?.state).toBe('rolling')
+    expect(releases(incident, unit('1.8.0'), [busy, gated([{ phase: 'Failed' }])])[0]?.state).toBe('failed')
+  })
+
+  it('reads Flagger only once Flux applied the release: before that it is rolling whatever the Canaries say', () => {
+    const before = gated([{ phase: 'Failed', revision: 'sha256:old' }], { serving: 'sha256:old' })
+    expect(releases(incident, unit('1.7.0'), [before])[0]?.state).toBe('rolling')
+    expect(releases(incident, unit('1.8.0', false), [before])[0]?.state).toBe('rolling')
+  })
+
+  it('keeps the unit’s rule for an Application with no Canary', () => {
+    expect(releases(incident, unit('1.8.0'), [])[0]?.state).toBe('live')
+    expect(releases(incident, unit('1.8.0'), [gated([])])[0]?.state).toBe('live')
+  })
+})
+
+describe('a Project in flight', () => {
+  const views = (state: 'live' | 'rolling' | 'failed') =>
+    releases(
+      [rollout(2, '1.1.0', [state === 'failed' ? 'failure' : 'success'])],
+      unit(state === 'rolling' ? '1.0.0' : '1.1.0'),
+    )
+
+  it('is one whose newest release is still switching in', () => {
+    expect(inFlight(views('rolling'), [])).toBe(true)
+    expect(inFlight(views('live'), [])).toBe(false)
+    expect(inFlight(views('failed'), [])).toBe(false)
+    expect(inFlight([], [])).toBe(false)
+  })
+
+  it('is one whose Canary is in any phase but Succeeded or Failed, or whose gate saw a pin not yet serving', () => {
+    expect(inFlight(views('live'), [gated([{ phase: 'WaitingPromotion' }])])).toBe(true)
+    expect(inFlight(views('live'), [gated([{ phase: 'Succeeded' }], { pinned: 'sha256:next' })])).toBe(true)
+    expect(inFlight(views('live'), [gated([{ phase: 'Succeeded' }, { phase: 'Failed' }])])).toBe(false)
+    // A rolled-back release the gate holds stays pinned until a new pin lands: it is settled.
+    expect(inFlight(views('failed'), [gated([{ phase: 'Failed' }], { pinned: 'sha256:new' })])).toBe(false)
+    // A Canary Flagger has not seen yet waits for its first deploy, not for a release in flight.
+    expect(inFlight(views('live'), [gated([{}])])).toBe(false)
   })
 })

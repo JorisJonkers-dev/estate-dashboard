@@ -90,6 +90,14 @@ describe('the Projects table', () => {
     })
   })
 
+  it('never reads a Project as live while Flagger rolled its release back', () => {
+    // 2026-10-27: Flux applied the release and went Ready, but the canary failed and the old one serves.
+    const reads = base()
+    reads.releases = [release('estate-dashboard', 'Failed')]
+    const row = projectRows(reads).find((r) => r.name === 'estate-dashboard')
+    expect([row?.state, row?.tone]).toEqual(['Release failed, rolled back', 'warn'])
+  })
+
   it('shows a pinned Project the ledger does not name on the estate path', () => {
     const reads = base()
     reads.handover = { estate: [], legacy: [] }
@@ -168,6 +176,16 @@ describe('the health strip', () => {
     ])
     reads.releases = [release('a', 'Succeeded')]
     expect(health(reads)[2]).toMatchObject({ tone: 'ok', detail: 'none failed' })
+  })
+
+  it('warns where the Release Gate could not say what a release serves', () => {
+    const reads = base()
+    reads.releases = [{ ...release('a', 'Failed'), unreadable: 'the Release Gate did not answer: 503' }]
+    expect(health(reads)[2]).toMatchObject({
+      status: 'None in flight',
+      tone: 'warn',
+      detail: "1 release failed · the gate's record of 1 release unread",
+    })
   })
 
   it('ranks each alert class by severity', () => {
