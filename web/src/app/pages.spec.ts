@@ -59,6 +59,63 @@ function button(wrapper: VueWrapper, text: string) {
 
 const body = () => document.body.textContent
 
+/**
+ * 2026-10-27: estate-dashboard 0.21.1 was pinned and applied, its canary failed the gate's checks, and
+ * Flagger rolled it back, so 0.20.0 still serves.
+ */
+const heldBackIncident: Handler = (request) => {
+  const { pathname } = new URL(request.url)
+  const at = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString()
+  const stage = (state: string, minutes: number) => ({ state, description: state, at: at(minutes) })
+  switch (pathname) {
+    case '/api/v1/delivery/units':
+      return mockFetch(request)
+        .then((r) => r.json() as Promise<{ truncated: boolean; items: { source: string; version?: string }[] }>)
+        .then((list) =>
+          json({
+            ...list,
+            items: list.items.map((u) => (u.source === 'project-estate-dashboard' ? { ...u, version: '0.21.1' } : u)),
+          }),
+        )
+    case '/api/v1/delivery/releases':
+      return json({
+        truncated: false,
+        items: [
+          {
+            namespace: 'estate-dashboard-system',
+            application: 'estate-dashboard',
+            members: [{ process: 'estate-dashboard', phase: 'Failed', iterations: 3, revision: 'sha256:new' }],
+            serving: 'sha256:old',
+            pinned: 'sha256:new',
+          },
+        ],
+      })
+    case '/api/v1/estate/projects/estate-dashboard/rollouts':
+      return json({
+        items: [
+          { id: 2, version: '0.21.1', commit: 'b'.repeat(40), at: at(30), stages: [stage('success', 28)] },
+          { id: 1, version: '0.20.0', commit: 'a'.repeat(40), at: at(3000), stages: [stage('success', 2990)] },
+        ],
+      })
+    case '/api/v1/estate/projects/estate-dashboard/deploys':
+      return json({
+        items: [
+          { commit: 'b', at: at(30), message: 'chore(deploy): estate-dashboard 0.21.1 [ci skip]' },
+          { commit: 'a', at: at(3000), message: 'chore(deploy): auth 3.4.2, estate-dashboard 0.20.0 [ci skip]' },
+        ],
+      })
+    default:
+      return undefined
+  }
+}
+
+/** Every link on the page whose text is exactly the given text, by where it leads. */
+const hrefs = (wrapper: VueWrapper, text: string) =>
+  wrapper
+    .findAll('a')
+    .filter((a) => a.text() === text)
+    .map((a) => a.attributes('href'))
+
 afterEach(() => {
   document.body.innerHTML = ''
 })
@@ -86,6 +143,20 @@ describe('the overview', () => {
     expect(wrapper.findAll('tbody th').map((t) => t.text())).toEqual(['auth'])
     await wrapper.get('input[type="search"]').setValue('nothing-like-this')
     expect(wrapper.text()).toContain('No projects match.')
+  })
+
+  it('says which release failed and which serves, next to the workflows that retry it or roll back', async () => {
+    const { wrapper } = await visit('/', heldBackIncident)
+    const row = wrapper.findAll('tbody tr').find((r) => r.text().includes('estate-dashboard'))
+    expect(row?.text()).toContain('0.21.1 failed and was rolled back; 0.20.0 serves')
+    const needs = wrapper.get('#needs-h').element.closest('section')?.textContent ?? ''
+    expect(needs).toContain('estate-dashboard 0.21.1 failed and was rolled back; 0.20.0 serves')
+    expect(hrefs(wrapper, 'Retry 0.21.1')).toEqual([
+      'https://github.com/JorisJonkers-dev/estate/actions/workflows/retry.yml',
+    ])
+    expect(hrefs(wrapper, 'Roll back')).toEqual([
+      'https://github.com/JorisJonkers-dev/estate/actions/workflows/rollback.yml',
+    ])
   })
 
   it('says what it could not read', async () => {
@@ -119,6 +190,24 @@ describe('a project', () => {
     expect(wrapper.get('[role="tooltip"]').text()).toContain('No data')
     await blocks[0]?.trigger('mouseleave')
     expect(wrapper.find('[role="tooltip"]').exists()).toBe(false)
+  })
+
+  it('says plainly when its newest release failed and an older one serves, with links to retry it or roll back', async () => {
+    const { wrapper } = await visit('/projects/estate-dashboard', heldBackIncident)
+    const header = wrapper.get('h1').element.parentElement?.textContent ?? ''
+    expect(header).toContain('0.21.1 failed and was rolled back; 0.20.0 serves.')
+    expect(hrefs(wrapper, 'Retry 0.21.1')).toEqual([
+      'https://github.com/JorisJonkers-dev/estate/actions/workflows/retry.yml',
+    ])
+    expect(hrefs(wrapper, 'Roll back')).toEqual([
+      'https://github.com/JorisJonkers-dev/estate/actions/workflows/rollback.yml',
+    ])
+  })
+
+  it('says nothing of a failed release while its newest one serves', async () => {
+    const { wrapper } = await visit('/projects/estate-dashboard')
+    expect(wrapper.get('h1').element.parentElement?.textContent).not.toContain('failed and was rolled back')
+    expect(hrefs(wrapper, 'Retry 0.2.0')).toEqual([])
   })
 
   it('asks before it opens the pause or the rollback workflow', async () => {

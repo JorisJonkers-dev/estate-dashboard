@@ -1,5 +1,6 @@
 import type { Alert, Deploy, Handover, Issue, Pin, Release, Unit } from '../../../infrastructure/api/types.gen'
 import type { Tone } from '../../../shared/tone'
+import { heldBackActions, heldBackText, type HeldBack } from '../../projects/domain/project'
 
 export type { Tone }
 
@@ -18,6 +19,8 @@ export interface ProjectRow {
   pin?: string
   /** When its pin last moved. */
   deployedAt?: string
+  /** Its newest release failed and was rolled back, and the one before it serves. */
+  heldBack?: HeldBack
 }
 
 /** The filters over the Projects table, in the order the page shows them. */
@@ -35,6 +38,8 @@ export interface Reads {
   alerts?: Alert[]
   /** The newest deploy of each Project, by Project. */
   deploys: Record<string, Deploy | undefined>
+  /** The release each Project's pin named before its newest one, by Project; absent where unread. */
+  previous?: Record<string, string | undefined>
 }
 
 /** Flagger phases in which a Canary is still switching (Flagger's CanaryPhase). */
@@ -81,7 +86,9 @@ function stateOf(
   units: Unit[],
   releasing: boolean,
   rolledBack: boolean,
-): { state: string; tone: Tone } {
+  version: string | undefined,
+  previous: string | undefined,
+): { state: string; tone: Tone; heldBack?: HeldBack } {
   if (conditions.includes('isolated')) return { state: 'Refused, isolated', tone: 'crit' }
   const [first] = conditions
   if (first !== undefined) return { state: describeCondition(first), tone: 'warn' }
@@ -89,6 +96,10 @@ function stateOf(
   if (pin?.rolledBack) return { state: `Rolled back to ${pin.rolledBack.version}, paused`, tone: 'back' }
   if (pin?.paused) return { state: 'Paused', tone: 'back' }
   // Flux applied it and its unit is Ready, yet Flagger rolled the release back: the old one serves.
+  if (rolledBack && version !== undefined && previous !== undefined) {
+    const heldBack = { failed: version, serving: previous }
+    return { state: heldBackText(heldBack), tone: 'warn', heldBack }
+  }
   if (rolledBack) return { state: 'Release failed, rolled back', tone: 'warn' }
   if (releasing) return { state: 'Releasing', tone: 'info' }
   if (!pin?.digest) return { state: 'Not pinned yet', tone: 'warn' }
@@ -123,16 +134,19 @@ export function projectRows(reads: Reads): ProjectRow[] {
     .map(([name, path]): ProjectRow => {
       const pin = path === 'estate' ? pins.get(name) : undefined
       const own = path === 'estate' ? (units.get(name) ?? []) : []
-      const { state, tone } = stateOf(
+      const version = own.find((u) => u.version)?.version
+      const { state, tone, heldBack } = stateOf(
         path,
         conditions.get(name) ?? [],
         pin,
         own,
         releasing.has(name),
         rolledBack.has(name),
+        version,
+        reads.previous?.[name],
       )
       const row: ProjectRow = { name, path, state, tone }
-      const version = own.find((u) => u.version)?.version
+      if (heldBack) row.heldBack = heldBack
       if (version) row.version = version
       if (pin?.digest) row.pin = shortDigest(pin.digest)
       const deployed = reads.deploys[name]?.at
@@ -142,10 +156,24 @@ export function projectRows(reads: Reads): ProjectRow[] {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/** How a pin commit names a Project's release: `<project> 1.2.3`, the version captured. */
+const naming = (project: string) =>
+  new RegExp(`(?:^|[\\s:,])${project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} v?(\\d+\\.\\d+\\.\\d+)`)
+
 /** The newest pin commit that moved the Project to a release; a rewrite of its source names none. */
 export function releaseOf(project: string, deploys: Deploy[]): Deploy | undefined {
-  const named = new RegExp(`(^|[\\s:,])${project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} v?\\d+\\.\\d+\\.\\d+`)
+  const named = naming(project)
   return deploys.find((d) => named.test(d.message))
+}
+
+/**
+ * The release a Project's pin named before its newest one, from its pin commits newest first: a
+ * pin that moved again to the same release, as a retry does, is still the newest.
+ */
+export function previousRelease(project: string, deploys: Deploy[]): string | undefined {
+  const named = naming(project)
+  const versions = deploys.flatMap((d) => named.exec(d.message)?.[1] ?? [])
+  return versions.find((v) => v !== versions[0])
 }
 
 /** The first twelve hex digits of a digest. */
@@ -242,17 +270,34 @@ export interface Need {
   key: string
   severity: 'Critical' | 'Warning' | 'Info'
   tone: Tone
-  class: 'Composition' | 'Platform'
+  class: 'Composition' | 'Release' | 'Platform'
   title: string
   where: string
   since: string
-  /** Where the item is handled: its issue, or the Alerts page. */
+  /** Where the item is handled: its issue, its Project, or the Alerts page. */
   href: string
+  /** What a human can do about it next, each a GitHub workflow to dispatch. */
+  actions?: { label: string; href: string }[]
 }
 
-/** Firing alerts and open conditions, newest first. */
+/** Firing alerts, open conditions and releases that failed while an older one serves, newest first. */
 export function needs(reads: Reads): Need[] {
   const out: Need[] = []
+  for (const row of projectRows(reads)) {
+    const since = reads.deploys[row.name]?.at
+    if (!row.heldBack || since === undefined) continue
+    out.push({
+      key: `held-${row.name}`,
+      severity: 'Warning',
+      tone: 'warn',
+      class: 'Release',
+      title: `${row.name} ${heldBackText(row.heldBack)}`,
+      where: row.name,
+      since,
+      href: `/projects/${row.name}`,
+      actions: heldBackActions(row.heldBack),
+    })
+  }
   for (const issue of reads.issues ?? []) {
     if (!issue.project || !issue.condition || issue.condition === pausedCondition) continue
     const critical = issue.condition === 'isolated'

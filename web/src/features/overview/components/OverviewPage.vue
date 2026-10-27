@@ -76,6 +76,9 @@ const isExternal = (href: string) => href.startsWith('https://')
             }}</a>
             <RouterLink v-else :to="n.href" class="font-medium no-underline hover:underline">{{ n.title }}</RouterLink>
             <span class="text-sm text-text-muted">{{ n.where }}</span>
+            <span v-if="n.actions" class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <a v-for="a in n.actions" :key="a.label" :href="a.href">{{ a.label }}</a>
+            </span>
           </li>
         </ul>
       </section>

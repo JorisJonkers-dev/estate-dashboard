@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { Alert, Issue, Release, Unit } from '../../../infrastructure/api/types.gen'
-import { age, describeCondition, health, needs, passes, projectRows, releaseOf, type Reads } from './overview'
+import {
+  age,
+  describeCondition,
+  health,
+  needs,
+  passes,
+  previousRelease,
+  projectRows,
+  releaseOf,
+  type Reads,
+} from './overview'
 
 const unit = (project: string, ready = true, version?: string): Unit => ({
   name: `apps-${project}`,
@@ -96,6 +106,21 @@ describe('the Projects table', () => {
     reads.releases = [release('estate-dashboard', 'Failed')]
     const row = projectRows(reads).find((r) => r.name === 'estate-dashboard')
     expect([row?.state, row?.tone]).toEqual(['Release failed, rolled back', 'warn'])
+  })
+
+  it('says which release failed and which serves, where it read the release before the newest', () => {
+    // 2026-10-27: estate-dashboard 0.21.1 failed its analysis; Flagger rolled back and 0.20.0 serves.
+    const reads = base()
+    reads.releases = [release('estate-dashboard', 'Failed')]
+    reads.units = [unit('delivery', true, '0.6.0'), unit('estate-dashboard', true, '0.21.1')]
+    reads.previous = { 'estate-dashboard': '0.20.0', 'delivery': '0.5.0' }
+    const rows = projectRows(reads)
+    expect(rows.find((r) => r.name === 'estate-dashboard')).toMatchObject({
+      state: '0.21.1 failed and was rolled back; 0.20.0 serves',
+      tone: 'warn',
+      heldBack: { failed: '0.21.1', serving: '0.20.0' },
+    })
+    expect(rows.find((r) => r.name === 'delivery')).not.toHaveProperty('heldBack')
   })
 
   it('shows a pinned Project the ledger does not name on the estate path', () => {
@@ -224,6 +249,20 @@ describe('when a Project was released', () => {
     expect(releaseOf('dashboard', deploys)).toBeUndefined()
     expect(releaseOf('notes', deploys)).toBeUndefined()
   })
+
+  it('reads the release its pin named before the newest, past a pin that moved again to the same one', () => {
+    const deploy = (message: string) => ({ commit: 'c', at: '2026-10-27T08:00:00Z', message })
+    const deploys = [
+      deploy('chore(deploy): estate-dashboard 0.21.1 [ci skip]'),
+      deploy('chore(deploy): rewrite the pin source of estate-dashboard [ci skip]'),
+      deploy('chore(deploy): _estate, estate-dashboard 0.21.1 [ci skip]'),
+      deploy('chore(deploy): auth 0.21.2, estate-dashboard 0.20.0 [ci skip]'),
+      deploy('chore(deploy): estate-dashboard 0.19.0 [ci skip]'),
+    ]
+    expect(previousRelease('estate-dashboard', deploys)).toBe('0.20.0')
+    expect(previousRelease('auth', deploys)).toBeUndefined()
+    expect(previousRelease('notes', [])).toBeUndefined()
+  })
 })
 
 describe('what needs you', () => {
@@ -238,6 +277,38 @@ describe('what needs you', () => {
       ['Warning', 'Platform', 'BackupFailed', '/alerts'],
       ['Critical', 'Composition', 'notes: isolated', 'https://github.com/JorisJonkers-dev/estate/issues/72'],
     ])
+  })
+
+  it('lists a release that failed while an older one serves, with the workflows that retry it or roll back', () => {
+    const reads = base()
+    reads.releases = [release('estate-dashboard', 'Failed')]
+    reads.units = [unit('estate-dashboard', true, '0.21.1')]
+    reads.previous = { 'estate-dashboard': '0.20.0' }
+    reads.deploys = {
+      'estate-dashboard': {
+        commit: 'd',
+        at: '2026-10-27T08:00:00Z',
+        message: 'chore(deploy): estate-dashboard 0.21.1',
+      },
+    }
+    expect(needs(reads)).toEqual([
+      {
+        key: 'held-estate-dashboard',
+        severity: 'Warning',
+        tone: 'warn',
+        class: 'Release',
+        title: 'estate-dashboard 0.21.1 failed and was rolled back; 0.20.0 serves',
+        where: 'estate-dashboard',
+        since: '2026-10-27T08:00:00Z',
+        href: '/projects/estate-dashboard',
+        actions: [
+          { label: 'Retry 0.21.1', href: 'https://github.com/JorisJonkers-dev/estate/actions/workflows/retry.yml' },
+          { label: 'Roll back', href: 'https://github.com/JorisJonkers-dev/estate/actions/workflows/rollback.yml' },
+        ],
+      },
+    ])
+    reads.deploys = {}
+    expect(needs(reads)).toEqual([])
   })
 })
 

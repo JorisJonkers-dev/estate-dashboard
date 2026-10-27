@@ -11,7 +11,7 @@ import StatusStrip from '../../../shared/ui/StatusStrip.vue'
 import { age } from '../../overview/domain/overview'
 import { useProject } from '../composables/useProject'
 import { healthBlocks } from '../domain/delivery'
-import { links } from '../domain/project'
+import { heldBackActions, heldBackText, links } from '../domain/project'
 import ChecksPanel from './ChecksPanel.vue'
 import ContainerLogs from './ContainerLogs.vue'
 import DeliveryPanel from './DeliveryPanel.vue'
@@ -28,6 +28,7 @@ const {
   pin,
   alerts,
   releases,
+  heldBack,
   streams,
   rolloutsLoading,
   pods,
@@ -107,6 +108,12 @@ const primary =
           <p v-else-if="pin?.paused" class="m-0 mt-2 text-back">
             Paused by {{ pin.paused.by }}<template v-if="pin.paused.reason">: {{ pin.paused.reason }}</template>
           </p>
+          <div v-else-if="heldBack" role="status" class="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <p class="m-0 text-warn">{{ heldBackText(heldBack) }}.</p>
+            <a v-for="a in heldBackActions(heldBack)" :key="a.label" :href="a.href" class="text-[15px]">{{
+              a.label
+            }}</a>
+          </div>
         </div>
         <div v-if="row && !legacy" class="flex w-full flex-col gap-2.5 md:w-[28rem]">
           <StatusStrip
