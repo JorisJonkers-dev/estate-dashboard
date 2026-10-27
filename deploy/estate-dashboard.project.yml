@@ -86,8 +86,11 @@ applications:
               objects: [canaries]
               verbs: [get, list, watch]
 
+        # 96Mi was OOMKilled on 2026-10-27 while one Project's rollout page read Loki, GitHub,
+        # Prometheus and the Release Gate at once; the page now reads every 5s while a release is
+        # in flight.
         placement:
-          memory: 96Mi
+          memory: 256Mi
           cpu: 50m
 
         probes:
