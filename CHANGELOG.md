@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.9.1...v0.10.0) (2026-10-27)
+
+
+### Features
+
+* **web:** say plainly when a release failed and an older one serves, with links to retry it or roll back ([#96](https://github.com/JorisJonkers-dev/estate-dashboard/issues/96)) ([1a6eb39](https://github.com/JorisJonkers-dev/estate-dashboard/commit/1a6eb3976ba33427faf4abeacd6dce889b1ee563))
+
+
+### Bug Fixes
+
+* **deploy:** publish fragments with deploy-kit 1.0 ([#95](https://github.com/JorisJonkers-dev/estate-dashboard/issues/95)) ([eab0462](https://github.com/JorisJonkers-dev/estate-dashboard/commit/eab0462baf47d0977689d29bb4c9721b89e11507))
+
 ## [0.9.1](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.9.0...v0.9.1) (2026-10-27)
 
 
