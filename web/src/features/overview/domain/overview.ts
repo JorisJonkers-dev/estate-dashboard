@@ -58,6 +58,11 @@ export function inFlight(release: Release): boolean {
   return release.members.some((m) => m.phase !== undefined && switching.has(m.phase))
 }
 
+/** Whether Flagger failed a gated Application's release, and so rolled it back. */
+export function failedRelease(release: Release): boolean {
+  return release.members.some((m) => m.phase === 'Failed')
+}
+
 /** The open conditions composition keeps, other than pauses, by Project. */
 function conditionsByProject(issues: Issue[]): Map<string, string[]> {
   const out = new Map<string, string[]>()
@@ -75,6 +80,7 @@ function stateOf(
   pin: Pin | undefined,
   units: Unit[],
   releasing: boolean,
+  rolledBack: boolean,
 ): { state: string; tone: Tone } {
   if (conditions.includes('isolated')) return { state: 'Refused, isolated', tone: 'crit' }
   const [first] = conditions
@@ -82,6 +88,8 @@ function stateOf(
   if (path === 'legacy') return { state: 'Old path', tone: 'idle' }
   if (pin?.rolledBack) return { state: `Rolled back to ${pin.rolledBack.version}, paused`, tone: 'back' }
   if (pin?.paused) return { state: 'Paused', tone: 'back' }
+  // Flux applied it and its unit is Ready, yet Flagger rolled the release back: the old one serves.
+  if (rolledBack) return { state: 'Release failed, rolled back', tone: 'warn' }
   if (releasing) return { state: 'Releasing', tone: 'info' }
   if (!pin?.digest) return { state: 'Not pinned yet', tone: 'warn' }
   if (units.length === 0 || units.some((u) => !u.ready)) return { state: 'Not ready', tone: 'warn' }
@@ -104,6 +112,7 @@ export function projectRows(reads: Reads): ProjectRow[] {
     if (project) units.set(project, [...(units.get(project) ?? []), unit])
   }
   const releasing = new Set((reads.releases ?? []).filter(inFlight).map(projectOfRelease))
+  const rolledBack = new Set((reads.releases ?? []).filter(failedRelease).map(projectOfRelease))
   const paths = new Map<string, Path>()
   for (const name of reads.handover?.legacy ?? []) paths.set(name, 'legacy')
   for (const name of reads.handover?.estate ?? []) paths.set(name, 'estate')
@@ -114,7 +123,14 @@ export function projectRows(reads: Reads): ProjectRow[] {
     .map(([name, path]): ProjectRow => {
       const pin = path === 'estate' ? pins.get(name) : undefined
       const own = path === 'estate' ? (units.get(name) ?? []) : []
-      const { state, tone } = stateOf(path, conditions.get(name) ?? [], pin, own, releasing.has(name))
+      const { state, tone } = stateOf(
+        path,
+        conditions.get(name) ?? [],
+        pin,
+        own,
+        releasing.has(name),
+        rolledBack.has(name),
+      )
       const row: ProjectRow = { name, path, state, tone }
       const version = own.find((u) => u.version)?.version
       if (version) row.version = version
@@ -198,10 +214,15 @@ export function health(reads: Reads): Health[] {
     if (!reads.releases)
       return { name: 'Releases', status: 'Unknown', tone: 'idle', detail: "couldn't read the Release Gate" }
     const flying = reads.releases.filter(inFlight).length
-    const failed = reads.releases.filter((r) => r.members.some((m) => m.phase === 'Failed')).length
-    const detail = failed === 0 ? 'none failed' : `${plural(failed, 'release')} failed`
+    const failed = reads.releases.filter(failedRelease).length
+    // A gate that did not answer leaves each release only what its Canaries say.
+    const unread = reads.releases.filter((r) => r.unreadable !== undefined).length
+    const detail = [
+      failed === 0 ? 'none failed' : `${plural(failed, 'release')} failed`,
+      ...(unread === 0 ? [] : [`the gate's record of ${plural(unread, 'release')} unread`]),
+    ].join(' · ')
     if (flying > 0) return { name: 'Releases', status: `${String(flying)} in flight`, tone: 'info', detail }
-    return { name: 'Releases', status: 'None in flight', tone: failed > 0 ? 'warn' : 'ok', detail }
+    return { name: 'Releases', status: 'None in flight', tone: failed + unread > 0 ? 'warn' : 'ok', detail }
   })()
   const platform: Health = (() => {
     if (!reads.alerts)

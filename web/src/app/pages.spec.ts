@@ -267,6 +267,7 @@ describe('a rollout', () => {
     await wrapper.get('button[aria-label="Back to the start"]').trigger('click')
     expect(wrapper.text()).toContain('0:00 of')
     expect(wrapper.text()).not.toContain('Live')
+    expect(button(wrapper, 'Back to live').exists()).toBe(true)
     expect(wrapper.get('table[aria-label="Containers"]').findAll('tbody')[0]?.text()).toContain('Waiting')
     await wrapper.get('button[aria-label="Play"]').trigger('click')
     vi.advanceTimersByTime(1000)
@@ -277,6 +278,72 @@ describe('a rollout', () => {
     expect(wrapper.text()).toContain('1:15 of')
     expect(wrapper.get('table[aria-label="Containers"]').findAll('tbody')[0]?.text()).toContain('Ready, no traffic')
     vi.useRealTimers()
+  })
+
+  it('jumps back to live from a replay, and follows a release in flight whenever it is opened', async () => {
+    const { wrapper, router } = await visit('/projects/auth/rollout')
+    await wrapper.get('button[aria-label="Back to the start"]').trigger('click')
+    const clockText = () => wrapper.get('[aria-label="Replay"] time').text()
+    await button(wrapper, 'Back to live').trigger('click')
+    expect(wrapper.text()).toContain('Live')
+    expect(clockText()).not.toMatch(/^0:00 of/)
+    // A finished release opens at its end, and one in flight opened after it follows live, no Play pressed.
+    await wrapper.get('button[aria-label="Back to the start"]').trigger('click')
+    await router.push('/projects/auth/rollout?version=3.4.2')
+    await settle()
+    expect(clockText()).toMatch(/^(\d+):(\d+) of \1:\2$/)
+    expect(wrapper.text()).not.toContain('Back to live')
+    await router.push('/projects/auth/rollout')
+    await settle()
+    expect(wrapper.text()).toContain('Live')
+    expect(wrapper.text()).not.toContain('Back to live')
+  })
+
+  it('rereads what drives a release every few seconds while one is in flight, and slowly once none is', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const reads = (fetch: ReturnType<typeof vi.fn>, path: string) =>
+      fetch.mock.calls.filter(([input]) => String(input instanceof Request ? input.url : input).includes(path)).length
+    for (const [project, more] of [
+      ['auth', true],
+      ['delivery', false],
+    ] as const) {
+      const { fetch, wrapper } = await visit(`/projects/${project}/rollout`)
+      const before = ['/delivery/units', '/delivery/releases', '/rollouts', '/pods'].map((p) => reads(fetch, p))
+      await vi.advanceTimersByTimeAsync(6_000)
+      await settle()
+      const after = ['/delivery/units', '/delivery/releases', '/rollouts', '/pods'].map((p) => reads(fetch, p))
+      expect([project, after.every((n, i) => n > (before[i] ?? 0))]).toEqual([project, more])
+      wrapper.unmount()
+    }
+    vi.useRealTimers()
+  })
+
+  it('shows a blue-green release Flagger rolled back as failed, its canary’s analysis and the old pod serving', async () => {
+    // 2026-10-27: Flux applied the release and went Ready; the gate's checks failed, and Flagger rolled back.
+    const { wrapper } = await visit('/projects/delivery/rollout', (r) =>
+      new URL(r.url).pathname === '/api/v1/delivery/releases'
+        ? json({
+            truncated: false,
+            items: [
+              {
+                namespace: 'delivery-system',
+                application: 'delivery',
+                members: [{ process: 'reporter', phase: 'Failed', iterations: 3, revision: 'sha256:new' }],
+                unreadable: 'the Release Gate did not answer: connection refused',
+              },
+            ],
+          })
+        : undefined,
+    )
+    const header = wrapper.get('h1').element.parentElement?.textContent ?? ''
+    expect(header).toContain('Failed')
+    expect(header).not.toContain('Done')
+    expect(wrapper.text()).toContain('blue-green, through a canary')
+    const lanes = wrapper.get('table[aria-label="Containers"]').findAll('tbody')
+    const reporter = lanes.find((l) => l.text().includes('reporter'))?.text() ?? ''
+    expect(reporter).toContain('canary · rolled back after 3 iterations')
+    expect(reporter).toContain('Flagger rolled it back after 3 iterations · the old pod keeps all traffic')
+    expect(wrapper.text()).toContain('A blue-green canary runs its analysis while the old pod keeps all traffic')
   })
 
   it('shows a finished continuous release as done, its old pods stopped', async () => {

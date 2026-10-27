@@ -11,8 +11,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,13 +58,16 @@ const (
 type Kube struct {
 	Dynamic dynamic.Interface
 	// Gate is the Release Gate's address, http://<host>:<port>; nil where the dashboard knows
-	// none, and then no release can be read.
+	// none, and then each release is only what its Canaries say.
 	Gate *url.URL
 	HTTP *http.Client
 }
 
-// ErrNoGate is returned where the dashboard reads a cluster but knows no Release Gate to ask.
+// ErrNoGate is why a release has no record of the gate where the dashboard knows no gate to ask.
 var ErrNoGate = errors.New("no Release Gate is configured")
+
+// maxUnreadable is the longest reason a release could not be read: what the contract carries.
+const maxUnreadable = 256
 
 var _ domain.Cluster = Kube{}
 
@@ -196,15 +202,14 @@ func readCanary(o unstructured.Unstructured) canaryOf {
 // render wrote, whose webhooks name their Application; each one's inputs and the gate's record of
 // it are what the gate serves, read in one request. Its members are the Canaries already listed.
 // One Application whose data cannot be read is reported as such and keeps no other from being read.
+// A gate that does not answer leaves every release what its Canaries say: Flagger's phase is the
+// cluster's, and a stopped gate is when a release most needs it seen (2026-10-27).
 func (k Kube) Releases(ctx context.Context) (domain.Page[domain.Release], error) {
 	items, more, err := k.list(ctx, Canaries)
 	if err != nil {
 		return domain.Page[domain.Release]{}, err
 	}
-	served, err := k.gate(ctx)
-	if err != nil {
-		return domain.Page[domain.Release]{}, err
-	}
+	served, unanswered := k.gate(ctx)
 	byApplication := map[[2]string]map[string]domain.Member{}
 	var order [][2]string
 	for _, o := range items {
@@ -225,6 +230,10 @@ func (k Kube) Releases(ctx context.Context) (domain.Page[domain.Release], error)
 	}
 	releases := make([]domain.Release, 0, len(order))
 	for _, at := range order {
+		if unanswered != nil {
+			releases = append(releases, unread(at[0], at[1], unansweredWhy(unanswered), byApplication[at]))
+			continue
+		}
 		releases = append(releases, release(at[0], at[1], served[at], byApplication[at]))
 	}
 	return domain.Page[domain.Release]{Items: releases, Truncated: more}, nil
@@ -263,21 +272,36 @@ func (k Kube) gate(ctx context.Context) (map[[2]string]*gateRelease, error) {
 	return served, nil
 }
 
+// unansweredWhy is why no release has the gate's part: no gate known, or the one asked did not answer.
+func unansweredWhy(err error) string {
+	if errors.Is(err, ErrNoGate) {
+		return err.Error()
+	}
+	why := "the Release Gate did not answer: " + err.Error()
+	if len(why) > maxUnreadable {
+		why = strings.ToValidUTF8(why[:maxUnreadable], "")
+	}
+	return why
+}
+
+// unread is an Application whose gate's part could not be read: why, and its Canaries, by Process.
+func unread(namespace, application, why string, canaries map[string]domain.Member) domain.Release {
+	members := slices.SortedFunc(maps.Values(canaries), func(a, b domain.Member) int { return strings.Compare(a.Process, b.Process) })
+	return domain.Release{Namespace: namespace, Application: application, Members: members[:min(len(members), maxMembers)], Unreadable: why}
+}
+
 // release is one Application as the gate serves it, its members joined with their Canaries. An
 // Application the gate does not serve has no release-gate inputs it could read.
 func release(namespace, application string, served *gateRelease, canaries map[string]domain.Member) domain.Release {
-	release := domain.Release{Namespace: namespace, Application: application}
 	switch {
 	case served == nil:
-		release.Unreadable = "no release-gate inputs"
-		return release
+		return unread(namespace, application, "no release-gate inputs", canaries)
 	case served.Unreadable != "":
-		release.Unreadable = served.Unreadable
-		return release
+		return unread(namespace, application, served.Unreadable, canaries)
 	case len(served.Members) > maxMembers:
-		release.Unreadable = "more members than an Application has"
-		return release
+		return unread(namespace, application, "more members than an Application has", canaries)
 	}
+	release := domain.Release{Namespace: namespace, Application: application}
 	if m := served.Migration; m != nil {
 		release.Migration = &domain.Migration{Identity: m.Identity, TestedAgainst: m.TestedAgainst, NonTransactional: m.NonTransactional}
 	}
