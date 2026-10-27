@@ -21,7 +21,7 @@ import { projectRows } from '../../overview/domain/overview'
 import { window } from '../domain/logs'
 import { checksOf } from '../domain/health'
 import { deliveryFacts } from '../domain/delivery'
-import { inFlight, releases as releaseViews } from '../domain/releases'
+import { heldBack, inFlight, releases as releaseViews } from '../domain/releases'
 
 const live = { refetchInterval: 30_000 }
 
@@ -137,6 +137,8 @@ export function useProject(name: Ref<string>) {
       ),
     ),
     releases: views,
+    /** Its newest release failed and was rolled back, and an older one serves. */
+    heldBack: computed(() => heldBack(views.value)),
     streams: computed(() => streams.data.value?.items ?? []),
     pods: computed(() => pods.data.value?.items ?? []),
     podsLoading: computed(() => pods.isPending.value),

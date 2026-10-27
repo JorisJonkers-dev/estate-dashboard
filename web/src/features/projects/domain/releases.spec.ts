@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Member, Release, Rollout, Unit } from '../../../infrastructure/api/types.gen'
-import { inFlight, live, serving, releases } from './releases'
+import { heldBack, inFlight, live, serving, releases } from './releases'
 
 const rollout = (id: number, version: string, states: string[]): Rollout => ({
   id,
@@ -130,6 +130,15 @@ describe('the releases of a gated Project', () => {
     ])
     expect(live(views)).toBeUndefined()
     expect(serving(views)?.version).toBe('1.7.0')
+    expect(heldBack(views)).toEqual({ failed: '1.8.0', serving: '1.7.0' })
+  })
+
+  it('is held back only while its newest release failed and an older one serves', () => {
+    const failedGate = gated([{ phase: 'Failed', iterations: 3 }])
+    expect(heldBack(releases(incident, unit('1.8.0'), [gated([{ phase: 'Succeeded' }])]))).toBeUndefined()
+    expect(heldBack(releases(incident, unit('1.8.0'), [gated([{ phase: 'Progressing' }])]))).toBeUndefined()
+    expect(heldBack(releases([rollout(8, '1.8.0', ['success'])], unit('1.8.0'), [failedGate]))).toBeUndefined()
+    expect(heldBack([])).toBeUndefined()
   })
 
   it('is failed from Flagger alone where the gate answered nothing', () => {

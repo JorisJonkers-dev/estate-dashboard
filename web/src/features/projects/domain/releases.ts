@@ -1,4 +1,5 @@
 import type { Release, Rollout, Stage, Unit } from '../../../infrastructure/api/types.gen'
+import type { HeldBack } from './project'
 
 /** Where a release stands now, read from its stages and the unit. */
 export type ReleaseState = 'live' | 'rolling' | 'failed' | 'past'
@@ -105,6 +106,14 @@ export function serving(views: ReleaseView[]): ReleaseView | undefined {
   const state = views[0]?.state
   if (state !== 'rolling' && state !== 'failed') return live(views)
   return views.slice(1).find((v) => v.state !== 'failed')
+}
+
+/** The newest release where it failed and an older one still serves in its place; nothing otherwise. */
+export function heldBack(views: ReleaseView[]): HeldBack | undefined {
+  const [newest] = views
+  if (newest?.state !== 'failed') return undefined
+  const older = serving(views)
+  return older === undefined ? undefined : { failed: newest.version, serving: older.version }
 }
 
 /**
