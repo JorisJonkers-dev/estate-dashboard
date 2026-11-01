@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.10.0...v0.10.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **deploy:** read Alertmanager, Prometheus, Loki and Gatus in observability-system ([#99](https://github.com/JorisJonkers-dev/estate-dashboard/issues/99)) ([4c75af7](https://github.com/JorisJonkers-dev/estate-dashboard/commit/4c75af7beff5c1c53a4f45cf01f0a2e95f48fb74))
+
 ## [0.10.0](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.9.1...v0.10.0) (2026-10-27)
 
 
