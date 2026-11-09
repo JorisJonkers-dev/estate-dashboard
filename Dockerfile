@@ -2,7 +2,8 @@
 # One image: the Go binary serves the API and embeds the web build (web/embed.go).
 
 FROM --platform=$BUILDPLATFORM node:24.22.0-alpine AS web
-RUN npm install -g pnpm@12.6.0
+RUN --mount=type=secret,id=packages-npmrc,target=/run/secrets/packages-npmrc,required=false \
+    NPM_CONFIG_USERCONFIG=/run/secrets/packages-npmrc npm install -g pnpm@12.6.0
 WORKDIR /src
 COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY openapi/package.json openapi/package.json
@@ -10,7 +11,9 @@ COPY web/package.json web/package.json
 # The shared theme is on GitHub Packages; the token is a build secret, never a layer.
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     --mount=type=secret,id=github_token,required=true \
+    --mount=type=secret,id=packages-npmrc,target=/run/secrets/packages-npmrc,required=false \
     printf '//npm.pkg.github.com/:_authToken=%s\n' "$(cat /run/secrets/github_token)" > ~/.npmrc && \
+    if [ -f /run/secrets/packages-npmrc ]; then cat /run/secrets/packages-npmrc >> ~/.npmrc; fi && \
     pnpm install --frozen-lockfile --filter @estate-dashboard/web... && \
     rm ~/.npmrc
 COPY openapi openapi
@@ -21,7 +24,10 @@ RUN pnpm --filter @estate-dashboard/web build
 FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod go mod download
+ARG GOPROXY
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=secret,id=packages-netrc,target=/run/secrets/packages-netrc,required=false \
+    NETRC=/run/secrets/packages-netrc go mod download
 COPY . .
 COPY --from=web /src/web/dist web/dist
 ARG TARGETOS
@@ -29,7 +35,8 @@ ARG TARGETARCH
 ARG VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    --mount=type=secret,id=packages-netrc,target=/run/secrets/packages-netrc,required=false \
+    NETRC=/run/secrets/packages-netrc CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/estate-dashboard ./cmd/estate-dashboard
 
 FROM gcr.io/distroless/static-debian12:nonroot
