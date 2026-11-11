@@ -164,7 +164,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@8b5462a796f022647dfc44123ddb3655cc3c2f28 # v0.45.3
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@8aaf024208bf4b29acb468aecd3cd7ee130d5ac1 # v0.49.1
     with:
       project-file: deploy/estate-dashboard.project.yml
       version: ${{ needs.release-please.outputs.tag_name }}
