@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.2](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.10.1...v0.10.2) (2026-11-13)
+
+
+### Bug Fixes
+
+* **ci:** cover the report job's install with the packages proxy ([#116](https://github.com/JorisJonkers-dev/estate-dashboard/issues/116)) ([479c0ce](https://github.com/JorisJonkers-dev/estate-dashboard/commit/479c0ce25f1c1d24c6d2e12bf66c3ed65461c153))
+* **deps:** pin dependencies ([#17](https://github.com/JorisJonkers-dev/estate-dashboard/issues/17)) ([e8ceddf](https://github.com/JorisJonkers-dev/estate-dashboard/commit/e8ceddf837684be51d47d8cd50442c21f3bf82ac))
+* **deps:** update minor and patch dependencies ([#115](https://github.com/JorisJonkers-dev/estate-dashboard/issues/115)) ([af575b6](https://github.com/JorisJonkers-dev/estate-dashboard/commit/af575b6208c26bceac8ddcfc336c1536b8b6586b))
+* **deps:** update minor and patch dependencies ([#118](https://github.com/JorisJonkers-dev/estate-dashboard/issues/118)) ([21327a0](https://github.com/JorisJonkers-dev/estate-dashboard/commit/21327a053a6c3552140d23f47c54ded4d5771601))
+* **deps:** update minor and patch dependencies ([#18](https://github.com/JorisJonkers-dev/estate-dashboard/issues/18)) ([405c896](https://github.com/JorisJonkers-dev/estate-dashboard/commit/405c896a0bb5647bdd297cb876c9bb8c7a09e486))
+* **hygiene:** never cancel a run of the required hygiene checks ([#120](https://github.com/JorisJonkers-dev/estate-dashboard/issues/120)) ([68a120e](https://github.com/JorisJonkers-dev/estate-dashboard/commit/68a120e2057121667b0c0808c17f9094f3cec445))
+
 ## [0.10.1](https://github.com/JorisJonkers-dev/estate-dashboard/compare/v0.10.0...v0.10.1) (2026-11-01)
 
 
